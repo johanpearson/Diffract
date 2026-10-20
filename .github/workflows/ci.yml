@@ -38,4 +38,4 @@ jobs:
 
       - name: Test
         if: steps.sln.outputs.path != ''
-        run: dotnet test ${{ steps.sln.outputs.path }} -c Release --no-build
+        run: dotnet test --solution ${{ steps.sln.outputs.path }} -c Release --no-build

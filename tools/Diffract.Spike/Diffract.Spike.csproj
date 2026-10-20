@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>diffract-spike</AssemblyName>
+    <RootNamespace>Diffract.Spike</RootNamespace>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\sidecar\Diffract.Git\Diffract.Git.csproj" />
+    <ProjectReference Include="..\..\sidecar\Diffract.Leftovers\Diffract.Leftovers.csproj" />
+    <ProjectReference Include="..\..\tests\Diffract.Fixtures\Diffract.Fixtures.csproj" />
+  </ItemGroup>
+
+</Project>
