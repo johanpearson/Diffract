@@ -123,4 +123,7 @@ Johan agreed to these on 2026-10-20 when reviewing phase 0. The milestone doc is
 
 ## Still open
 
+- **How to clean up orphaned commits (milestone 3).** Git deletes them by itself once they are older than two weeks, the next time its automatic cleanup (`git gc`) runs. Diffract could offer two actions. "Clean up now" runs that cleanup on purpose after a preview; it cannot be undone, which the brief only allows with a preview. "Keep these" saves the commits under an `archive/` tag first, as the brief already does for unmerged work. To decide when milestone 3 is specified.
+- **Checking what a forgotten worktree folder holds (milestone 3).** Diffract cannot tell whether such a folder holds anything not in git, so it shows "Needs review" and "-" as the risk. It could compare each file with the repo's history, as was done by hand in phase 6: both forgotten folders held only a README that was already committed.
+
 - **The other orphaned commits in Repo A.** After the dropped checkpoints, 87 remain: mostly earlier versions of commits that were later rebased or squashed, and a few from dropped stashes. They are probably left from worktrees that were removed, since removing a worktree also removes its reflog. They show as one "Needs review" row.
