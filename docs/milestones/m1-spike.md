@@ -102,7 +102,8 @@ public sealed record RepoSnapshot(
 - For each worktree: status (dirty file count, ahead and behind main), last commit time, and last activity time. Last activity is the newest of: last commit time, modification time of changed files from status, and modification time of the worktree's index file. Do not walk the whole worktree.
 - For each branch and tag that rules care about: whether it is merged into main, and **commits at risk**, meaning commits reachable from it and from no other branch, remote-tracking branch or tag. Exclude the ref itself when counting, and do not count reachability through worktree HEADs or reflogs. Prove this with fixture tests.
 - For each local branch: its upstream, and whether the upstream is `gone`. A gone upstream usually means the PR was squash-merged and its branch deleted.
-- Leftover folders: list the subfolders of every folder that matches `worktreeContainerPatterns` in the config. A subfolder that is not a registered worktree and has no `.git` entry goes into `LeftoverFolders`. Never list folders anywhere else, so projects next to the repo are never touched.
+- Leftover folders: list the subfolders of every folder that matches `worktreeContainerPatterns` in the config. A subfolder that is not a registered worktree and has no `.git` entry goes into `LeftoverFolders`. So does one whose `.git` file points into this repo's worktree records (`<git dir>/worktrees/`) although git no longer lists it. For each leftover folder, record whether it holds any files.
+- Folders next to the repo: read only their `.git` file. A folder whose `.git` file points into this repo's worktree records, but that git no longer lists, also goes into `LeftoverFolders`. Nothing else in those folders is read, and no other folders are ever listed, so other projects next to the repo are never touched. Decided in phase 6, after two such folders turned up next to a real repo.
 - Run independent git calls in parallel where it helps. Report timing per call when the spike runs with `--timing`.
 
 ## Phase 3: fixtures
@@ -129,6 +130,9 @@ public sealed record RepoSnapshot(
 | `LeftoverWorktreeFolder` | Folder in `copilot-worktrees/<repo>/` with files but no `.git` entry, next to a real worktree | Review |
 | `OrphanedCommit` | Three commits made with `commit-tree`, on no ref or reflog: two chained "Agent host session ..." checkpoints and one plain commit | Review: one row of 2 for GitHub Copilot, one row of 1 with no agent |
 | `ReflogOnlyCommit` | Commit made then reset away, so only the reflog has it | No leftover |
+| `DroppedCheckpointCommits` | A chain of `copilot checkpoint: ...` commits and a `copilot:dirty-archive:...` commit on no ref or reflog, as Copilot leaves after deleting an old session's refs | Safe, one row, 4 at risk |
+| `EmptyLeftoverFolder` | Empty folder in `.claude/worktrees/` | Safe |
+| `ForgottenWorktreeFolder` | Worktree folder next to the repo whose record in `.git/worktrees/` is gone | Review |
 | `OldArchiveTag` | `archive/...` tag 45 days old with unique commits | Review |
 | `RecentArchiveTag` | `archive/...` tag 5 days old | No leftover |
 | `AwkwardPaths` | Worktrees in folders with spaces, å ä ö, and a 200+ character path | Parsers and rules still work |
@@ -169,6 +173,8 @@ public interface ILeftoverRule
 - Worktrees matching `hiddenWorktreePathPatterns` are never reported, unless they are dirty.
 - Checkpoint refs are grouped by session: everything under the same `<session-id>` is one `CheckpointSession` leftover. Its age is the age of its newest ref.
 - Orphaned commits are commits that no ref **and no reflog** points to. They are reported as one row per agent hint (from `commitSubjectPrefixes`) plus one for the rest, not one row per commit. Commits that only a reflog still has, such as the original commits of a squash-merged PR, are not reported: git keeps them for about 90 days and they are usually already on main in another form. Decided 2026-10-20 after the first scan of Diffract itself showed 12 such rows.
+- Orphaned commits whose subject starts with one of `checkpointCommitPrefixes` are checkpoints an agent tool made and later dropped itself. They get their own "Safe" row. Copilot deletes the refs of old checkpoint sessions but leaves the commits; that was 282 of 369 orphans in one real repo.
+- A leftover folder that holds no files is "Safe". A folder that was a worktree of this repo but that git no longer knows is "Needs review", since it may hold uncommitted work.
 - A branch with a gone upstream is "Safe" even when it is not an ancestor of main. Its commits at risk are still counted and shown.
 - Patterns that change what is reported (`checkpointRefPatterns`, `hiddenWorktreePathPatterns`, `worktreeContainerPatterns`) are separate from the agent entries. Agent patterns only fill in the `Agent` hint.
 - `DiffractConfig` is loaded with System.Text.Json source generation. Defaults come from the embedded `diffract.json`. The spike accepts `--config <path>` to override.
@@ -217,7 +223,9 @@ In use         Worktree      claude/fix-flaky-login       Claude Code     0     
 - [ ] A test proves read-only mode rejects a write command without starting a process.
 - [ ] Tests do not depend on the developer's global git config.
 - [ ] `diffract-spike scan` on Johan's real repos matches his expectations.
-- [ ] `diffract-spike scan` takes under 1 second on a typical repo, excluding `fsck`. Report `fsck` timing separately.
+- [ ] A snapshot makes at most 8 git calls, plus 2 per worktree, 1 per unmerged local branch or tag, and 1 per 200 unreachable commits. A test checks this for every fixture scenario. `--timing` reports each call and `fsck` separately.
+
+  This replaced "under 1 second, excluding `fsck`" in phase 6. On Johan's laptop, starting any git process takes 170 to 360 ms, so wall-clock time measures the machine more than Diffract. Cutting the number of calls is left for milestone 2.
 - [ ] Library projects build with AOT analyzers enabled and no warnings.
 - [ ] `docs/findings/agent-leftovers.md` exists and `diffract.json` reflects it.
 
