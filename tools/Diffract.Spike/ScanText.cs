@@ -54,6 +54,13 @@ internal static class ScanText
         _ => kind.ToString(),
     };
 
+    /// <summary>
+    /// The commit count, or "-" for a folder: git does not know it, so nothing about it can be counted,
+    /// and "0" would wrongly read as "nothing to lose".
+    /// </summary>
+    public static string AtRiskLabel(Leftover leftover) =>
+        leftover.Kind == LeftoverKind.LeftoverFolder ? "-" : leftover.CommitsAtRisk.ToString(CultureInfo.InvariantCulture);
+
     /// <summary>"4 leftovers: 2 safe, 1 needs review, 1 in use". Verdicts with no leftovers are left out.</summary>
     public static string Summary(IReadOnlyList<Leftover> leftovers)
     {
@@ -71,7 +78,7 @@ internal static class ScanText
             .Select(l => new[]
             {
                 VerdictLabel(l.Verdict), KindLabel(l.Kind), l.Name, l.Agent ?? "-",
-                l.CommitsAtRisk.ToString(CultureInfo.InvariantCulture), l.Reason,
+                AtRiskLabel(l), l.Reason,
             })
             .Prepend(Headers)
             .ToList();

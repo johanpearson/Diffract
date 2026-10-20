@@ -50,6 +50,15 @@ public class ScanTextTests
     }
 
     [Fact]
+    public void Risk_of_a_folder_shows_a_dash_because_it_cannot_be_counted()
+    {
+        var lines = Write([Item(LocalBranch, "feature/x", NeedsReview, atRisk: 0), Item(LeftoverFolder, "repo-claude", NeedsReview)]);
+
+        Assert.Equal("Needs review  Branch  feature/x    -      0        Reason", lines[4]);
+        Assert.Equal("Needs review  Folder  repo-claude  -      -        Reason", lines[5]);
+    }
+
+    [Fact]
     public void Missing_agent_shows_a_dash()
     {
         var lines = Write([Item(LocalBranch, "feature/x", SafeToRemove)]);
