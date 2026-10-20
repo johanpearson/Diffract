@@ -15,11 +15,13 @@
     },
     {
       "name": "GitHub Copilot",
-      "branchPatterns": [ "copilot/*", "copilot-prewarm-*" ],
+      "branchPatterns": [ "copilot/*" ],
       "worktreePathPatterns": [ "**/copilot-worktrees/**" ],
       "refPatterns": [ "refs/copilot/checkpoints/**" ]
     }
   ],
   "checkpointRefPatterns": [ "refs/copilot/checkpoints/**", "refs/checkpoints/**" ],
+  "hiddenWorktreePathPatterns": [ "**/copilot-worktrees/*/copilot-prewarm-*" ],
+  "worktreeContainerPatterns": [ "**/copilot-worktrees/*", "**/.claude/worktrees" ],
   "toolStashPatterns": [ "autostash", "claude", "copilot" ]
 }

@@ -74,20 +74,28 @@ One stash in Repo B, with git's default `WIP on <branch>` message, made by Johan
 
 No traces in these repos. Johan thinks Claude Code was used in them, so its leftovers may already have been cleaned up. The current patterns (`claude/*` branches, `**/.claude/worktrees/**` paths) come from the spec and have not been checked against real data.
 
-## Proposed changes to `diffract.json`
+## Pattern set in `diffract.json`
 
 1. Copilot worktree path pattern `**/copilot-worktrees/**`. This is the most reliable sign of a Copilot worktree, since branch names get renamed.
-2. Copilot branch patterns: keep `copilot/*` for the GitHub coding agent and add `copilot-prewarm-*`. The `<github-user>-*` names are not added, because they depend on the user and can't be told apart from a person's own branches.
-3. New top-level `checkpointRefPatterns`, which decides what counts as a checkpoint ref: `refs/copilot/checkpoints/**` (seen) and `refs/checkpoints/**` (from the spec, not seen).
-4. New per-agent `refPatterns` for attribution: `refs/copilot/checkpoints/**` for Copilot. It is kept separate from `checkpointRefPatterns` so that attribution stays a hint and never decides a verdict.
-5. `toolStashPatterns` unchanged. Nothing seen confirms or rules them out.
+2. Copilot branch pattern `copilot/*` stays, for the GitHub coding agent. The `<github-user>-*` names are not added, because they depend on the user and can't be told apart from a person's own branches.
+3. `checkpointRefPatterns` decides what counts as a checkpoint ref: `refs/copilot/checkpoints/**` (seen) and `refs/checkpoints/**` (from the spec, not seen).
+4. Per-agent `refPatterns` is for attribution only: `refs/copilot/checkpoints/**` for Copilot.
+5. `hiddenWorktreePathPatterns` lists worktrees that are never reported: `**/copilot-worktrees/*/copilot-prewarm-*`. A prewarm worktree is detached, so it has no branch name to match and is recognized by its folder.
+6. `worktreeContainerPatterns` lists folders that hold only worktrees: `**/copilot-worktrees/*` and `**/.claude/worktrees`. Only these are searched for leftover folders.
+7. `toolStashPatterns` unchanged. Nothing seen confirms or rules them out.
 
-## What this means for the spec
+Items 3, 5 and 6 are separate from the agent entries on purpose. The brief says attribution is a hint and never decides anything, so patterns that change what is reported get their own keys.
 
-These go beyond pattern changes and are listed as decisions in the PR:
+## Decisions
 
-- **Checkpoint refs need grouping and a different rule.** Grouping per session gives one row each, which is 10 here instead of 163. The spec's test is whether the ref's commit is on a branch, and a checkpoint commit never is, so every checkpoint would be "Needs review". A better test is whether the session's newest checkpoint is older than `staleAfterDays`.
-- **Squash merges hide merged branches.** An ancestry check calls them unmerged, with commits at risk. A branch whose upstream is `gone` is a strong hint that it was merged.
-- **Prewarm worktrees** are detached and clean, so the spec's `DetachedWorktree` row makes them "Needs review". Copilot recreates them anyway.
-- **Orphaned worktree folders** are invisible to git. Finding them means listing the folders under each worktree's parent folder.
-- **Unreachable commits are noisy.** Repo A has 386. Where they come from was not checked, since that needs commands outside the phase 0 list. Rebases and squash merges are the likely source. One row per chain tip, or only recent ones, would keep the scan readable.
+Johan agreed to these on 2026-10-20 when reviewing phase 0. The milestone doc is updated to match.
+
+- **Checkpoints are grouped per session.** One leftover per `<session-id>`, with the number of refs. A session whose newest checkpoint is older than `staleAfterDays` is "Needs review". A newer session is not reported.
+- **A branch whose upstream is `gone` counts as probably merged.** This catches squash merges. It is "Safe", and its unique commits are still counted as at risk so the cleanup in milestone 3 keeps a backup tag for them.
+- **Prewarm worktrees are hidden** through `hiddenWorktreePathPatterns`, unless they are dirty. Dirty means someone is working in them.
+- **Leftover worktree folders are reported** as "Needs review". The snapshot lists the subfolders of each folder that matches `worktreeContainerPatterns`. A subfolder that is not a registered worktree and has no `.git` entry is a leftover. Only container folders are searched, so other projects next to a repo are never touched.
+- **Claude Code patterns stay untested** until a repo with Claude Code leftovers turns up. Phase 6 is the next chance.
+
+## Still open
+
+- **Unreachable commits are noisy.** Repo A has 386. Where they come from was not checked, since that needs commands outside the phase 0 list. Rebases and squash merges are the likely source. Phase 6 will show whether one row per chain tip is readable enough.
