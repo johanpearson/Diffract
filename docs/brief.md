@@ -95,7 +95,7 @@ diffract/
 ## Milestones
 
 1. **Spike: snapshot and rules.** Console app that classifies leftovers in any repo. (Done)
-2. Tauri shell, sidecar and live worktree view. Includes "Open terminal here" for the repo and each worktree (Windows Terminal, falling back to PowerShell), and a git version check at startup that offers to update Git for Windows through winget when git is older than 2.40 or a newer release exists. The update only runs after the user confirms.
+2. Tauri shell, sidecar and live worktree view. Includes "Open terminal here" for the repo and each worktree (Windows Terminal, falling back to PowerShell), and a git version check at startup that offers to update Git for Windows through winget when git is older than 2.40 or a newer release exists. The update only runs after the user confirms. (Current)
 3. Safe cleanup with backup tags and undo.
 4. History graph.
 5. Changes and commit. *Checkpoint: start dogfooding.*
