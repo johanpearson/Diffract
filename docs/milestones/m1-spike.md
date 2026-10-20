@@ -1,6 +1,6 @@
 # Milestone 1: snapshot and rules spike
 
-**Status:** in progress
+**Status:** done. Johan signed off the phase 6 checkpoint on 2026-10-20.
 **Estimate:** about 1 week of evenings.
 **Done when:** the spike correctly classifies leftovers in Johan's real repos, and every rule is covered by fixture tests.
 
@@ -218,16 +218,16 @@ In use         Worktree      claude/fix-flaky-login       Claude Code     0     
 
 ## Acceptance criteria
 
-- [ ] `dotnet test` passes locally and in CI on `windows-latest`.
-- [ ] Every fixture scenario has a test asserting the exact leftovers and verdicts.
-- [ ] A test proves read-only mode rejects a write command without starting a process.
-- [ ] Tests do not depend on the developer's global git config.
-- [ ] `diffract-spike scan` on Johan's real repos matches his expectations.
-- [ ] A snapshot makes at most 8 git calls, plus 2 per worktree, 1 per unmerged local branch or tag, and 1 per 200 unreachable commits. A test checks this for every fixture scenario. `--timing` reports each call and `fsck` separately.
+- [x] `dotnet test` passes locally and in CI on `windows-latest`.
+- [x] Every fixture scenario has a test asserting the exact leftovers and verdicts.
+- [x] A test proves read-only mode rejects a write command without starting a process.
+- [x] Tests do not depend on the developer's global git config.
+- [x] `diffract-spike scan` on Johan's real repos matches his expectations.
+- [x] A snapshot makes at most 8 git calls, plus 2 per worktree, 1 per unmerged local branch or tag, and 1 per 200 unreachable commits. A test checks this for every fixture scenario. `--timing` reports each call and `fsck` separately.
 
   This replaced "under 1 second, excluding `fsck`" in phase 6. On Johan's laptop, starting any git process takes 170 to 360 ms, so wall-clock time measures the machine more than Diffract. Cutting the number of calls is left for milestone 2.
-- [ ] Library projects build with AOT analyzers enabled and no warnings.
-- [ ] `docs/findings/agent-leftovers.md` exists and `diffract.json` reflects it.
+- [x] Library projects build with AOT analyzers enabled and no warnings.
+- [x] `docs/findings/agent-leftovers.md` exists and `diffract.json` reflects it.
 
 ## Out of scope for milestone 1
 
