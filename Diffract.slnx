@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/sidecar/">
+    <Project Path="sidecar/Diffract.Git/Diffract.Git.csproj" />
+    <Project Path="sidecar/Diffract.Leftovers/Diffract.Leftovers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Diffract.Fixtures/Diffract.Fixtures.csproj" />
+    <Project Path="tests/Diffract.Git.Tests/Diffract.Git.Tests.csproj" />
+    <Project Path="tests/Diffract.Leftovers.Tests/Diffract.Leftovers.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Diffract.Spike/Diffract.Spike.csproj" />
+  </Folder>
+  <Folder Name="/solution items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="diffract.json" />
+    <File Path="global.json" />
+    <File Path="nuget.config" />
+  </Folder>
+</Solution>
