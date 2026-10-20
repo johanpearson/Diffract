@@ -22,6 +22,8 @@ public static class IsolatedGit
         {
             ["GIT_CONFIG_GLOBAL"] = globalConfig,
             ["GIT_CONFIG_NOSYSTEM"] = "1",
+            // Never discover a repo above the test's own temp folder.
+            ["GIT_CEILING_DIRECTORIES"] = System.IO.Path.GetDirectoryName(temp.Path)!,
             ["GIT_AUTHOR_NAME"] = "Fixture Author",
             ["GIT_AUTHOR_EMAIL"] = "fixture@example.com",
             ["GIT_COMMITTER_NAME"] = "Fixture Author",
@@ -32,7 +34,7 @@ public static class IsolatedGit
     }
 
     /// <summary>A runner that may write. Throws unless <paramref name="workingDirectory"/> is inside <paramref name="temp"/>.</summary>
-    public static GitRunner WritableRunner(TempDirectory temp, string workingDirectory)
+    public static GitRunner WritableRunner(TempDirectory temp, string workingDirectory, DateTimeOffset? date = null)
     {
         var full = System.IO.Path.GetFullPath(workingDirectory);
         var root = System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(temp.Path));
@@ -41,7 +43,7 @@ public static class IsolatedGit
         if (!inside)
             throw new InvalidOperationException($"Refusing a writable git runner outside the test temp folder: {full}");
 
-        return new(workingDirectory, new GitRunnerOptions { ReadOnly = false, Environment = Environment(temp) });
+        return new(workingDirectory, new GitRunnerOptions { ReadOnly = false, Environment = Environment(temp, date) });
     }
 
     public static GitRunner ReadOnlyRunner(TempDirectory temp, string workingDirectory) =>
