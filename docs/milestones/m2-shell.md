@@ -1,6 +1,6 @@
 # Milestone 2: Tauri shell, sidecar and live worktree view
 
-**Status:** not started
+**Status:** in progress
 **Estimate:** 2 to 3 weeks of evenings.
 **Done when:** an installed build runs on Johan's machine, shows the worktrees and leftovers of a repo he opens, and updates live while an agent works in it.
 

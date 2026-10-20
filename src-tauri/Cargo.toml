@@ -1,0 +1,18 @@
+[package]
+name = "diffract"
+version = "0.1.0"
+description = "A Git desktop client for Windows that understands worktrees and agent leftovers"
+edition = "2024"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+tauri-plugin-shell = "2.5"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
