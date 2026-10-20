@@ -12,21 +12,55 @@ public static class GitDirectory
         var dotGit = Path.Combine(worktreePath, ".git");
         if (Directory.Exists(dotGit))
             return Existing(Path.Combine(dotGit, "index"));
+
+        return ReadGitFileLink(worktreePath) is { } gitDir ? Existing(Path.Combine(gitDir, "index")) : null;
+    }
+
+    /// <summary>
+    /// The full path in a <c>.git</c> file holding "gitdir: &lt;path&gt;", as linked worktrees have.
+    /// Null when there is no such file. Reads that one file and nothing else in the folder.
+    /// </summary>
+    public static string? ReadGitFileLink(string folder)
+    {
+        var dotGit = Path.Combine(folder, ".git");
         if (!File.Exists(dotGit))
             return null;
 
         const string prefix = "gitdir:";
-        var line = File.ReadLines(dotGit).FirstOrDefault()?.Trim();
+        string? line;
+        try
+        {
+            line = File.ReadLines(dotGit).FirstOrDefault()?.Trim();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
         if (line is null || !line.StartsWith(prefix, StringComparison.Ordinal))
             return null;
 
-        var gitDir = Path.GetFullPath(line[prefix.Length..].Trim(), worktreePath);
-        return Existing(Path.Combine(gitDir, "index"));
+        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(line[prefix.Length..].Trim(), folder));
     }
 
     /// <summary>True when the folder has a .git file or folder, so git (or a tool) once used it as a worktree or repo.</summary>
     public static bool HasGitEntry(string folder) =>
         File.Exists(Path.Combine(folder, ".git")) || Directory.Exists(Path.Combine(folder, ".git"));
+
+    /// <summary>
+    /// For a path like <c>C:\src\repo\.git\worktrees\name</c>, the repo it belongs to: <c>C:\src\repo</c>,
+    /// or the git directory itself for a bare repo. Null when the path is not a worktree record.
+    /// </summary>
+    public static string? OwnerOfWorktreeRecord(string recordPath)
+    {
+        var worktrees = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(recordPath));
+        if (worktrees is null || !Path.GetFileName(worktrees).Equals("worktrees", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var gitDir = Path.GetDirectoryName(worktrees);
+        if (gitDir is null)
+            return null;
+        return Path.GetFileName(gitDir).Equals(".git", StringComparison.OrdinalIgnoreCase) ? Path.GetDirectoryName(gitDir) : gitDir;
+    }
 
     private static string? Existing(string path) => File.Exists(path) ? path : null;
 }

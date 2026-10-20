@@ -188,6 +188,20 @@ public sealed class ScanCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Worktree_folder_its_repo_forgot_exits_with_2_and_says_why()
+    {
+        var repo = await BuildAsync("Clean");
+        var forgotten = Path.Combine(Path.GetDirectoryName(repo)!, "repo-claude");
+        await IsolatedGit.WritableRunner(_temp, repo).RunAsync(["worktree", "add", "-q", "-b", "claude-work", forgotten], TestContext.Current.CancellationToken);
+        Directory.Delete(Path.Combine(repo, ".git", "worktrees", "repo-claude"), recursive: true);
+
+        var run = await ScanAsync(forgotten);
+
+        Assert.Equal(ExitCodes.NotAGitRepository, run.ExitCode);
+        Assert.Contains($"It was a worktree of {repo}, but that repo no longer knows it.", run.Error);
+    }
+
+    [Fact]
     public async Task Missing_folder_exits_with_2()
     {
         var run = await ScanAsync(_temp.Combine("does-not-exist"));

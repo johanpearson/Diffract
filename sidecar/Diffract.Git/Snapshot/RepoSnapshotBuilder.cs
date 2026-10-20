@@ -90,10 +90,25 @@ public sealed class RepoSnapshotBuilder
             var result = await call.RunAsync(repoPath, WorktreeListParser.Arguments, ct).ConfigureAwait(false);
             return WorktreeListParser.Parse(result.StandardOutput);
         }
-        catch (GitCommandException ex) when (ex.StandardError.Contains("not a git repository", StringComparison.OrdinalIgnoreCase))
+        // Newer git words a broken .git file differently ("gitfile does not point to a valid repository"),
+        // so that case is recognized by the link itself, not by the message.
+        catch (GitCommandException ex) when (ex.StandardError.Contains("not a git repository", StringComparison.OrdinalIgnoreCase)
+            || ExplainBrokenLink(repoPath) is not null)
         {
-            throw new NotAGitRepositoryException(repoPath);
+            throw new NotAGitRepositoryException(repoPath, ExplainBrokenLink(repoPath));
         }
+    }
+
+    // A folder whose .git file points to worktree records that are gone: the worktree was removed or
+    // pruned in git, but the folder stayed.
+    private static string? ExplainBrokenLink(string folder)
+    {
+        if (GitDirectory.ReadGitFileLink(folder) is not { } link || Directory.Exists(link))
+            return null;
+
+        return GitDirectory.OwnerOfWorktreeRecord(link) is { } owner
+            ? $"It was a worktree of {owner}, but that repo no longer knows it."
+            : $"Its .git file points to {link}, which no longer exists.";
     }
 
     // Stashes are shared by all worktrees, but `stash list` refuses to run in a bare repo.

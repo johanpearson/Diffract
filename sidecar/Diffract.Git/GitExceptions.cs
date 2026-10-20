@@ -24,8 +24,9 @@ public sealed class ReadOnlyViolationException(IReadOnlyList<string> arguments, 
     public string Reason { get; } = reason;
 }
 
-public sealed class NotAGitRepositoryException(string path)
-    : GitException($"Not a git repository: {path}")
+/// <param name="detail">Why, when there is more to say than "not a repo", as a full sentence.</param>
+public sealed class NotAGitRepositoryException(string path, string? detail = null)
+    : GitException(detail is null ? $"Not a git repository: {path}" : $"Not a git repository: {path}. {detail}")
 {
     public string Path { get; } = path;
 }

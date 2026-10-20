@@ -87,7 +87,7 @@ internal static class ScanText
     {
         output.WriteLine("Git calls, slowest first:");
         foreach (var call in timings.OrderByDescending(t => t.Duration))
-            output.WriteLine($"{Ms(call.Duration),9}  {call.Command}");
+            output.WriteLine($"{Ms(call.Duration),9}  {Shorten(call.Command)}");
 
         var fsck = timings.Where(IsFsck).ToList();
         var others = timings.Where(t => !IsFsck(t)).ToList();
@@ -97,6 +97,21 @@ internal static class ScanText
             ? "Other calls: none"
             : $"Other calls: {others.Count}, slowest {Ms(others.Max(t => t.Duration))}");
     }
+
+    /// <summary>Keeps the first commit id of a command and counts the rest, since some calls pass hundreds.</summary>
+    public static string Shorten(string command)
+    {
+        var parts = command.Split(' ');
+        var ids = parts.Count(IsCommitId);
+        if (ids <= 1)
+            return command;
+
+        var firstId = Array.FindIndex(parts, IsCommitId);
+        var kept = parts.Where((p, i) => i <= firstId || !IsCommitId(p));
+        return $"{string.Join(' ', kept)} (+{ids - 1} more ids)";
+    }
+
+    private static bool IsCommitId(string part) => part.Length == 40 && part.All(char.IsAsciiHexDigitLower);
 
     private static bool IsFsck(GitCallTiming timing) => timing.Command.StartsWith("git fsck", StringComparison.Ordinal);
 

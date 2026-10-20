@@ -92,6 +92,20 @@ public class RepoSnapshotBuilderTests
     }
 
     [Fact]
+    public async Task Worktree_folder_its_repo_forgot_says_so()
+    {
+        using var temp = new TempDirectory();
+        var repo = await RepoWithCommitAsync(temp);
+        var forgotten = temp.Combine("repo-claude");
+        await repo.GitAsync("worktree", "add", "-q", "-b", "claude-work", forgotten);
+        Directory.Delete(Path.Combine(repo.Path, ".git", "worktrees", "repo-claude"), recursive: true);
+
+        var ex = await Assert.ThrowsAsync<NotAGitRepositoryException>(() => SnapshotAsync(temp, forgotten));
+
+        Assert.Equal($"Not a git repository: {Full(forgotten)}. It was a worktree of {Full(repo.Path)}, but that repo no longer knows it.", ex.Message);
+    }
+
+    [Fact]
     public void Refuses_a_writable_runner()
     {
         Assert.Throws<ArgumentException>(() => new RepoSnapshotBuilder(new GitRunnerOptions { ReadOnly = false }, new SnapshotOptions()));

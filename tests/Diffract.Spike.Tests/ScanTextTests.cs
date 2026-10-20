@@ -87,6 +87,19 @@ public class ScanTextTests
         Assert.Equal(["Safe", "Needs review", "In use"], Enum.GetValues<Verdict>().Select(ScanText.VerdictLabel));
     }
 
+    [Theory]
+    [InlineData("git version", "git version")]
+    [InlineData("git rev-list --left-right --count refs/heads/main...918dc612ca211d831b114bfc76dab25678b68e51",
+        "git rev-list --left-right --count refs/heads/main...918dc612ca211d831b114bfc76dab25678b68e51")]
+    [InlineData("git log --no-walk=unsorted --format=%H %ct 6ae5471f2b6dbcd31159fca4a519ba8b4b302bf3",
+        "git log --no-walk=unsorted --format=%H %ct 6ae5471f2b6dbcd31159fca4a519ba8b4b302bf3")]
+    [InlineData("git log --no-walk=unsorted --format=%H 6ae5471f2b6dbcd31159fca4a519ba8b4b302bf3 121b471d56e4bbf60714f3f4fd2e359b6e6d340e 918dc612ca211d831b114bfc76dab25678b68e51",
+        "git log --no-walk=unsorted --format=%H 6ae5471f2b6dbcd31159fca4a519ba8b4b302bf3 (+2 more ids)")]
+    public void Long_lists_of_commit_ids_are_shortened(string command, string expected)
+    {
+        Assert.Equal(expected, ScanText.Shorten(command));
+    }
+
     [Fact]
     public void Timings_are_sorted_slowest_first_with_fsck_on_its_own_line()
     {

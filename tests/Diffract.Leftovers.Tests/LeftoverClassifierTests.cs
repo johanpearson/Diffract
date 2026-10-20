@@ -38,6 +38,14 @@ public class LeftoverClassifierTests
     }
 
     [Fact]
+    public void Activity_under_a_minute_ago_reads_naturally()
+    {
+        var repo = Snap.Repo([Snap.Worktree(Wt, "claude/agent") with { LastActivityAt = Snap.Now.AddSeconds(-20) }], [Snap.Branch("claude/agent")]);
+
+        Assert.Equal("Files changed less than a minute ago", Assert.Single(Classify(repo)).Reason);
+    }
+
+    [Fact]
     public void Sorted_by_verdict_then_kind_then_name()
     {
         var repo = Snap.Repo(
