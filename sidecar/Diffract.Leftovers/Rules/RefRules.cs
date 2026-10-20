@@ -156,11 +156,18 @@ public sealed class OldBackupTagRule : ILeftoverRule
     }
 }
 
-/// <summary>A folder inside a worktree container that git does not know about, left by a failed worktree removal.</summary>
+/// <summary>
+/// A folder git does not know, left by a worktree removal that did not finish: "Safe" when it holds no files,
+/// otherwise it needs review.
+/// </summary>
 public sealed class LeftoverFolderRule : ILeftoverRule
 {
     public IEnumerable<Leftover> Evaluate(RepoSnapshot repo, DiffractConfig config, TimeProvider time) =>
-        from path in repo.LeftoverFolders
-        select new Leftover(LeftoverKind.LeftoverFolder, Path.GetFileName(path), path, Attribution.ForPath(config, path),
-            Verdict.NeedsReview, 0, "Folder sits with the worktrees, but git does not know it");
+        from folder in repo.LeftoverFolders
+        let verdict = folder.HoldsNoFiles ? Verdict.SafeToRemove : Verdict.NeedsReview
+        let reason = folder.WasWorktree ? "Was a worktree of this repo, but git no longer knows it"
+            : folder.HoldsNoFiles ? "Empty folder left where a worktree was"
+            : "Folder sits with the worktrees, but git does not know it"
+        select new Leftover(LeftoverKind.LeftoverFolder, Path.GetFileName(folder.Path), folder.Path,
+            Attribution.ForPath(config, folder.Path), verdict, 0, reason);
 }

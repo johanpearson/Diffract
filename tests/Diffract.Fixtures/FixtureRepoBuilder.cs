@@ -35,6 +35,8 @@ public sealed class FixtureRepoBuilder(TempDirectory root, DateTimeOffset now)
         ("OrphanedCommit", b => b.OrphanedCommitAsync()),
         ("ReflogOnlyCommit", b => b.ReflogOnlyCommitAsync()),
         ("DroppedCheckpointCommits", b => b.DroppedCheckpointCommitsAsync()),
+        ("EmptyLeftoverFolder", b => b.EmptyLeftoverFolderAsync()),
+        ("ForgottenWorktreeFolder", b => b.ForgottenWorktreeFolderAsync()),
         ("OldArchiveTag", b => b.OldArchiveTagAsync()),
         ("RecentArchiveTag", b => b.RecentArchiveTagAsync()),
         ("AwkwardPaths", b => b.AwkwardPathsAsync()),
@@ -259,6 +261,29 @@ public sealed class FixtureRepoBuilder(TempDirectory root, DateTimeOffset now)
         var baseline = await CommitTreeAsync(repo, "-m", $"{session} - baseline checkpoint");
         await CommitTreeAsync(repo, "-p", baseline, "-m", $"{session} - checkpoint 1");
         await CommitTreeAsync(repo, "-m", "Experiment");
+        return Done(repo);
+    }
+
+    /// <summary>What Claude Code left in a real repo: an empty folder in .claude/worktrees after the worktree was removed.</summary>
+    public async Task<FixtureScenario> EmptyLeftoverFolderAsync()
+    {
+        var repo = await NewRepoAsync("EmptyLeftoverFolder");
+        Directory.CreateDirectory(Path.Combine(repo.Path, ".claude", "worktrees", "repo-product-plan-205c69"));
+        return Done(repo);
+    }
+
+    /// <summary>
+    /// A worktree folder next to the repo whose record git no longer has, as when a worktree is removed in git
+    /// but its folder is locked open and stays. Its .git file still points into the repo's worktree records.
+    /// </summary>
+    public async Task<FixtureScenario> ForgottenWorktreeFolderAsync()
+    {
+        var repo = await NewRepoAsync("ForgottenWorktreeFolder");
+        var path = Folder("ForgottenWorktreeFolder", "repo-claude");
+        await repo.GitAsync("worktree", "add", "-q", "-b", "claude-plan", path);
+        repo.Clock.Now = DaysAgo(2);
+        await repo.At(path).CommitAsync("plan.md", "plan", "Plan");
+        Directory.Delete(Path.Combine(repo.Path, ".git", "worktrees", "repo-claude"), recursive: true);
         return Done(repo);
     }
 

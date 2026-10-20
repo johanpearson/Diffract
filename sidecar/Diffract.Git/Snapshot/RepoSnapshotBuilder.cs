@@ -344,19 +344,26 @@ public sealed class RepoSnapshotBuilder
         && !name.StartsWith(Tags, StringComparison.Ordinal);
 
     /// <summary>
-    /// Subfolders of worktree container folders that are neither registered worktrees nor have a .git entry.
-    /// Containers are the parent folders of linked worktrees, plus pattern paths with no wildcards
-    /// below the repo root (such as .claude/worktrees). No other folders are ever listed.
+    /// Folders git does not know as worktrees, in two places only:
+    /// <list type="bullet">
+    /// <item>Subfolders of worktree containers: the parent folders of linked worktrees, plus pattern paths with
+    /// no wildcards below the repo root (such as .claude/worktrees). Listed when they have no .git entry, or a
+    /// .git file that points into this repo's worktree records.</item>
+    /// <item>Folders next to the repo. Only their .git file is read, and they are listed only when it points
+    /// into this repo's worktree records. Nothing else in them is looked at.</item>
+    /// </list>
     /// </summary>
-    private List<string> FindLeftoverFolders(IReadOnlyList<WorktreeInfo> worktrees)
+    private List<LeftoverFolderInfo> FindLeftoverFolders(IReadOnlyList<WorktreeInfo> worktrees)
     {
-        var patterns = _options.WorktreeContainerPatterns;
-        if (patterns.Count == 0)
-            return [];
-
         var registered = worktrees.Select(w => w.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var repoRoot = worktrees[0].Path;
-        var containers = worktrees.Skip(1)
+        var records = WorktreeRecordsFolder(worktrees[0]);
+        bool WasWorktree(string folder) =>
+            records is not null && GitDirectory.ReadGitFileLink(folder) is { } link
+            && string.Equals(Path.GetDirectoryName(link), records, StringComparison.OrdinalIgnoreCase);
+
+        var patterns = _options.WorktreeContainerPatterns;
+        var containers = patterns.Count == 0 ? [] : worktrees.Skip(1)
             .Select(w => Path.GetDirectoryName(w.Path))
             .OfType<string>()
             .Concat(patterns
@@ -366,12 +373,56 @@ public sealed class RepoSnapshotBuilder
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(c => Directory.Exists(c) && GlobMatcher.IsMatchAny(patterns, c, ignoreCase: true));
 
-        return containers
-            .SelectMany(Directory.EnumerateDirectories)
-            .Select(NormalizePath)
-            .Where(d => !registered.Contains(d) && !GitDirectory.HasGitEntry(d))
+        var inContainers = containers
+            .SelectMany(SubfoldersOf)
+            .Where(d => !registered.Contains(d) && (!GitDirectory.HasGitEntry(d) || WasWorktree(d)));
+        var nextToRepo = (Path.GetDirectoryName(repoRoot) is { } parent ? SubfoldersOf(parent) : [])
+            .Where(d => !registered.Contains(d) && WasWorktree(d));
+
+        return inContainers.Concat(nextToRepo)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(d => new LeftoverFolderInfo(d, HoldsNoFiles(d), WasWorktree(d)))
             .ToList();
+    }
+
+    // <git dir>/worktrees, where git keeps one record folder per linked worktree.
+    private static string? WorktreeRecordsFolder(WorktreeInfo main)
+    {
+        var gitDir = main.IsBare ? main.Path
+            : Directory.Exists(Path.Combine(main.Path, ".git")) ? Path.Combine(main.Path, ".git")
+            : GitDirectory.ReadGitFileLink(main.Path);
+        return gitDir is null ? null : NormalizePath(Path.Combine(gitDir, "worktrees"));
+    }
+
+    private static IEnumerable<string> SubfoldersOf(string folder)
+    {
+        try
+        {
+            return Directory.EnumerateDirectories(folder).Select(NormalizePath).ToList();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    // Stops at the first file or link, so a folder full of files costs one directory read.
+    private static bool HoldsNoFiles(string folder)
+    {
+        try
+        {
+            foreach (var entry in new DirectoryInfo(folder).EnumerateFileSystemInfos())
+            {
+                if (entry is FileInfo || entry.Attributes.HasFlag(FileAttributes.ReparsePoint) || !HoldsNoFiles(entry.FullName))
+                    return false;
+            }
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static string NormalizePath(string path) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));

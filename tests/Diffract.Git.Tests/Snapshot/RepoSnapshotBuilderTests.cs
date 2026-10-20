@@ -581,7 +581,40 @@ public class RepoSnapshotBuilderTests
 
         var snapshot = await SnapshotAsync(temp, repo.Path, new SnapshotOptions { WorktreeContainerPatterns = ["**/copilot-worktrees/*"] });
 
-        Assert.Equal([Full(Path.Combine(container, "me-left-behind"))], snapshot.LeftoverFolders);
+        Assert.Equal([new LeftoverFolderInfo(Full(Path.Combine(container, "me-left-behind")), HoldsNoFiles: false, WasWorktree: false)], snapshot.LeftoverFolders);
+    }
+
+    [Fact]
+    public async Task Forgotten_worktree_in_a_container_is_listed()
+    {
+        using var temp = new TempDirectory();
+        var repo = await RepoWithCommitAsync(temp);
+        var container = temp.Combine("copilot-worktrees", "repo");
+        await repo.GitAsync("worktree", "add", "-q", "-b", "me-kept", Path.Combine(container, "me-kept"));
+        await repo.GitAsync("worktree", "add", "-q", "-b", "me-forgotten", Path.Combine(container, "me-forgotten"));
+        Directory.Delete(Path.Combine(repo.Path, ".git", "worktrees", "me-forgotten"), recursive: true);
+
+        var snapshot = await SnapshotAsync(temp, repo.Path, new SnapshotOptions { WorktreeContainerPatterns = ["**/copilot-worktrees/*"] });
+
+        Assert.Equal([new LeftoverFolderInfo(Full(Path.Combine(container, "me-forgotten")), HoldsNoFiles: false, WasWorktree: true)], snapshot.LeftoverFolders);
+    }
+
+    [Fact]
+    public async Task Forgotten_worktree_next_to_the_repo_is_listed_by_its_git_file_alone()
+    {
+        using var temp = new TempDirectory();
+        var repo = await RepoWithCommitAsync(temp);
+        var other = await RepoWithCommitAsync(temp, "other");
+        await repo.GitAsync("worktree", "add", "-q", "-b", "live", temp.Combine("repo-live"));
+        await repo.GitAsync("worktree", "add", "-q", "-b", "claude", temp.Combine("repo-claude"));
+        await other.GitAsync("worktree", "add", "-q", "-b", "elsewhere", temp.Combine("other-forgotten"));
+        Directory.Delete(Path.Combine(repo.Path, ".git", "worktrees", "repo-claude"), recursive: true);
+        Directory.Delete(Path.Combine(other.Path, ".git", "worktrees", "other-forgotten"), recursive: true);
+        Directory.CreateDirectory(temp.Combine("unrelated-project"));
+
+        var snapshot = await SnapshotAsync(temp, repo.Path);
+
+        Assert.Equal([new LeftoverFolderInfo(Full(temp.Combine("repo-claude")), HoldsNoFiles: false, WasWorktree: true)], snapshot.LeftoverFolders);
     }
 
     [Fact]
@@ -604,11 +637,18 @@ public class RepoSnapshotBuilderTests
     {
         using var temp = new TempDirectory();
         var repo = await RepoWithCommitAsync(temp);
-        Directory.CreateDirectory(Path.Combine(repo.Path, ".claude", "worktrees", "agent-1"));
+        Directory.CreateDirectory(Path.Combine(repo.Path, ".claude", "worktrees", "agent-1", "src", "empty"));
+        Directory.CreateDirectory(Path.Combine(repo.Path, ".claude", "worktrees", "agent-2", "src"));
+        File.WriteAllText(Path.Combine(repo.Path, ".claude", "worktrees", "agent-2", "src", "deep.txt"), "x");
 
         var snapshot = await SnapshotAsync(temp, repo.Path, new SnapshotOptions { WorktreeContainerPatterns = ["**/.claude/worktrees"] });
 
-        Assert.Equal([Full(Path.Combine(repo.Path, ".claude", "worktrees", "agent-1"))], snapshot.LeftoverFolders);
+        Assert.Equal(
+            [
+                new LeftoverFolderInfo(Full(Path.Combine(repo.Path, ".claude", "worktrees", "agent-1")), HoldsNoFiles: true, WasWorktree: false),
+                new LeftoverFolderInfo(Full(Path.Combine(repo.Path, ".claude", "worktrees", "agent-2")), HoldsNoFiles: false, WasWorktree: false),
+            ],
+            snapshot.LeftoverFolders);
     }
 
     private static void SetIndexTime(string worktreePath, DateTimeOffset time) =>

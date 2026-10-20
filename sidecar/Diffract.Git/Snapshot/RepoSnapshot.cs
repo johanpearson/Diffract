@@ -12,7 +12,7 @@ public sealed record RepoSnapshot(
     IReadOnlyList<StashInfo> Stashes,
     IReadOnlyList<RefInfo> OtherRefs,
     IReadOnlyList<UnreachableCommit> UnreachableCommits,
-    IReadOnlyList<string> LeftoverFolders,
+    IReadOnlyList<LeftoverFolderInfo> LeftoverFolders,
     DateTimeOffset TakenAt);
 
 /// <param name="Path">Full Windows path.</param>
@@ -64,6 +64,14 @@ public sealed record TagInfo(
     DateTimeOffset? CreatedAt,
     bool IsMergedIntoMain,
     int? CommitsAtRisk);
+
+/// <summary>A folder that looks like what is left of a worktree, but that git does not know.</summary>
+/// <param name="HoldsNoFiles">No files at any depth, and no links. Removing it loses nothing.</param>
+/// <param name="WasWorktree">
+/// Its .git file points into this repo's worktree records, but git no longer lists it as a worktree.
+/// Otherwise it is a folder in a worktree container with no .git entry at all.
+/// </param>
+public sealed record LeftoverFolderInfo(string Path, bool HoldsNoFiles, bool WasWorktree);
 
 /// <summary>A commit that no ref and no reflog points to.</summary>
 /// <param name="Subject">The first line of the commit message.</param>

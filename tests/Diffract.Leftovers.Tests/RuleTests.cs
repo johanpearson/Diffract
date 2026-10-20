@@ -26,6 +26,8 @@ public class RuleTests(ScenarioSnapshots snapshots)
         ("OrphanedCommitRule", "DroppedCheckpointCommits", LeftoverKind.OrphanedCommit, Verdict.SafeToRemove),
         ("OldBackupTagRule", "OldArchiveTag", LeftoverKind.BackupTag, Verdict.NeedsReview),
         ("LeftoverFolderRule", "LeftoverWorktreeFolder", LeftoverKind.LeftoverFolder, Verdict.NeedsReview),
+        ("LeftoverFolderRule", "EmptyLeftoverFolder", LeftoverKind.LeftoverFolder, Verdict.SafeToRemove),
+        ("LeftoverFolderRule", "ForgottenWorktreeFolder", LeftoverKind.LeftoverFolder, Verdict.NeedsReview),
     ];
 
     private static readonly string[] RuleNames = [.. LeftoverClassifier.DefaultRules.Select(r => r.GetType().Name)];

@@ -42,7 +42,7 @@ public class FixtureRepoBuilderTests
                 "Clean", "MergedWorktree", "PrunableWorktree", "StaleAgentWorktree", "ActiveAgentWorktree", "LockedWorktree",
                 "UserDirtyWorktree", "AgentBranchMerged", "AgentBranchUnmerged", "RemoteAgentBranch", "ToolStash",
                 "StaleCheckpointSession", "RecentCheckpointSession", "SquashMergedBranch", "PrewarmWorktree",
-                "LeftoverWorktreeFolder", "OrphanedCommit", "ReflogOnlyCommit", "DroppedCheckpointCommits", "OldArchiveTag", "RecentArchiveTag", "AwkwardPaths",
+                "LeftoverWorktreeFolder", "OrphanedCommit", "ReflogOnlyCommit", "DroppedCheckpointCommits", "EmptyLeftoverFolder", "ForgottenWorktreeFolder", "OldArchiveTag", "RecentArchiveTag", "AwkwardPaths",
                 "DetachedWorktree", "MasterAsMain",
             ],
             FixtureRepoBuilder.ScenarioNames);
@@ -334,7 +334,7 @@ public class FixtureRepoBuilderTests
 
         var snapshot = await SnapshotAsync(temp, "LeftoverWorktreeFolder");
 
-        Assert.Equal([Full(temp.Combine("LeftoverWorktreeFolder", "copilot-worktrees", "repo", "dev-expert-robot"))], snapshot.LeftoverFolders);
+        Assert.Equal([Full(temp.Combine("LeftoverWorktreeFolder", "copilot-worktrees", "repo", "dev-expert-robot"))], snapshot.LeftoverFolders.Select(f => f.Path));
         Assert.True(Linked(snapshot).IsDetached);
     }
 

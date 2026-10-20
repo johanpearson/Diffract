@@ -81,6 +81,14 @@ public class ScenarioVerdictTests(ScenarioSnapshots snapshots)
     public Task ReflogOnlyCommit() => AssertLeftoversAsync("ReflogOnlyCommit");
 
     [Fact]
+    public Task EmptyLeftoverFolder() =>
+        AssertLeftoversAsync("EmptyLeftoverFolder", (LeftoverFolder, "repo-product-plan-205c69", SafeToRemove, 0, Claude));
+
+    [Fact]
+    public Task ForgottenWorktreeFolder() =>
+        AssertLeftoversAsync("ForgottenWorktreeFolder", (LeftoverFolder, "repo-claude", NeedsReview, 0, null));
+
+    [Fact]
     public Task DroppedCheckpointCommits() =>
         AssertLeftoversAsync("DroppedCheckpointCommits", (LeftoverKind.OrphanedCommit, "4 checkpoint commits", SafeToRemove, 4, Copilot));
 
