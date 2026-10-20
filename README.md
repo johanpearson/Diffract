@@ -12,6 +12,7 @@ Current milestone: [docs/milestones/m1-spike.md](docs/milestones/m1-spike.md), t
 
 - [docs/brief.md](docs/brief.md): what Diffract is, locked decisions, architecture
 - [docs/milestones/m1-spike.md](docs/milestones/m1-spike.md): current milestone, scope and acceptance criteria
+- [docs/findings/agent-leftovers.md](docs/findings/agent-leftovers.md): what Claude Code and Copilot really leave behind in a repo
 - [docs/visual-plan.html](docs/visual-plan.html): the visual plan with a clickable prototype (open locally in a browser)
 - [AGENTS.md](AGENTS.md): rules for coding agents working in this repo
 - [docs/START-PROMPT.md](docs/START-PROMPT.md): the prompt that starts the agent on the current milestone

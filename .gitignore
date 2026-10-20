@@ -15,6 +15,9 @@ dist/
 target/
 src-tauri/gen/
 
+# Claude Code personal settings
+.claude/settings.local.json
+
 # Editors and OS
 .vscode/*
 !.vscode/extensions.json

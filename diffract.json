@@ -10,13 +10,16 @@
     {
       "name": "Claude Code",
       "branchPatterns": [ "claude/*" ],
-      "worktreePathPatterns": [ "**/.claude/worktrees/**" ]
+      "worktreePathPatterns": [ "**/.claude/worktrees/**" ],
+      "refPatterns": [ ]
     },
     {
       "name": "GitHub Copilot",
-      "branchPatterns": [ "copilot/*" ],
-      "worktreePathPatterns": [ ]
+      "branchPatterns": [ "copilot/*", "copilot-prewarm-*" ],
+      "worktreePathPatterns": [ "**/copilot-worktrees/**" ],
+      "refPatterns": [ "refs/copilot/checkpoints/**" ]
     }
   ],
+  "checkpointRefPatterns": [ "refs/copilot/checkpoints/**", "refs/checkpoints/**" ],
   "toolStashPatterns": [ "autostash", "claude", "copilot" ]
 }
