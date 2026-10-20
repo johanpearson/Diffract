@@ -117,16 +117,6 @@ public class FixtureRepoBuilderTests
     }
 
     [Fact]
-    public void Output_folder_path_must_be_short_enough_for_git()
-    {
-        using var temp = new TempDirectory();
-        var path = temp.Combine(new string('x', TempDirectory.MaxFixtureOutputLength));
-
-        Assert.Throws<InvalidOperationException>(() => TempDirectory.ForFixtureOutput(path));
-        Assert.False(Directory.Exists(path));
-    }
-
-    [Fact]
     public async Task Output_folder_must_not_be_inside_a_repo()
     {
         using var temp = new TempDirectory();

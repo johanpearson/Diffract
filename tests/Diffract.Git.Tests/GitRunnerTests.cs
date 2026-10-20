@@ -90,6 +90,18 @@ public class GitRunnerTests
     }
 
     [Fact]
+    public async Task Long_paths_are_on_even_when_config_says_otherwise()
+    {
+        using var temp = new TempDirectory();
+        await IsolatedGit.WritableRunner(temp, temp.Path).RunAsync(["init", "-q", "-b", "main"], Ct);
+        await IsolatedGit.WritableRunner(temp, temp.Path).RunAsync(["config", "core.longpaths", "false"], Ct);
+
+        var result = await IsolatedGit.ReadOnlyRunner(temp, temp.Path).RunAsync(["config", "--get", "core.longpaths"], Ct);
+
+        Assert.Equal("true", result.StandardOutput.Trim());
+    }
+
+    [Fact]
     public async Task Times_out_and_kills_the_process()
     {
         using var temp = new TempDirectory();
