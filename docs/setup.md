@@ -83,11 +83,11 @@ git --version                      # 2.40 or newer
 dotnet test --solution Diffract.slnx
 ```
 
-The last check proves the C++ linker works: it publishes the spike as a native binary, which fails without it.
+The last check proves the C++ linker works: it publishes the spike as a native binary, which fails without it. These two commands work in both PowerShell and Command Prompt. The output goes to `artifacts\`, which git ignores.
 
 ```powershell
-dotnet publish tools/Diffract.Spike -c Release -r win-x64 -o "$env:TEMP\diffract-aot"
-& "$env:TEMP\diffract-aot\diffract-spike.exe" scan .
+dotnet publish tools/Diffract.Spike -c Release -r win-x64 -o artifacts\aot
+artifacts\aot\diffract-spike.exe scan .
 ```
 
 ## Later in milestone 2
