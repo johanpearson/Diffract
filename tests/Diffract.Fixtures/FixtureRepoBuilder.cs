@@ -34,6 +34,7 @@ public sealed class FixtureRepoBuilder(TempDirectory root, DateTimeOffset now)
         ("LeftoverWorktreeFolder", b => b.LeftoverWorktreeFolderAsync()),
         ("OrphanedCommit", b => b.OrphanedCommitAsync()),
         ("ReflogOnlyCommit", b => b.ReflogOnlyCommitAsync()),
+        ("DroppedCheckpointCommits", b => b.DroppedCheckpointCommitsAsync()),
         ("OldArchiveTag", b => b.OldArchiveTagAsync()),
         ("RecentArchiveTag", b => b.RecentArchiveTagAsync()),
         ("AwkwardPaths", b => b.AwkwardPathsAsync()),
@@ -258,6 +259,22 @@ public sealed class FixtureRepoBuilder(TempDirectory root, DateTimeOffset now)
         var baseline = await CommitTreeAsync(repo, "-m", $"{session} - baseline checkpoint");
         await CommitTreeAsync(repo, "-p", baseline, "-m", $"{session} - checkpoint 1");
         await CommitTreeAsync(repo, "-m", "Experiment");
+        return Done(repo);
+    }
+
+    /// <summary>
+    /// What Copilot leaves after deleting an old session's checkpoint refs itself: a chain of
+    /// "copilot checkpoint" commits and a "copilot:dirty-archive" commit, on no ref or reflog.
+    /// </summary>
+    public async Task<FixtureScenario> DroppedCheckpointCommitsAsync()
+    {
+        var repo = await NewRepoAsync("DroppedCheckpointCommits");
+        repo.Clock.Now = DaysAgo(12);
+        const string session = "2d5ea27e-1150-4b75-8a94-552a718ce094";
+        var parent = await repo.RevParseAsync("HEAD");
+        foreach (var id in new[] { "6f0c5a1e-0b51-4a1d-9e0f-3f3c2b8d7a10", "8a4d2c9b-61e3-4f7a-b2d5-0c9e8f1a3b24", "c1e7f3a2-5d9b-4c6e-8a0f-2b4d6e8f0a35" })
+            parent = await CommitTreeAsync(repo, "-p", parent, "-m", $"copilot checkpoint: {session} @ {id}");
+        await CommitTreeAsync(repo, "-m", "copilot:dirty-archive:9e1b7c3d-2a4f-4b8e-a6c0-5d3f1e9b7a42");
         return Done(repo);
     }
 

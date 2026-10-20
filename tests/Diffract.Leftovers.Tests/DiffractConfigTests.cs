@@ -13,7 +13,8 @@ public class DiffractConfigTests
         Assert.Equal(("archive/", 30), (config.Archive.TagPrefix, config.Archive.ReviewAfterDays));
         Assert.Equal(["Claude Code", "GitHub Copilot"], config.Agents.Select(a => a.Name));
         Assert.Equal(["refs/copilot/checkpoints/**"], config.Agents[1].RefPatterns);
-        Assert.Equal(["Agent host session "], config.Agents[1].CommitSubjectPrefixes);
+        Assert.Equal(["Agent host session ", "copilot checkpoint: ", "copilot:dirty-archive:"], config.Agents[1].CommitSubjectPrefixes);
+        Assert.Equal(["copilot checkpoint: ", "copilot:dirty-archive:"], config.CheckpointCommitPrefixes);
         Assert.Empty(config.Agents[0].CommitSubjectPrefixes);
         Assert.Equal(["refs/copilot/checkpoints/**", "refs/checkpoints/**"], config.CheckpointRefPatterns);
         Assert.Equal(["**/copilot-worktrees/*/copilot-prewarm-*"], config.HiddenWorktreePathPatterns);

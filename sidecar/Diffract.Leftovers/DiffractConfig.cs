@@ -24,6 +24,12 @@ public sealed record DiffractConfig
 
     public IReadOnlyList<string> CheckpointRefPatterns { get; init; } = [];
 
+    /// <summary>
+    /// Orphaned commits whose subject starts with one of these, matching case, are checkpoints an agent tool
+    /// made and later dropped itself. They get their own "Safe" row.
+    /// </summary>
+    public IReadOnlyList<string> CheckpointCommitPrefixes { get; init; } = [];
+
     /// <summary>Worktrees at these paths are never reported unless they are dirty.</summary>
     public IReadOnlyList<string> HiddenWorktreePathPatterns { get; init; } = [];
 

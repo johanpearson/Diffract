@@ -242,6 +242,19 @@ public class LeftoverClassifierTests
     }
 
     [Fact]
+    public void Dropped_checkpoint_commits_are_safe_only_through_their_own_setting()
+    {
+        var repo = Snap.Repo() with { UnreachableCommits = [new("c1", Snap.Now, "copilot checkpoint: s @ 1")] };
+        var hintOnly = Config with { CheckpointCommitPrefixes = [] };
+
+        var withSetting = Assert.Single(Classify(repo));
+        var without = Assert.Single(new LeftoverClassifier().Classify(repo, hintOnly, Time));
+
+        Assert.Equal(("1 checkpoint commit", Verdict.SafeToRemove, "GitHub Copilot"), (withSetting.Name, withSetting.Verdict, withSetting.Agent));
+        Assert.Equal(("1 commit", Verdict.NeedsReview, "GitHub Copilot"), (without.Name, without.Verdict, without.Agent));
+    }
+
+    [Fact]
     public void Rules_can_be_chosen()
     {
         var repo = Snap.Repo(branches: [Snap.Branch("a", merged: true)]);

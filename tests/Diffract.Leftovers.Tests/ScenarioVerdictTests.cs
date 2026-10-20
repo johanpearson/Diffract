@@ -81,6 +81,10 @@ public class ScenarioVerdictTests(ScenarioSnapshots snapshots)
     public Task ReflogOnlyCommit() => AssertLeftoversAsync("ReflogOnlyCommit");
 
     [Fact]
+    public Task DroppedCheckpointCommits() =>
+        AssertLeftoversAsync("DroppedCheckpointCommits", (LeftoverKind.OrphanedCommit, "4 checkpoint commits", SafeToRemove, 4, Copilot));
+
+    [Fact]
     public Task OldArchiveTag() => AssertLeftoversAsync("OldArchiveTag", (BackupTag, "archive/old-idea", NeedsReview, 1, null));
 
     [Fact]

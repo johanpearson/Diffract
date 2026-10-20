@@ -42,7 +42,7 @@ public class FixtureRepoBuilderTests
                 "Clean", "MergedWorktree", "PrunableWorktree", "StaleAgentWorktree", "ActiveAgentWorktree", "LockedWorktree",
                 "UserDirtyWorktree", "AgentBranchMerged", "AgentBranchUnmerged", "RemoteAgentBranch", "ToolStash",
                 "StaleCheckpointSession", "RecentCheckpointSession", "SquashMergedBranch", "PrewarmWorktree",
-                "LeftoverWorktreeFolder", "OrphanedCommit", "ReflogOnlyCommit", "OldArchiveTag", "RecentArchiveTag", "AwkwardPaths",
+                "LeftoverWorktreeFolder", "OrphanedCommit", "ReflogOnlyCommit", "DroppedCheckpointCommits", "OldArchiveTag", "RecentArchiveTag", "AwkwardPaths",
                 "DetachedWorktree", "MasterAsMain",
             ],
             FixtureRepoBuilder.ScenarioNames);

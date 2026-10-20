@@ -116,18 +116,26 @@ public sealed class CheckpointSessionRule : ILeftoverRule
 }
 
 /// <summary>
-/// Commits that no ref and no reflog points to, found by <c>git fsck --unreachable</c>: one row per agent
-/// their subjects point to, and one for the rest. Commits still in a reflog, such as the originals of
+/// Commits that no ref and no reflog points to, found by <c>git fsck --unreachable</c>. Checkpoint commits an
+/// agent tool dropped itself (<c>checkpointCommitPrefixes</c>) are "Safe"; the rest need review. Each of those
+/// is one row per agent hint, plus one without. Commits still in a reflog, such as the originals of
 /// squash-merged branches, are not reported.
 /// </summary>
 public sealed class OrphanedCommitRule : ILeftoverRule
 {
     public IEnumerable<Leftover> Evaluate(RepoSnapshot repo, DiffractConfig config, TimeProvider time) =>
         from commit in repo.UnreachableCommits
-        group commit by Attribution.ForCommit(config, commit) into byAgent
-        let count = byAgent.Count()
-        select new Leftover(LeftoverKind.OrphanedCommit, Describe.Count(count, "commit"), null, byAgent.Key, Verdict.NeedsReview, count,
-            $"Not on any branch, tag, stash or reflog, so git may delete {(count == 1 ? "it" : "them")} in its next cleanup");
+        group commit by (Checkpoint: IsCheckpoint(config, commit), Agent: Attribution.ForCommit(config, commit)) into rowGroup
+        let count = rowGroup.Count()
+        let them = count == 1 ? "it" : "them"
+        select rowGroup.Key.Checkpoint
+            ? new Leftover(LeftoverKind.OrphanedCommit, Describe.Count(count, "checkpoint commit"), null, rowGroup.Key.Agent,
+                Verdict.SafeToRemove, count, $"Checkpoints an agent tool made and then dropped; git may delete {them} in its next cleanup")
+            : new Leftover(LeftoverKind.OrphanedCommit, Describe.Count(count, "commit"), null, rowGroup.Key.Agent,
+                Verdict.NeedsReview, count, $"Not on any branch, tag, stash or reflog, so git may delete {them} in its next cleanup");
+
+    private static bool IsCheckpoint(DiffractConfig config, UnreachableCommit commit) =>
+        config.CheckpointCommitPrefixes.Any(p => commit.Subject.StartsWith(p, StringComparison.Ordinal));
 }
 
 /// <summary>A backup tag under <c>archive.tagPrefix</c> older than <c>archive.reviewAfterDays</c>.</summary>
