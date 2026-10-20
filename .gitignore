@@ -1,0 +1,26 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+artifacts/
+
+# Node
+node_modules/
+dist/
+
+# Rust / Tauri
+target/
+src-tauri/gen/
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+.DS_Store
+
+# Local fixture output
+.fixtures/

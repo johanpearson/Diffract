@@ -1,0 +1,1461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diffract: visual plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1EC; --surface:#FFFFFF; --surface-2:#E4E9E2; --ink:#18221D; --ink-2:#46534B; --ink-3:#6F7C74;
+  --line:#D1D8CF; --accent:#2F6B4B; --accent-ink:#FFFFFF; --accent-soft:#D8E8DD;
+  --warn:#8A5200; --warn-soft:#F5E6C9; --risk:#9E3128; --risk-soft:#F5DAD6;
+  --app-bg:#151A1D; --app-panel:#1A2125; --app-panel-2:#212A2F; --app-line:#2C373D; --app-ink:#E4EAE7; --app-ink-2:#A1AEA8; --app-ink-3:#6E7B75; --app-sel:#26323A;
+  --l0:#8FB8A0; --l1:#6AA6F0; --l2:#E8A33D; --l3:#B48CF2; --l4:#4FC6B8;
+  --ok:#5CC28A; --amber:#E8B04B; --red:#EF7A6E;
+  --sans:"Schibsted Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1411; --surface:#161D19; --surface-2:#1E2721; --ink:#E2E9E4; --ink-2:#A9B6AE; --ink-3:#7B887F;
+    --line:#29342D; --accent:#7CC59B; --accent-ink:#0E1912; --accent-soft:#1E3227;
+    --warn:#E8B04B; --warn-soft:#382D17; --risk:#EF8A7E; --risk-soft:#3A211E;
+    --app-bg:#0C1013; --app-panel:#12181B; --app-panel-2:#192125; --app-line:#252F35; --app-sel:#1F2A31;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1411; --surface:#161D19; --surface-2:#1E2721; --ink:#E2E9E4; --ink-2:#A9B6AE; --ink-3:#7B887F;
+  --line:#29342D; --accent:#7CC59B; --accent-ink:#0E1912; --accent-soft:#1E3227;
+  --warn:#E8B04B; --warn-soft:#382D17; --risk:#EF8A7E; --risk-soft:#3A211E;
+  --app-bg:#0C1013; --app-panel:#12181B; --app-panel-2:#192125; --app-line:#252F35; --app-sel:#1F2A31;
+  color-scheme:dark;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 64px);scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+a{color:var(--accent)}
+code,pre,.mono{font-family:var(--mono);font-size:.84em}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+
+header.top{padding:56px 0 28px}
+.status{display:inline-flex;gap:8px;align-items:center;font-size:14px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:4px 12px;border-radius:999px}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+h1{font-size:clamp(48px,8vw,96px);line-height:.95;letter-spacing:-.035em;font-weight:800;margin:18px 0 14px}
+.lede{font-size:clamp(19px,2.2vw,23px);line-height:1.4;color:var(--ink-2);max-width:40ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:24px;font-size:15px;color:var(--ink-3)}
+.meta b{color:var(--ink);font-weight:600}
+.rev{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin-top:28px;max-width:820px}
+.rev h3{margin:0 0 4px;font-size:17px}
+.rev ul{margin:8px 0 0;padding-left:20px;color:var(--ink-2);font-size:15.5px}
+.rev li{margin:4px 0}
+
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--bg);border-bottom:1px solid var(--line)}
+nav.toc .wrap{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav.toc a{flex:none;text-decoration:none;color:var(--ink-2);font-size:15px;font-weight:500;padding:14px 12px}
+nav.toc a:hover{color:var(--ink)}
+
+section{padding:56px 0 8px}
+h2{font-size:32px;letter-spacing:-.02em;line-height:1.15;margin:0 0 10px;font-weight:700}
+.sub{color:var(--ink-2);max-width:68ch;margin:0 0 28px}
+h3{font-size:19px;margin:0 0 8px;font-weight:700}
+p{max-width:72ch}
+
+.review-head{margin-bottom:14px}
+.tabs{display:inline-flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:12px;max-width:100%;overflow-x:auto;margin-top:16px}
+.tabs button{flex:none;font:inherit;font-size:15px;font-weight:600;border:0;background:transparent;color:var(--ink-2);padding:8px 14px;border-radius:9px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 0 var(--line)}
+.tabs .new{font-size:11px;font-weight:700;color:var(--accent);margin-left:6px}
+.hint{font-size:14px;color:var(--ink-3)}
+.scroller{overflow-x:auto;border-radius:14px}
+.app{min-width:960px;height:580px;background:var(--app-bg);color:var(--app-ink);border-radius:14px;display:grid;grid-template-columns:220px 1fr;overflow:hidden;font-size:13.5px;line-height:1.4;border:1px solid var(--app-line)}
+.app button,.app select,.app input,.app textarea{font-family:var(--sans)}
+.side{background:var(--app-panel);border-right:1px solid var(--app-line);padding:14px 10px;overflow:auto}
+.repo{display:flex;align-items:center;gap:10px;padding:4px 6px 14px;border-bottom:1px solid var(--app-line);margin-bottom:10px}
+.repo-mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(120deg,var(--l1),var(--l3) 45%,var(--l2));display:grid;place-items:center;font-weight:800;color:#0C1013}
+.repo b{display:block;font-size:14px}
+.repo span{color:var(--app-ink-3);font-size:12px}
+.side h4{font-size:12px;color:var(--app-ink-3);font-weight:600;margin:14px 6px 6px}
+.side ul{list-style:none;margin:0;padding:0}
+.side li{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;color:var(--app-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side li .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.side li .n{margin-left:auto;font-size:11px;background:var(--app-panel-2);padding:1px 7px;border-radius:999px;color:var(--app-ink-2)}
+.side li .n.warn{background:#4A3713;color:var(--amber)}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--app-line);background:var(--app-panel)}
+.bar .title{font-weight:700;font-size:14px}
+.bar .grow{flex:1}
+.bar .muted{color:var(--app-ink-3);font-size:12px}
+.abtn{border:1px solid var(--app-line);background:var(--app-panel-2);color:var(--app-ink);padding:6px 11px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer}
+.abtn:hover{border-color:var(--app-ink-3)}
+.abtn.primary{background:var(--ok);border-color:var(--ok);color:#0B1A11}
+.abtn.danger{color:var(--red)}
+.abtn:disabled{opacity:.4;cursor:not-allowed}
+.toggle{display:flex;align-items:center;gap:6px;color:var(--app-ink-2);font-size:12.5px;cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--ok)}
+.view{display:none;flex:1;min-height:0;flex-direction:column}
+.view.on{display:flex}
+.empty{color:var(--app-ink-3);font-size:12.5px;padding:8px}
+
+/* History */
+.hist-wrap{flex:1;display:grid;grid-template-columns:1fr 290px;min-height:0}
+.hist{position:relative;overflow:auto}
+.hist svg{position:absolute;left:0;top:0;pointer-events:none}
+.row{height:34px;display:flex;align-items:center;gap:10px;padding-right:14px;cursor:pointer;border-left:2px solid transparent}
+.row:hover{background:rgba(255,255,255,.03)}
+.row.sel{background:var(--app-sel);border-left-color:var(--ok)}
+.row.faded{opacity:.38}
+.row .msg{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .when{color:var(--app-ink-3);font-size:12px;flex:none;width:64px;text-align:right}
+.ref{font-size:11px;font-weight:600;padding:1px 7px;border-radius:5px;border:1px solid currentColor;flex:none;white-space:nowrap}
+.ref.tag{border-style:dashed}
+.who{display:inline-flex;align-items:center;gap:5px;width:74px;color:var(--app-ink-3);font-size:12px;flex:none}
+.who i{width:7px;height:7px;border-radius:2px;display:inline-block}
+.detail{border-left:1px solid var(--app-line);background:var(--app-panel);padding:16px;overflow:auto}
+.detail h5{margin:0 0 4px;font-size:15px;line-height:1.35}
+.detail .k{color:var(--app-ink-3);font-size:12px;margin-top:14px}
+.detail .v{margin-top:2px}
+.detail ul{list-style:none;padding:0;margin:6px 0 0}
+.detail li{display:flex;gap:8px;padding:3px 0;font-family:var(--mono);font-size:12px;color:var(--app-ink-2)}
+.detail li b{font-weight:500;width:14px}
+.add{color:var(--ok)} .mod{color:var(--amber)} .del{color:var(--red)}
+.pulse{transform-box:fill-box;transform-origin:center;animation:pulse 2s ease-out infinite}
+@keyframes pulse{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(2.6)}}
+@media (prefers-reduced-motion: reduce){.pulse{animation:none;opacity:.35}}
+
+/* Agents */
+.agents{flex:1;overflow:auto;padding:14px 16px}
+.summary{display:flex;gap:10px;margin-bottom:14px}
+.sum{flex:1;background:var(--app-panel);border:1px solid var(--app-line);border-radius:10px;padding:10px 12px}
+.sum b{font-size:22px;display:block;line-height:1.1}
+.sum span{color:var(--app-ink-3);font-size:12px}
+.sum.safe b{color:var(--ok)} .sum.review b{color:var(--amber)} .sum.use b{color:var(--l1)}
+.chips{display:flex;gap:6px;margin-bottom:10px;align-items:center}
+.chip{border:1px solid var(--app-line);background:transparent;color:var(--app-ink-2);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--app-ink);color:var(--app-bg);border-color:var(--app-ink)}
+.item{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--app-line);border-radius:10px;margin-bottom:8px;background:var(--app-panel);transition:opacity .25s, transform .25s}
+.item.gone{opacity:0;transform:translateX(16px)}
+.item input{margin-top:3px;accent-color:var(--ok)}
+.item .nm{font-weight:600;font-family:var(--mono);font-size:12.5px}
+.item .kind{color:var(--app-ink-3);font-size:12px;margin-left:6px;font-family:var(--sans);font-weight:500}
+.item .why{color:var(--app-ink-2);font-size:12.5px;margin-top:2px}
+.item .path{color:var(--app-ink-3);font-size:11.5px;font-family:var(--mono);margin-top:2px}
+.verdict{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.verdict.safe{background:#173A26;color:var(--ok)}
+.verdict.review{background:#43330F;color:var(--amber)}
+.verdict.use{background:#16304A;color:var(--l1)}
+.item-actions{display:flex;gap:6px;margin-top:8px}
+.item-actions button{font-size:11.5px;padding:3px 8px}
+
+/* Changes */
+.changes{flex:1;display:grid;grid-template-columns:300px 1fr;min-height:0}
+.files{border-right:1px solid var(--app-line);display:flex;flex-direction:column;background:var(--app-panel);min-height:0}
+.files .lists{flex:1;overflow:auto;padding:8px}
+.files h6{font-size:12px;color:var(--app-ink-3);margin:8px 6px 4px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.files h6 button{font-size:11px;padding:2px 7px}
+.file{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px}
+.file:hover{background:rgba(255,255,255,.04)}
+.file.sel{background:var(--app-sel)}
+.file .st{width:14px;font-weight:600}
+.file .fn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file button{font-size:11px;padding:2px 7px;opacity:0}
+.file:hover button,.file.sel button,.file button:focus-visible{opacity:1}
+.commit{border-top:1px solid var(--app-line);padding:10px}
+.commit textarea{width:100%;height:62px;resize:none;background:var(--app-bg);color:var(--app-ink);border:1px solid var(--app-line);border-radius:7px;padding:8px;font-size:12.5px}
+.commit .abtn{width:100%;margin-top:8px;padding:8px}
+.diff{overflow:auto;font-family:var(--mono);font-size:12px;line-height:1.6;padding:8px 0}
+.diff .dh{color:var(--app-ink-2);padding:4px 14px 8px;font-family:var(--sans);font-size:13px;font-weight:600}
+.dl{display:flex;white-space:pre;padding-right:14px}
+.dl .ln{width:44px;flex:none;text-align:right;padding-right:10px;color:var(--app-ink-3);user-select:none}
+.dl.p{background:rgba(92,194,138,.12)} .dl.p .tx{color:#BFE9CF}
+.dl.m{background:rgba(239,122,110,.12)} .dl.m .tx{color:#F3C0B9}
+.dl.h{color:var(--l1);background:rgba(106,166,240,.07);margin-top:4px}
+
+/* Rebase */
+.rb{flex:1;display:grid;grid-template-columns:1fr 300px;min-height:0}
+.todo{overflow:auto;padding:14px 16px}
+.todo .lead{color:var(--app-ink-3);font-size:12.5px;margin:0 0 10px}
+.trow{display:grid;grid-template-columns:58px 92px 66px 1fr;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--app-line);border-radius:9px;margin-bottom:6px;background:var(--app-panel)}
+.trow .mv{display:flex;gap:4px}
+.trow .mv button{padding:2px 7px;font-size:12px}
+.trow select,.ctl select,.ctl input[type=text],.dlg input[type=text],.dlg select,.trow input{width:100%;background:var(--app-bg);color:var(--app-ink);border:1px solid var(--app-line);border-radius:6px;padding:5px 7px;font-size:12.5px}
+.trow .h{font-family:var(--mono);font-size:12px;color:var(--app-ink-3)}
+.trow .tm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow.drop .tm{text-decoration:line-through;opacity:.45}
+.trow.fold{margin-left:24px;border-style:dashed}
+.preview{border-left:1px solid var(--app-line);background:var(--app-panel);padding:16px;overflow:auto}
+.preview h5{margin:0 0 10px;font-size:14px}
+.pc{padding:8px 10px;border-radius:8px;background:var(--app-panel-2);margin-bottom:6px;font-size:12.5px}
+.pc small{display:block;color:var(--app-ink-3);font-size:11.5px;margin-top:2px}
+.warnbox{background:#3A2E14;color:var(--amber);border-radius:8px;padding:8px 10px;font-size:12.5px;margin-top:10px}
+
+/* Conflicts */
+.cbanner{padding:10px 14px;border-bottom:1px solid var(--app-line);background:var(--app-panel)}
+.cbanner .t{font-weight:700;font-size:13.5px}
+.cbanner .s{color:var(--app-ink-3);font-size:12px;margin-top:2px}
+.prog{height:4px;background:var(--app-line);border-radius:2px;margin-top:8px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--amber);transition:width .3s}
+.cf{flex:1;display:grid;grid-template-columns:230px 1fr;min-height:0}
+.cfiles{border-right:1px solid var(--app-line);background:var(--app-panel);padding:8px;overflow:auto}
+.cfile{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px}
+.cfile.sel{background:var(--app-sel)}
+.cfile .b{font-family:var(--sans);font-size:11px;font-weight:700;white-space:nowrap}
+.cfile .b.u{color:var(--amber)} .cfile .b.r{color:var(--ok)}
+.cmain{overflow:auto;padding:14px 16px}
+.hunk{border:1px solid var(--app-line);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.hunk.resolved{border-color:#2E5C41}
+.hunk-h{display:flex;justify-content:space-between;padding:8px 12px;background:var(--app-panel);font-size:12.5px;font-weight:600}
+.hunk-h span{color:var(--app-ink-3);font-weight:500}
+.sides{display:grid;grid-template-columns:1fr 1fr}
+.sides > div{padding:8px 0;overflow-x:auto}
+.sides > div + div{border-left:1px solid var(--app-line)}
+.lab{font-size:11.5px;color:var(--app-ink-3);padding:0 12px 4px;font-weight:600}
+.cl{white-space:pre;padding:0 12px;font-family:var(--mono);font-size:12px;line-height:1.6}
+.s-main .cl{background:rgba(106,166,240,.10)}
+.s-mine .cl{background:rgba(232,163,61,.12)}
+.hunk-acts{display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--app-line)}
+.hunk-acts .abtn[aria-pressed="true"]{background:var(--ok);color:#0B1A11;border-color:var(--ok)}
+.result{border:1px solid var(--app-line);border-radius:10px;padding:8px 0;margin-top:4px}
+.result .cl.un{color:var(--amber);background:rgba(232,163,61,.08)}
+.result .cl.rs{background:rgba(92,194,138,.10)}
+.cdone{padding:40px;text-align:center;color:var(--app-ink-2)}
+.cdone b{display:block;color:var(--app-ink);font-size:16px;margin-bottom:6px}
+
+/* Settings */
+.stv{flex:1;overflow:auto;padding:6px 18px 16px}
+.srow{display:grid;grid-template-columns:1fr 280px;gap:18px;padding:13px 0;border-bottom:1px solid var(--app-line)}
+.srow h6{margin:0;font-size:13.5px}
+.srow p{margin:2px 0 0;color:var(--app-ink-3);font-size:12.5px;max-width:52ch}
+.srow .src{font-size:11.5px;color:var(--app-ink-3);margin-top:6px}
+.srow .src code{color:var(--app-ink-2)}
+.seg{display:inline-flex;border:1px solid var(--app-line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--app-ink-2);padding:5px 12px;font-size:12.5px;font-weight:600;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--app-ink);color:var(--app-bg)}
+.cmds{background:var(--app-bg);border:1px solid var(--app-line);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--app-ink-2);white-space:pre-wrap;margin-top:14px}
+.ctl .note{color:var(--amber);font-size:12px;margin-top:6px}
+.ctl .note label{display:flex;gap:6px;align-items:center;margin-top:4px;color:var(--app-ink-2)}
+
+/* Dialog + toast */
+.modal{position:fixed;inset:0;background:rgba(5,8,10,.55);display:none;place-items:center;z-index:30;padding:20px}
+.modal.on{display:grid}
+.dlg{background:var(--app-panel);color:var(--app-ink);border:1px solid var(--app-line);border-radius:14px;width:min(520px,100%);padding:20px;font-size:14px;max-height:90vh;overflow:auto}
+.dlg h4{margin:0 0 6px;font-size:18px}
+.dlg ul{margin:12px 0;padding:0;list-style:none}
+.dlg li{padding:8px 10px;border:1px solid var(--app-line);border-radius:8px;margin-bottom:6px;font-size:13px}
+.dlg li .loss{display:block;color:var(--amber);font-size:12px;margin-top:2px}
+.dlg .chk{display:flex;gap:8px;align-items:center;margin:10px 0;color:var(--app-ink-2);font-size:13px}
+.dlg .chk input{accent-color:var(--ok)}
+.dlg .field{display:block;margin:10px 0}
+.dlg .field span{display:block;font-size:12px;color:var(--app-ink-3);margin-bottom:4px}
+.dlg .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:500;transition:.25s;z-index:40;max-width:calc(100% - 32px);pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* Document blocks */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+.panel ul{margin:0;padding-left:20px}
+.panel li{margin:6px 0}
+.panel.no li::marker{color:var(--ink-3)}
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+.diagram svg{display:block;min-width:780px;width:100%;height:auto}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px 28px;margin-top:20px}
+.notes p{margin:0;font-size:15.5px;color:var(--ink-2)}
+.notes b{color:var(--ink)}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:15px}
+th,td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--ink-3);font-size:14px}
+tr:last-child td{border-bottom:0}
+td code{background:var(--surface-2);padding:1px 6px;border-radius:5px;white-space:nowrap}
+.pill{display:inline-block;font-size:13px;font-weight:600;padding:2px 10px;border-radius:999px;white-space:nowrap}
+.pill.safe{background:var(--accent-soft);color:var(--accent)}
+.pill.review{background:var(--warn-soft);color:var(--warn)}
+.pill.use{background:var(--surface-2);color:var(--ink-2)}
+.after{margin-top:12px;font-size:15px;color:var(--ink-2)}
+.annot{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.annot{grid-template-columns:1fr}}
+pre.code{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;overflow-x:auto;line-height:1.6;font-size:13.5px}
+.code .c{color:var(--ink-3)} .code .kw{color:var(--accent);font-weight:500} .code .ty{color:var(--warn)}
+.side-notes{display:flex;flex-direction:column;gap:14px}
+.side-notes div{border-left:3px solid var(--accent);padding:2px 0 2px 14px}
+.side-notes p{margin:0;font-size:15.5px;color:var(--ink-2)}
+.side-notes b{color:var(--ink)}
+.tree{font-family:var(--mono);font-size:13.5px;line-height:1.85;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;overflow-x:auto}
+.tree div{white-space:pre;display:flex;gap:24px}
+.tree .p{min-width:300px}
+.tree .d{color:var(--ink-3);font-family:var(--sans);font-size:14.5px}
+.tree .dir{font-weight:500}
+ol.steps{list-style:none;margin:0;padding:0;position:relative}
+ol.steps::before{content:"";position:absolute;left:19px;top:8px;bottom:8px;width:2px;background:var(--line)}
+ol.steps li{position:relative;display:grid;grid-template-columns:40px 1fr;gap:18px;padding:0 0 26px}
+.num{width:40px;height:40px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);display:grid;place-items:center;font-weight:700;color:var(--accent);position:relative}
+ol.steps li:first-child .num{background:var(--accent);color:var(--accent-ink)}
+ol.steps li.gate .num{border-style:dashed}
+.step-h{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;padding-top:6px}
+.step-h h3{margin:0}
+.est{font-size:14px;color:var(--ink-3)}
+.steps p{margin:6px 0 0;color:var(--ink-2)}
+.done{font-size:14.5px;margin-top:6px;color:var(--ink)}
+.done b{font-weight:600}
+.checkpoint{display:inline-block;margin-top:8px;font-size:13.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:3px 10px;border-radius:999px}
+.risks{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.risk{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.risk h3{font-size:17px}
+.risk p{margin:0;color:var(--ink-2);font-size:15.5px}
+
+.decided{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:36px}
+.dec{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.dec span{display:block;font-size:13.5px;color:var(--ink-3)}
+.dec b{font-size:16px}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:14px}
+.q.answered{border-color:var(--accent)}
+.q-top{display:flex;justify-content:space-between;gap:12px;align-items:start}
+.q h3{font-size:18px}
+.q .why{margin:0 0 12px;color:var(--ink-2);font-size:15.5px}
+.q .state{font-size:13px;font-weight:600;color:var(--ink-3);white-space:nowrap}
+.q.answered .state{color:var(--accent)}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{font:inherit;font-size:15px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:8px 14px;cursor:pointer;text-align:left}
+.opt small{display:block;color:var(--ink-3);font-size:13px}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.opt .rec{font-size:12px;font-weight:700;color:var(--accent);margin-left:6px}
+.q textarea{width:100%;margin-top:12px;min-height:44px;resize:vertical;font:inherit;font-size:15px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.answers-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:20px}
+.btn{font:inherit;font-weight:600;font-size:16px;border:0;border-radius:10px;padding:11px 20px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line)}
+#answerText{width:100%;min-height:160px;margin-top:14px;font-family:var(--mono);font-size:13px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px;display:none}
+footer{padding:48px 0 64px;color:var(--ink-3);font-size:15px}
+</style>
+</head>
+<body>
+
+<header class="top wrap">
+  <span class="status">Revision 5, all decisions made</span>
+  <h1>Diffract</h1>
+  <p class="lede">A modern Git desktop client for Windows that understands worktrees, cleans up after AI agents and makes rebases less scary.</p>
+  <div class="meta">
+    <span>Owner <b>Johan</b></span>
+    <span>Updated <b>20 Oct 2026</b></span>
+    <span>Stack <b>Tauri, React, .NET 10 sidecar</b></span>
+    <span>Platform <b>Windows</b></span>
+  </div>
+  <div class="rev">
+    <h3>What changed since revision 3</h3>
+    <ul>
+      <li>Windows only. macOS is out, along with a second webview, notarization and cross-platform path quirks.</li>
+      <li>Tauri stays as the shell, with the .NET 10 sidecar over stdio.</li>
+      <li>Milestones shrink a little, mostly in milestone 2 and testing.</li>
+    </ul>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Plan sections">
+  <div class="wrap">
+    <a href="#review">Prototype</a>
+    <a href="#goals">Goals</a>
+    <a href="#arch">Architecture</a>
+    <a href="#leftovers">Agent leftovers</a>
+    <a href="#conflicts">Rebase and conflicts</a>
+    <a href="#model">Core model</a>
+    <a href="#files">File map</a>
+    <a href="#milestones">Milestones</a>
+    <a href="#risks">Risks</a>
+    <a href="#questions">Decisions</a>
+  </div>
+</nav>
+
+<main>
+<section id="review" class="wrap">
+  <div class="review-head">
+    <h2>Try the main views</h2>
+    <p class="sub" style="margin:0">Clickable mock with fake data. Start an interactive rebase, resolve the conflict it hits, and change repo settings.</p>
+    <div class="tabs" role="tablist" aria-label="Prototype views">
+      <button role="tab" aria-selected="true" data-view="history">History</button>
+      <button role="tab" aria-selected="false" data-view="agents">Worktrees and agents</button>
+      <button role="tab" aria-selected="false" data-view="changes">Changes</button>
+      <button role="tab" aria-selected="false" data-view="rebase">Rebase<span class="new">new</span></button>
+      <button role="tab" aria-selected="false" data-view="conflicts">Conflicts<span class="new">new</span></button>
+      <button role="tab" aria-selected="false" data-view="settings">Repo settings<span class="new">new</span></button>
+    </div>
+  </div>
+
+  <div class="scroller">
+  <div class="app" id="app">
+    <aside class="side">
+      <div class="repo"><div class="repo-mark">D</div><div><b>checkout-service</b><span>C:\src\checkout</span></div></div>
+      <h4>Branches</h4>
+      <ul id="sideBranches"></ul>
+      <h4>Worktrees</h4>
+      <ul>
+        <li><span class="dot" style="background:var(--l0)"></span>main <span class="n">primary</span></li>
+        <li><span class="dot" style="background:var(--l1)"></span>payment-retry <span class="n">3 dirty</span></li>
+        <li><span class="dot" style="background:var(--l2)"></span>fix-flaky-login <span class="n">active</span></li>
+        <li><span class="dot" style="background:var(--app-ink-3)"></span>Leftovers <span class="n warn" id="sideLeft">6</span></li>
+      </ul>
+      <h4>Stashes</h4>
+      <ul><li>2 stashes</li></ul>
+    </aside>
+
+    <div class="main">
+      <div class="view on" id="v-history">
+        <div class="bar">
+          <span class="title">History</span><span class="grow"></span>
+          <label class="toggle"><input type="checkbox" id="fadeMerged" checked> Fade merged branches</label>
+          <label class="toggle"><input type="checkbox" id="agentsOnly"> Agent work only</label>
+        </div>
+        <div class="hist-wrap">
+          <div class="hist" id="hist"></div>
+          <div class="detail" id="detail"></div>
+        </div>
+      </div>
+
+      <div class="view" id="v-agents">
+        <div class="bar">
+          <span class="title">Worktrees and agents</span><span class="grow"></span>
+          <button class="abtn" id="selSafe">Select all safe</button>
+          <button class="abtn primary" id="cleanBtn" disabled>Clean up selected</button>
+        </div>
+        <div class="agents">
+          <div class="summary" id="summary"></div>
+          <div class="chips" id="chips"></div>
+          <div id="items"></div>
+        </div>
+      </div>
+
+      <div class="view" id="v-changes">
+        <div class="bar">
+          <span class="title">Changes</span>
+          <span class="ref" style="color:var(--l1)">feature/payment-retry</span>
+          <span class="muted">..\checkout-payment</span>
+          <span class="grow"></span>
+          <button class="abtn" id="pullBtn">Pull</button>
+          <button class="abtn" id="pushBtn">Push</button>
+        </div>
+        <div class="changes">
+          <div class="files">
+            <div class="lists">
+              <h6>Unstaged <button class="abtn" id="stageAll">Stage all</button></h6>
+              <div id="unstaged"></div>
+              <h6>Staged</h6>
+              <div id="staged"></div>
+            </div>
+            <div class="commit">
+              <textarea id="msg" placeholder="Commit message" aria-label="Commit message"></textarea>
+              <button class="abtn primary" id="commitBtn" disabled>Commit</button>
+            </div>
+          </div>
+          <div class="diff" id="diff"></div>
+        </div>
+      </div>
+
+      <div class="view" id="v-rebase">
+        <div class="bar">
+          <span class="title">Interactive rebase</span>
+          <span class="ref" style="color:var(--l1)">feature/payment-retry</span>
+          <span class="muted">onto</span>
+          <span class="ref" style="color:var(--l0)">main</span>
+          <span class="grow"></span>
+          <button class="abtn" id="rbReset">Reset</button>
+          <button class="abtn primary" id="rbStart">Start rebase</button>
+        </div>
+        <div class="rb">
+          <div class="todo">
+            <p class="lead">Oldest commit first, the order git will apply them. Change the action or move commits up and down.</p>
+            <div id="todo"></div>
+          </div>
+          <div class="preview" id="rbPreview"></div>
+        </div>
+      </div>
+
+      <div class="view" id="v-conflicts">
+        <div class="cbanner" id="cBanner"></div>
+        <div class="cf" id="cBody">
+          <div class="cfiles" id="cFiles"></div>
+          <div class="cmain" id="cMain"></div>
+        </div>
+      </div>
+
+      <div class="view" id="v-settings">
+        <div class="bar">
+          <span class="title">Repo settings</span>
+          <div class="seg" role="group" aria-label="Settings scope">
+            <button aria-pressed="true" data-scope="repo">This repo</button>
+            <button aria-pressed="false" data-scope="global">Global</button>
+          </div>
+          <span class="grow"></span>
+          <button class="abtn" id="newRepo">New repository</button>
+          <button class="abtn primary" id="saveSettings" disabled>Save changes</button>
+        </div>
+        <div class="stv" id="stv"></div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <p class="hint" style="margin-top:10px">Look and feel is a starting point, not a decision. Comment on anything you’d change.</p>
+</section>
+
+<section id="goals" class="wrap">
+  <h2>Why build it, and what it is not</h2>
+  <p class="sub">Git Extensions works, but it was designed before worktrees were common and long before agents started creating them for you. Diffract aims to replace it completely.</p>
+  <div class="cols">
+    <div class="panel">
+      <h3>Goals for v1</h3>
+      <ul>
+        <li>A modern, fast Windows app you enjoy looking at all day.</li>
+        <li>Worktrees as a first-class concept: see every one, its state and who is using it.</li>
+        <li>Find and safely clean up agent leftovers from Claude Code and Copilot.</li>
+        <li>A full daily driver: commit, merge, interactive rebase and conflict resolution.</li>
+        <li>Repo setup made visible: line endings, default branch, identity, and where each value comes from.</li>
+        <li>Never lose work. Every destructive action has a preview and an undo path.</li>
+      </ul>
+    </div>
+    <div class="panel no">
+      <h3>Not in v1</h3>
+      <ul>
+        <li>macOS and Linux. It’s a personal tool for Windows.</li>
+        <li>Hosting integration (PRs, issues, reviews).</li>
+        <li>Plugin system.</li>
+        <li>Reimplementing git. Diffract only drives the git CLI.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="arch" class="wrap">
+  <h2>Architecture</h2>
+  <p class="sub">Tauri gives a small native shell around WebView2. The git work stays in C#, running as a sidecar process the shell starts and talks to over stdin and stdout.</p>
+  <div class="diagram">
+    <svg viewBox="0 0 980 470" role="img" aria-label="Architecture: React UI in a Tauri shell. The Rust core relays commands and events to a .NET 10 sidecar over stdio JSON-RPC. The sidecar has GitRunner, RepoWatcher, LeftoverRules, Merge and rebase sessions, and OperationLog, and calls the git CLI.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ink-3)"/></marker>
+      </defs>
+      <g font-family="Schibsted Grotesk, Segoe UI, sans-serif">
+        <rect x="20" y="20" width="940" height="196" rx="12" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="40" y="48" font-size="15" font-weight="700" fill="var(--ink)">Tauri app (WebView2)</text>
+        <rect x="40" y="62" width="900" height="64" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="58" y="86" font-size="14" font-weight="600" fill="var(--ink)">React UI</text>
+        <text x="58" y="106" font-size="12.5" fill="var(--ink-3)">History (Canvas 2D), Worktrees and agents, Changes, Rebase, Conflicts, Settings. Monaco for diffs.</text>
+        <line x1="490" y1="127" x2="490" y2="145" stroke="var(--ink-3)" stroke-width="1.5" marker-end="url(#ar)" marker-start="url(#ar)"/>
+        <rect x="40" y="148" width="900" height="52" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="58" y="171" font-size="14" font-weight="600" fill="var(--ink)">Rust core (thin)</text>
+        <text x="58" y="189" font-size="12.5" fill="var(--ink-3)">Starts and supervises the sidecar, relays commands and events, file dialogs, window and menu, auto-update</text>
+
+        <line x1="490" y1="218" x2="490" y2="250" stroke="var(--ink-3)" stroke-width="1.5" marker-end="url(#ar)" marker-start="url(#ar)"/>
+        <text x="502" y="240" font-size="12.5" fill="var(--ink-3)">JSON-RPC over stdio, no open ports</text>
+
+        <rect x="20" y="254" width="940" height="128" rx="12" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="40" y="280" font-size="15" font-weight="700" fill="var(--ink)">.NET 10 sidecar (single win-x64 binary)</text>
+        <rect x="40" y="294" width="170" height="70" rx="8" fill="var(--surface-2)"/>
+        <text x="54" y="318" font-size="13.5" font-weight="600" fill="var(--ink)">GitRunner</text>
+        <text x="54" y="336" font-size="12" fill="var(--ink-3)">Process calls, -z</text>
+        <text x="54" y="351" font-size="12" fill="var(--ink-3)">porcelain parsers</text>
+        <rect x="222" y="294" width="170" height="70" rx="8" fill="var(--surface-2)"/>
+        <text x="236" y="318" font-size="13.5" font-weight="600" fill="var(--ink)">RepoWatcher</text>
+        <text x="236" y="336" font-size="12" fill="var(--ink-3)">.git and worktrees,</text>
+        <text x="236" y="351" font-size="12" fill="var(--ink-3)">debounced refresh</text>
+        <rect x="404" y="294" width="170" height="70" rx="8" fill="var(--accent-soft)"/>
+        <text x="418" y="318" font-size="13.5" font-weight="600" fill="var(--ink)">LeftoverRules</text>
+        <text x="418" y="336" font-size="12" fill="var(--ink-2)">Patterns from</text>
+        <text x="418" y="351" font-size="12" fill="var(--ink-2)">diffract.json</text>
+        <rect x="586" y="294" width="170" height="70" rx="8" fill="var(--accent-soft)"/>
+        <text x="600" y="318" font-size="13.5" font-weight="600" fill="var(--ink)">Merge and rebase</text>
+        <text x="600" y="336" font-size="12" fill="var(--ink-2)">Sessions, todo files,</text>
+        <text x="600" y="351" font-size="12" fill="var(--ink-2)">index-stage conflicts</text>
+        <rect x="768" y="294" width="172" height="70" rx="8" fill="var(--surface-2)"/>
+        <text x="782" y="318" font-size="13.5" font-weight="600" fill="var(--ink)">OperationLog</text>
+        <text x="782" y="336" font-size="12" fill="var(--ink-3)">Previews, archive tags,</text>
+        <text x="782" y="351" font-size="12" fill="var(--ink-3)">undo</text>
+
+        <line x1="490" y1="384" x2="490" y2="410" stroke="var(--ink-3)" stroke-width="1.5" marker-end="url(#ar)"/>
+        <rect x="250" y="412" width="480" height="44" rx="10" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="490" y="439" font-size="14" font-weight="600" fill="var(--ink)" text-anchor="middle">git CLI (2.40+), repository and all its worktrees on disk</text>
+      </g>
+    </svg>
+  </div>
+  <div class="notes">
+    <p><b>Why keep .NET with Tauri.</b> Tauri’s native side is Rust, but your strength and the hardest logic, parsing and rules, stay in C#. Rust stays thin enough that agents can write most of it.</p>
+    <p><b>Stdio, not localhost.</b> The sidecar never listens on a port, so there is nothing for other processes to connect to and no firewall prompts.</p>
+    <p><b>Live by default.</b> Agents change repos while you look at them. The watcher pushes events so every view stays current, including during a rebase.</p>
+  </div>
+</section>
+
+<section id="leftovers" class="wrap">
+  <h2>How agent leftovers are detected</h2>
+  <p class="sub">Each rule produces an item with a verdict. Anything in use is never offered for cleanup. Agent patterns live in diffract.json, seeded for Claude Code and GitHub Copilot.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Leftover</th><th>How it’s found</th><th>Default verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Worktree whose folder is gone</td><td><code>git worktree list --porcelain</code> reports <code>prunable</code></td><td><span class="pill safe">Safe to remove</span></td></tr>
+        <tr><td>Worktree on a merged branch</td><td><code>git branch --merged main</code> plus a clean status in that worktree</td><td><span class="pill safe">Safe to remove</span></td></tr>
+        <tr><td>Stale agent worktree</td><td>Branch or folder matches an agent pattern, no commits or file changes for N days</td><td><span class="pill review">Needs review</span></td></tr>
+        <tr><td>Local agent branches</td><td><code>git for-each-ref refs/heads/</code> filtered by agent patterns</td><td><span class="pill safe">Safe</span> if merged, otherwise <span class="pill review">Review</span></td></tr>
+        <tr><td>Copilot branches from origin</td><td>Remote-tracking <code>copilot/*</code> branches after fetch, checked against main</td><td><span class="pill safe">Safe</span> if merged, otherwise <span class="pill review">Review</span></td></tr>
+        <tr><td>Stashes left by tools</td><td><code>git stash list</code> with message patterns like “autostash”</td><td><span class="pill review">Needs review</span></td></tr>
+        <tr><td>Checkpoint refs</td><td><code>git for-each-ref</code> outside heads, tags, remotes and stash</td><td><span class="pill safe">Safe</span> if reachable from a branch</td></tr>
+        <tr><td>Orphaned commits</td><td><code>git fsck --unreachable --no-reflogs</code> limited to recent reflog entries</td><td><span class="pill review">Needs review</span></td></tr>
+        <tr><td>Old backup tags</td><td>Tags under <code>archive/</code> created by Diffract, older than a configurable age (30 days by default)</td><td><span class="pill review">Needs review</span></td></tr>
+        <tr><td>Active work</td><td>Worktree lock file, or file changes in the last 10 minutes</td><td><span class="pill use">In use, never cleaned</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="after">The exact branch and folder names both agents use get verified against your real repos in milestone 1, before any rule ships.</p>
+</section>
+
+<section id="conflicts" class="wrap">
+  <h2>Rebase and conflicts</h2>
+  <p class="sub">The part most Git UIs get wrong. These are the design rules behind the Rebase and Conflicts tabs in the prototype.</p>
+  <div class="cols">
+    <div class="panel">
+      <h3>Plain names instead of ours and theirs</h3>
+      <p style="margin:0;color:var(--ink-2)">During a rebase git swaps the meaning of ours and theirs. Diffract always labels sides by what they are, like “On main” and “Your commit c4d0a17”.</p>
+    </div>
+    <div class="panel">
+      <h3>Read conflicts from the index</h3>
+      <p style="margin:0;color:var(--ink-2)">Conflict sides come from git’s index stages (base, ours, theirs), not from parsing markers in the file. That also handles delete versus modify, renames and binary files.</p>
+    </div>
+    <div class="panel">
+      <h3>Always show where you are</h3>
+      <p style="margin:0;color:var(--ink-2)">A banner with the operation, the commit being applied and progress, plus abort and skip that are always one click away. Works the same for merge, rebase and cherry-pick.</p>
+    </div>
+    <div class="panel">
+      <h3>Survives restarts</h3>
+      <p style="margin:0;color:var(--ink-2)">State is read from .git (rebase-merge, MERGE_HEAD), so Diffract picks up a rebase started in the terminal or by an agent, and vice versa.</p>
+    </div>
+  </div>
+</section>
+
+<section id="model" class="wrap">
+  <h2>Core model</h2>
+  <p class="sub">A snapshot of the repo, rules that read it, and sessions for operations that span several steps. Rules are pure functions, so they’re trivial to test.</p>
+  <div class="annot">
+<pre class="code"><span class="kw">public sealed record</span> <span class="ty">RepoSnapshot</span>(
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">WorktreeInfo</span>&gt; Worktrees,
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">BranchInfo</span>&gt; Branches,
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">StashInfo</span>&gt; Stashes,
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">RefInfo</span>&gt; OtherRefs,
+    <span class="ty">OperationState</span>? InProgress,   <span class="c">// rebase, merge, cherry-pick</span>
+    <span class="ty">DateTimeOffset</span> TakenAt);
+
+<span class="kw">public sealed record</span> <span class="ty">Leftover</span>(
+    <span class="ty">LeftoverKind</span> Kind, <span class="kw">string</span> Name, <span class="kw">string</span>? Agent,
+    <span class="ty">Verdict</span> Verdict, <span class="kw">int</span> CommitsAtRisk, <span class="kw">string</span> Reason);
+
+<span class="kw">public interface</span> <span class="ty">ILeftoverRule</span>
+{
+    <span class="ty">IEnumerable</span>&lt;<span class="ty">Leftover</span>&gt; Evaluate(<span class="ty">RepoSnapshot</span> repo, <span class="ty">DiffractConfig</span> config);
+}
+
+<span class="kw">public sealed record</span> <span class="ty">ConflictFile</span>(
+    <span class="kw">string</span> Path, <span class="ty">ConflictKind</span> Kind,   <span class="c">// Content, DeleteModify, Rename, Binary</span>
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">ConflictHunk</span>&gt; Hunks);
+
+<span class="kw">public sealed record</span> <span class="ty">ConflictHunk</span>(
+    <span class="kw">int</span> Index, <span class="kw">string</span>? Base, <span class="kw">string</span> Target, <span class="kw">string</span> Incoming,
+    <span class="ty">Resolution</span>? Chosen);
+
+<span class="c">// Destructive work is always plan, then apply</span>
+<span class="ty">CleanupPlan</span> plan = cleanup.Plan(selected);
+<span class="kw">await</span> cleanup.ApplyAsync(plan, ct);</pre>
+    <div class="side-notes">
+      <div><p><b>Snapshot, not live objects.</b> One immutable snapshot per refresh. The UI diffs snapshots to animate what changed.</p></div>
+      <div><p><b>InProgress drives the banner.</b> If a rebase or merge is underway, every view knows, and the Conflicts tab opens on its own.</p></div>
+      <div><p><b>Target and Incoming, not ours and theirs.</b> The session maps git’s stages to these names once, so the UI never has to think about the rebase swap.</p></div>
+      <div><p><b>Agent is a guess, not a fact.</b> It comes from patterns in config, so it’s shown as a hint and never used to decide what to delete.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="files" class="wrap">
+  <h2>File map</h2>
+  <p class="sub">Solution layout. Tests lean on generated fixture repos, including scripted rebases that end in each kind of conflict.</p>
+  <div class="tree">
+    <div><span class="p dir">diffract/</span></div>
+    <div><span class="p">├─ src-tauri/</span><span class="d">Rust core: sidecar supervisor, relay, menus, updater</span></div>
+    <div><span class="p">├─ ui/</span><span class="d">React and TypeScript with Vite</span></div>
+    <div><span class="p">│  ├─ views/history/</span><span class="d">Lane layout and Canvas 2D renderer</span></div>
+    <div><span class="p">│  ├─ views/worktrees/</span><span class="d">Leftover list and cleanup dialog</span></div>
+    <div><span class="p">│  ├─ views/changes/</span><span class="d">Monaco diff, staging, commit box</span></div>
+    <div><span class="p">│  ├─ views/rebase/</span><span class="d">Todo editor and result preview</span></div>
+    <div><span class="p">│  ├─ views/conflicts/</span><span class="d">Hunk picker, result editor, progress banner</span></div>
+    <div><span class="p">│  └─ views/settings/</span><span class="d">Config with sources, new repository dialog</span></div>
+    <div><span class="p">├─ sidecar/</span></div>
+    <div><span class="p">│  ├─ Diffract.Sidecar/</span><span class="d">JSON-RPC over stdio, startup</span></div>
+    <div><span class="p">│  ├─ Diffract.Git/</span><span class="d">GitRunner, porcelain and config parsers</span></div>
+    <div><span class="p">│  ├─ Diffract.Leftovers/</span><span class="d">Rules, CleanupPlanner, OperationLog</span></div>
+    <div><span class="p">│  └─ Diffract.Operations/</span><span class="d">Merge, rebase and cherry-pick sessions</span></div>
+    <div><span class="p">├─ tests/</span></div>
+    <div><span class="p">│  ├─ Diffract.Git.Tests/</span><span class="d">Parsers against captured git output</span></div>
+    <div><span class="p">│  ├─ Diffract.Leftovers.Tests/</span><span class="d">Rules against real fixture repos</span></div>
+    <div><span class="p">│  ├─ Diffract.Operations.Tests/</span><span class="d">Every conflict kind, mid-rebase restarts</span></div>
+    <div><span class="p">│  ├─ fixtures/make-repos.ps1</span><span class="d">Builds repos with worktrees, stashes, orphans, conflicts</span></div>
+    <div><span class="p">│  └─ e2e/</span><span class="d">Playwright against the UI</span></div>
+    <div><span class="p">└─ diffract.json</span><span class="d">Agent patterns, stale threshold, main branch name</span></div>
+  </div>
+</section>
+
+<section id="milestones" class="wrap">
+  <h2>Milestones</h2>
+  <p class="sub">Putting merge and rebase in v1 roughly doubles the work, to around 4 months of evenings now that it’s Windows only. Milestones 1 to 5 still give you a usable tool after about 10 weeks, so you can dogfood long before v1 is complete.</p>
+  <ol class="steps">
+    <li><span class="num">1</span><div><div class="step-h"><h3>Spike: snapshot and rules</h3><span class="est">About 1 week</span></div>
+      <p>Console app that builds a RepoSnapshot and prints classified leftovers. Fixture script, rule tests, and a check of what Claude Code and Copilot really leave behind.</p>
+      <p class="done"><b>Done when</b> it correctly classifies your real repos.</p></div></li>
+    <li><span class="num">2</span><div><div class="step-h"><h3>Tauri shell, sidecar and live worktree view</h3><span class="est">2 to 3 weeks</span></div>
+      <p>Tauri app that starts the sidecar, JSON-RPC relay, RepoWatcher, read-only Worktrees and agents view. Windows build and installer in CI from day one.</p>
+      <p class="done"><b>Done when</b> an installed build runs on your machine and updates live.</p></div></li>
+    <li><span class="num">3</span><div><div class="step-h"><h3>Safe cleanup</h3><span class="est">1 to 2 weeks</span></div>
+      <p>Cleanup planner, confirm dialog, backup tags for unmerged work, cleanup of old backup tags, operation log with undo.</p>
+      <p class="done"><b>Done when</b> you stop cleaning worktrees by hand.</p></div></li>
+    <li><span class="num">4</span><div><div class="step-h"><h3>History graph</h3><span class="est">About 2 weeks</span></div>
+      <p>Lane layout, Canvas 2D renderer with virtualization, commit details, fade merged and agent-only filters.</p>
+      <p class="done"><b>Done when</b> it stays smooth on a repo with 50k commits.</p></div></li>
+    <li class="gate"><span class="num">5</span><div><div class="step-h"><h3>Changes and commit</h3><span class="est">About 2 weeks</span></div>
+      <p>Status, file and hunk staging, Monaco diff, commit, pull and push.</p>
+      <p class="done"><b>Done when</b> it’s your tool for normal work.</p>
+      <span class="checkpoint">Usable checkpoint: Git Extensions only needed for merges and rebases</span></div></li>
+    <li><span class="num">6</span><div><div class="step-h"><h3>Repo setup and settings</h3><span class="est">About 1 week</span></div>
+      <p>Config view with value sources: line endings with renormalize, identity, commit signing, pull strategy and prune. New repository dialog with .gitignore templates.</p>
+      <p class="done"><b>Done when</b> you set up a new repo without touching the terminal.</p></div></li>
+    <li><span class="num">7</span><div><div class="step-h"><h3>Merge and conflict resolution</h3><span class="est">3 to 4 weeks</span></div>
+      <p>Merge and cherry-pick sessions, progress banner, hunk picker with result editor, every conflict kind from the fixtures.</p>
+      <p class="done"><b>Done when</b> every fixture conflict can be resolved without leaving Diffract.</p></div></li>
+    <li><span class="num">8</span><div><div class="step-h"><h3>Interactive rebase</h3><span class="est">2 to 3 weeks</span></div>
+      <p>Todo editor with reorder, squash, fixup, reword and drop, result preview, force push with lease.</p>
+      <p class="done"><b>Done when</b> you uninstall Git Extensions.</p>
+      <span class="checkpoint">v1</span></div></li>
+    <li><span class="num">9</span><div><div class="step-h"><h3>Visual experiments</h3><span class="est">Open-ended</span></div>
+      <p>Time scrubber that replays history, blast-radius treemap per branch, worktree tracks view.</p></div></li>
+  </ol>
+</section>
+
+<section id="risks" class="wrap">
+  <h2>Risks</h2>
+  <p class="sub">What could hurt, and how the plan handles it.</p>
+  <div class="risks">
+    <div class="risk"><h3>Deleting someone’s work</h3><p>Plan then apply, backup tags for unmerged commits, an undo log, and nothing in use is ever offered.</p></div>
+    <div class="risk"><h3>Getting a rebase wrong</h3><p>Diffract drives git’s own rebase and never rewrites history itself. Abort is always available and the fixture suite covers mid-rebase restarts.</p></div>
+    <div class="risk"><h3>Sidecar packaging</h3><p>One win-x64 binary that Tauri bundles. Small, but a step to get working early, not late.</p></div>
+    <div class="risk"><h3>Windows path quirks</h3><p>Long paths, mixed separators, junctions and case-insensitive names. Covered by fixture repos created in awkward folders.</p></div>
+    <div class="risk"><h3>Scope</h3><p>v1 is now large. The checkpoint after milestone 5 means a long tail on rebase never blocks you from using the tool.</p></div>
+  </div>
+</section>
+
+<section id="questions" class="wrap">
+  <h2>Decisions</h2>
+  <p class="sub">All decisions locked in for milestone 1. Change any of them by commenting on this page.</p>
+  <div class="decided">
+    <div class="dec"><span>Desktop shell</span><b>Tauri</b></div>
+    <div class="dec"><span>Platform</span><b>Windows only</b></div>
+    <div class="dec"><span>Agents to support</span><b>Claude Code, Copilot</b></div>
+    <div class="dec"><span>History rendering</span><b>Canvas 2D</b></div>
+    <div class="dec"><span>v1 scope</span><b>Everything, incl. rebase</b></div>
+    <div class="dec"><span>Name</span><b>Diffract</b></div>
+    <div class="dec"><span>Unmerged work on cleanup</span><b>Backup tag, then remove</b></div>
+    <div class="dec"><span>Conflict layout</span><b>Side by side, result below</b></div>
+    <div class="dec"><span>Sidecar build</span><b>Native AOT</b></div>
+    <div class="dec"><span>Code signing</span><b>Unsigned for now</b></div>
+    <div class="dec"><span>Repo settings in v1</span><b>Identity, signing, pull, prune, .gitignore</b></div>
+    <div class="dec"><span>Start dogfooding</span><b>After milestone 5</b></div>
+  </div>
+  <h3>Revisit later</h3>
+  <p style="color:var(--ink-2);margin:0 0 8px">Backup tags: if they clutter your tag lists, store backups in a private ref namespace (refs/diffract/archive/) that normal tag views never show, or shorten the cleanup age.</p>
+  <div id="qs"></div>
+  <div class="answers-bar" style="display:none">
+    <button class="btn" id="copyAnswers">Copy answers</button>
+    <button class="btn ghost" id="resetAnswers">Clear answers</button>
+    <span class="hint" id="answeredCount"></span>
+  </div>
+  <textarea id="answerText" readonly aria-label="Your answers as text"></textarea>
+</section>
+</main>
+
+<footer class="wrap">All decisions are in. Next step: turn this plan into the kickoff brief for milestone 1. You can still comment directly on this page.</footer>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <div class="dlg">
+    <h4 id="dlgTitle"></h4>
+    <div id="dlgBody"></div>
+    <div class="acts">
+      <button class="abtn" id="dlgCancel">Cancel</button>
+      <button class="abtn primary" id="dlgOk">OK</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+let toastTimer;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 3400); }
+function btn(t, fn, cls){ const b = el('button','abtn' + (cls ? ' ' + cls : ''), t); b.addEventListener('click', fn); return b; }
+
+/* Tabs */
+function showTab(name){
+  document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', x.dataset.view === name ? 'true' : 'false'));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + name));
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.view)));
+
+/* Modal */
+let modalOk = null, lastFocus = null;
+function openModal(title, nodes, okText, onOk){
+  lastFocus = document.activeElement;
+  $('#dlgTitle').textContent = title;
+  const body = $('#dlgBody'); body.textContent = ''; nodes.forEach(n => body.append(n));
+  $('#dlgOk').textContent = okText; modalOk = onOk;
+  $('#modal').classList.add('on'); $('#dlgCancel').focus();
+}
+function closeModal(){ $('#modal').classList.remove('on'); if (lastFocus) lastFocus.focus(); }
+$('#dlgCancel').addEventListener('click', closeModal);
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal').classList.contains('on')) closeModal(); });
+$('#dlgOk').addEventListener('click', () => { const f = modalOk; if (f && f() === false) return; closeModal(); });
+
+/* History */
+const LANE = ['var(--l0)','var(--l1)','var(--l2)','var(--l3)','var(--l4)'];
+const AUTH = { You:'var(--app-ink-2)', Claude:'var(--l2)', Copilot:'var(--l3)' };
+const commits = [
+  {id:'a1f93c2', lane:2, p:['7b20e1d'], msg:'Replace sleep with explicit wait in LoginTests', who:'Claude', when:'2 min', refs:[{n:'claude/fix-flaky-login', wt:true}], active:true, agent:true,
+    files:[['M','tests/Auth/LoginTests.cs'],['M','tests/Support/WaitHelpers.cs']]},
+  {id:'c4d0a17', lane:1, p:['91be4f0'], msg:'Add retry policy to PaymentClient', who:'You', when:'25 min', refs:[{n:'feature/payment-retry', wt:true}],
+    files:[['M','src/Payments/PaymentClient.cs'],['A','src/Payments/RetryPolicy.cs']]},
+  {id:'7b20e1d', lane:2, p:['e8812aa'], msg:'Checkpoint: before refactor of auth helpers', who:'Claude', when:'40 min', refs:[{n:'checkpoint', tag:true}], agent:true,
+    files:[['M','tests/Support/AuthHelpers.cs']]},
+  {id:'e8812aa', lane:0, p:['5f3c9b8','d2a6c71'], msg:'Merge pull request #212 from copilot/update-deps', who:'You', when:'1 h', refs:[{n:'main'},{n:'origin/main'}],
+    files:[['M','Directory.Packages.props']]},
+  {id:'d2a6c71', lane:3, p:['5f3c9b8'], msg:'Bump Polly to 8.5 and xunit to 2.9', who:'Copilot', when:'3 h', refs:[{n:'origin/copilot/update-deps'}], merged:true, agent:true,
+    files:[['M','Directory.Packages.props']]},
+  {id:'91be4f0', lane:1, p:['5f3c9b8'], msg:'Introduce IPaymentClient abstraction', who:'You', when:'yesterday', refs:[],
+    files:[['A','src/Payments/IPaymentClient.cs'],['M','src/Payments/PaymentClient.cs'],['M','src/Startup.cs']]},
+  {id:'5f3c9b8', lane:0, p:['0ac77e3'], msg:'Fix currency rounding in cart totals', who:'You', when:'2 days', refs:[],
+    files:[['M','src/Cart/CartTotals.cs'],['M','tests/Cart/CartTotalsTests.cs']]},
+  {id:'b71e2d9', lane:4, p:['3e09f15'], msg:'Extract CartPricing service', who:'Copilot', when:'9 days', refs:[{n:'copilot/refactor-cart', wt:true}], agent:true, stale:true,
+    files:[['A','src/Cart/CartPricing.cs'],['M','src/Cart/CartService.cs']]},
+  {id:'3e09f15', lane:4, p:['0ac77e3'], msg:'WIP', who:'Copilot', when:'9 days', refs:[], agent:true, stale:true,
+    files:[['M','src/Cart/CartService.cs']]},
+  {id:'0ac77e3', lane:0, p:['6d14b20'], msg:'Release 2.4.0', who:'You', when:'12 days', refs:[{n:'v2.4.0', tag:true}],
+    files:[['M','CHANGELOG.md']]},
+  {id:'6d14b20', lane:0, p:[], msg:'Add order export endpoint', who:'You', when:'2 weeks', refs:[],
+    files:[['A','src/Orders/OrderExport.cs'],['M','src/Program.cs'],['D','src/Orders/LegacyExport.cs']]}
+];
+const ROW = 34, X0 = 16, DX = 17;
+const idx = Object.fromEntries(commits.map((c,i) => [c.id, i]));
+let selected = 'a1f93c2';
+
+function renderSideBranches(){
+  const ul = $('#sideBranches'); ul.textContent = '';
+  [['main',0],['feature/payment-retry',1],['claude/fix-flaky-login',2],['copilot/update-deps',3],['copilot/refactor-cart',4]].forEach(([n,l]) => {
+    const li = el('li'); const d = el('span','dot'); d.style.background = LANE[l]; li.append(d, document.createTextNode(n)); ul.append(li);
+  });
+}
+function renderHistory(){
+  const host = $('#hist'); host.textContent = '';
+  const fade = $('#fadeMerged').checked, agentsOnly = $('#agentsOnly').checked;
+  const maxLane = Math.max(...commits.map(c => c.lane));
+  const gw = X0 + maxLane * DX + 18;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns,'svg');
+  svg.setAttribute('width', gw); svg.setAttribute('height', commits.length * ROW);
+  const x = l => X0 + l * DX, y = i => i * ROW + ROW / 2;
+  const dim = c => (fade && c.merged) || (agentsOnly && !c.agent);
+  commits.forEach((c, i) => {
+    c.p.forEach((pid, k) => {
+      const j = idx[pid]; if (j == null) return;
+      const pc = commits[j];
+      const xc = x(c.lane), yc = y(i), xp = x(pc.lane), yp = y(j);
+      let d, color;
+      if (c.lane === pc.lane){ d = `M${xc} ${yc}L${xp} ${yp}`; color = LANE[c.lane]; }
+      else if (k > 0){ d = `M${xc} ${yc}C${xc} ${yc+ROW*.6} ${xp} ${yc+ROW*.4} ${xp} ${yc+ROW}L${xp} ${yp}`; color = LANE[pc.lane]; }
+      else { d = `M${xc} ${yc}L${xc} ${yp-ROW}C${xc} ${yp-ROW*.4} ${xp} ${yp-ROW*.6} ${xp} ${yp}`; color = LANE[c.lane]; }
+      const path = document.createElementNS(ns,'path');
+      path.setAttribute('d', d); path.setAttribute('fill','none'); path.setAttribute('stroke', color); path.setAttribute('stroke-width','2');
+      path.setAttribute('opacity', dim(c) || (k > 0 && dim(pc)) ? '.3' : '.9');
+      svg.append(path);
+    });
+  });
+  commits.forEach((c, i) => {
+    const g = document.createElementNS(ns,'g'); g.setAttribute('opacity', dim(c) ? '.35' : '1');
+    if (c.active){
+      const r = document.createElementNS(ns,'circle');
+      r.setAttribute('cx', x(c.lane)); r.setAttribute('cy', y(i)); r.setAttribute('r','6'); r.setAttribute('fill', LANE[c.lane]); r.setAttribute('class','pulse');
+      g.append(r);
+    }
+    const dot = document.createElementNS(ns,'circle');
+    dot.setAttribute('cx', x(c.lane)); dot.setAttribute('cy', y(i)); dot.setAttribute('r', c.p.length > 1 ? '5.5' : '4.5');
+    dot.setAttribute('fill', c.p.length > 1 ? 'var(--app-bg)' : LANE[c.lane]); dot.setAttribute('stroke', LANE[c.lane]); dot.setAttribute('stroke-width','2');
+    g.append(dot); svg.append(g);
+  });
+  host.append(svg);
+  commits.forEach(c => {
+    const r = el('div','row' + (c.id === selected ? ' sel' : '') + (dim(c) ? ' faded' : ''));
+    r.style.paddingLeft = gw + 'px'; r.tabIndex = 0; r.setAttribute('role','button');
+    r.setAttribute('aria-label', c.msg + ' by ' + c.who);
+    c.refs.forEach(f => {
+      const s = el('span','ref' + (f.tag ? ' tag' : ''), f.n + (f.wt ? '  ⌂' : ''));
+      s.style.color = LANE[c.lane];
+      if (f.wt) s.title = 'Checked out in a worktree';
+      r.append(s);
+    });
+    r.append(el('span','msg', c.msg));
+    const w = el('span','who'); const i = el('i'); i.style.background = AUTH[c.who]; w.append(i, document.createTextNode(c.who)); r.append(w);
+    r.append(el('span','when', c.when));
+    const pick = () => { selected = c.id; renderHistory(); };
+    r.addEventListener('click', pick);
+    r.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pick(); } });
+    host.append(r);
+  });
+  renderDetail();
+}
+function renderDetail(){
+  const c = commits[idx[selected]]; const d = $('#detail'); d.textContent = '';
+  d.append(el('h5', null, c.msg));
+  const status = c.active ? 'Agent is working in this worktree right now' : c.stale ? 'Stale: no activity for 9 days' : c.merged ? 'Merged into main' : '';
+  if (status){ const s = el('div', null, status); s.style.color = c.active ? 'var(--l2)' : c.stale ? 'var(--amber)' : 'var(--ok)'; s.style.fontSize = '12.5px'; s.style.marginTop = '4px'; d.append(s); }
+  [['Commit', c.id],['Author', c.who + (c.who !== 'You' ? ' (from branch pattern)' : '')],['When', c.when + ' ago'],['Parents', c.p.join(', ') || 'none']].forEach(([k,v]) => {
+    d.append(el('div','k',k)); const vv = el('div','v',v); if (k === 'Commit' || k === 'Parents') vv.className = 'v mono'; d.append(vv);
+  });
+  d.append(el('div','k','Files changed'));
+  const ul = el('ul');
+  c.files.forEach(([s,f]) => { const li = el('li'); const b = el('b', s === 'A' ? 'add' : s === 'D' ? 'del' : 'mod', s); li.append(b, document.createTextNode(f)); ul.append(li); });
+  d.append(ul);
+}
+$('#fadeMerged').addEventListener('change', renderHistory);
+$('#agentsOnly').addEventListener('change', renderHistory);
+
+/* Leftovers */
+let items = [
+  {id:'wt-copilot', kind:'Remote branch', name:'origin/copilot/update-deps', path:'', agent:'Copilot', v:'safe', why:'PR merged into main 1 h ago. Branch still on origin and tracked locally.', risk:0},
+  {id:'wt-missing', kind:'Worktree', name:'claude/spike-cache', path:'.claude\\worktrees\\spike-cache (folder missing)', agent:'Claude Code', v:'safe', why:'Folder was deleted outside git. Only metadata in .git/worktrees is left.', risk:0},
+  {id:'ref-cp', kind:'Checkpoint ref', name:'refs/checkpoints/claude/7b20e1d', path:'', agent:'Claude Code', v:'safe', why:'Points to a commit already on claude/fix-flaky-login.', risk:0},
+  {id:'wt-stale', kind:'Worktree', name:'copilot/refactor-cart', path:'..\\checkout-wt\\refactor-cart', agent:'Copilot', v:'review', why:'No activity for 9 days. 2 commits are not on any other branch.', risk:2},
+  {id:'stash-0', kind:'Stash', name:'stash@{0}', path:'', agent:'Claude Code', v:'review', why:'“autostash before rebase” with changes in 3 files.', risk:1},
+  {id:'orphan', kind:'Orphaned commit', name:'4e1c9b2 “WIP checkpoint”', path:'', agent:'Unknown', v:'review', why:'Only reachable from the reflog. Git will expire it in about 21 days.', risk:1},
+  {id:'arch-old', kind:'Backup tag', name:'archive/copilot/spike-search', path:'', agent:'Diffract', v:'review', why:'Backup kept during a cleanup 45 days ago. Its 3 commits exist nowhere else.', risk:3},
+  {id:'wt-claude', kind:'Worktree', name:'claude/fix-flaky-login', path:'.claude\\worktrees\\fix-flaky-login', agent:'Claude Code', v:'use', why:'Files changed 2 minutes ago. 2 commits ahead of main.', risk:0},
+  {id:'wt-you', kind:'Worktree', name:'feature/payment-retry', path:'..\\checkout-payment', agent:'You', v:'use', why:'3 uncommitted files. Your own work, never offered for cleanup.', risk:0}
+];
+const VLABEL = {safe:'Safe to remove', review:'Needs review', use:'In use'};
+let filter = 'all'; const chosen = new Set();
+function renderAgents(){
+  const sm = $('#summary'); sm.textContent = '';
+  [['safe','Safe to remove'],['review','Needs review'],['use','In use']].forEach(([k,l]) => {
+    const b = el('div','sum ' + k); b.append(el('b', null, String(items.filter(i => i.v === k).length)), el('span', null, l)); sm.append(b);
+  });
+  const ch = $('#chips'); ch.textContent = '';
+  [['all','All'],['safe','Safe to remove'],['review','Needs review'],['use','In use']].forEach(([k,l]) => {
+    const b = el('button','chip', l); b.setAttribute('aria-pressed', filter === k ? 'true' : 'false');
+    b.addEventListener('click', () => { filter = k; renderAgents(); }); ch.append(b);
+  });
+  const box = $('#items'); box.textContent = '';
+  const list = items.filter(i => filter === 'all' || i.v === filter);
+  if (!list.length){ box.append(el('div','empty','Nothing here. Agents left your repo tidy.')); }
+  list.forEach(i => {
+    const row = el('div','item'); row.id = 'it-' + i.id;
+    const cb = el('input'); cb.type = 'checkbox'; cb.disabled = i.v === 'use'; cb.checked = chosen.has(i.id);
+    cb.setAttribute('aria-label', 'Select ' + i.name);
+    cb.addEventListener('change', () => { cb.checked ? chosen.add(i.id) : chosen.delete(i.id); updateCleanBtn(); });
+    const mid = el('div');
+    const nm = el('div'); nm.append(el('span','nm', i.name), el('span','kind', i.kind + ', ' + i.agent)); mid.append(nm);
+    mid.append(el('div','why', i.why));
+    if (i.path) mid.append(el('div','path', i.path));
+    const acts = el('div','item-actions');
+    const missing = i.path.includes('missing');
+    if (i.v !== 'use' && i.kind !== 'Stash' && !missing) acts.append(btn('Diff vs main', () => toast('Would open a diff of ' + i.name + ' against main')));
+    if (i.kind === 'Stash') acts.append(btn('Show changes', () => toast('Would open the stash diff')));
+    if (i.kind === 'Worktree' && !missing) acts.append(btn('Open folder', () => toast('Would open ' + i.path)));
+    if (i.risk > 0) acts.append(btn('Create branch from it', () => toast('Would create a branch to keep this work')));
+    if (acts.childNodes.length) mid.append(acts);
+    row.append(cb, mid, el('span','verdict ' + i.v, VLABEL[i.v]));
+    box.append(row);
+  });
+  $('#sideLeft').textContent = items.filter(i => i.v !== 'use').length;
+  updateCleanBtn();
+}
+function updateCleanBtn(){ const n = chosen.size; const b = $('#cleanBtn'); b.disabled = n === 0; b.textContent = n ? 'Clean up ' + n + ' selected' : 'Clean up selected'; }
+$('#selSafe').addEventListener('click', () => { items.filter(i => i.v === 'safe').forEach(i => chosen.add(i.id)); renderAgents(); });
+$('#cleanBtn').addEventListener('click', () => {
+  const sel = items.filter(i => chosen.has(i.id));
+  const atRisk = sel.filter(i => i.risk > 0 && i.kind !== 'Backup tag');
+  const nodes = [el('p', null, 'This is exactly what will happen. Nothing else is touched.')];
+  const ul = el('ul');
+  sel.forEach(i => {
+    const li = el('li');
+    const what = i.kind === 'Worktree' ? (i.path.includes('missing') ? 'Prune worktree metadata for ' : 'Remove worktree and branch ') : i.kind === 'Stash' ? 'Drop ' : i.kind === 'Remote branch' ? 'Delete remote-tracking branch ' : 'Delete ';
+    li.append(document.createTextNode(what), el('b', null, i.name));
+    if (i.risk > 0) li.append(el('span','loss', i.risk + (i.risk === 1 ? ' commit exists' : ' commits exist') + ' nowhere else'));
+    ul.append(li);
+  });
+  nodes.push(ul);
+  let chk = null;
+  if (atRisk.length){
+    const lab = el('label','chk'); chk = el('input'); chk.type = 'checkbox'; chk.checked = true;
+    lab.append(chk, document.createTextNode('Keep a backup tag under archive/ for work that exists nowhere else'));
+    nodes.push(lab);
+  }
+  openModal('Clean up', nodes, 'Remove ' + sel.length + (sel.length === 1 ? ' item' : ' items'), () => {
+    const ids = [...chosen];
+    const archived = chk && chk.checked ? atRisk.length : 0;
+    ids.forEach(id => { const r = document.getElementById('it-' + id); if (r) r.classList.add('gone'); });
+    setTimeout(() => {
+      items = items.filter(i => !chosen.has(i.id)); chosen.clear(); renderAgents();
+      toast('Removed ' + ids.length + (ids.length === 1 ? ' item' : ' items') + (archived ? ', kept ' + archived + ' as backup tags' : '') + '. Undo is in the operation log.');
+    }, 260);
+  });
+});
+
+/* Changes */
+const DIFFS = {
+  'src/Payments/PaymentClient.cs': [
+    ['h','@@ -12,9 +12,14 @@ public sealed class PaymentClient : IPaymentClient'],
+    [' ','    private readonly HttpClient _http;',12],
+    ['-','    public PaymentClient(HttpClient http) => _http = http;',13],
+    ['+','    private readonly ResiliencePipeline _retry;',13],
+    ['+','',14],
+    ['+','    public PaymentClient(HttpClient http, ResiliencePipeline retry)',15],
+    ['+','    {',16],['+','        _http = http;',17],['+','        _retry = retry;',18],['+','    }',19],
+    [' ','',20],
+    [' ','    public async Task<PaymentResult> ChargeAsync(Charge charge, CancellationToken ct)',21],
+    ['-','        => await SendAsync(charge, ct);',22],
+    ['+','        => await _retry.ExecuteAsync(token => SendAsync(charge, token), ct);',22]
+  ],
+  'src/Payments/RetryPolicy.cs': [
+    ['h','@@ -0,0 +1,8 @@ new file'],
+    ['+','namespace Acme.Checkout.Payments;',1],['+','',2],['+','public static class RetryPolicy',3],['+','{',4],
+    ['+','    public static ResiliencePipeline Create() => new ResiliencePipelineBuilder()',5],
+    ['+','        .AddRetry(new RetryStrategyOptions { MaxRetryAttempts = 3 })',6],
+    ['+','        .Build();',7],['+','}',8]
+  ],
+  'tests/Payments/PaymentClientTests.cs': [
+    ['h','@@ -30,4 +30,15 @@ public class PaymentClientTests'],
+    [' ','    }',30],[' ','',31],
+    ['+','    [Fact]',32],
+    ['+','    public async Task ChargeAsync_retries_on_transient_failure()',33],
+    ['+','    {',34],
+    ['+','        var handler = new FlakyHandler(failures: 2);',35],
+    ['+','        var client = CreateClient(handler);',36],
+    ['+','',37],
+    ['+','        var result = await client.ChargeAsync(TestCharges.Valid, default);',38],
+    ['+','',39],
+    ['+','        Assert.True(result.Succeeded);',40],
+    ['+','        Assert.Equal(3, handler.Calls);',41],
+    ['+','    }',42]
+  ]
+};
+let files = [
+  {f:'src/Payments/PaymentClient.cs', s:'M', staged:false},
+  {f:'src/Payments/RetryPolicy.cs', s:'A', staged:false},
+  {f:'tests/Payments/PaymentClientTests.cs', s:'M', staged:false}
+];
+let curFile = files[0].f;
+function renderChanges(){
+  ['unstaged','staged'].forEach(which => {
+    const box = $('#' + which); box.textContent = '';
+    const list = files.filter(x => x.staged === (which === 'staged'));
+    if (!list.length) box.append(el('div','empty', which === 'staged' ? 'Nothing staged yet. Stage files to commit them.' : 'Working tree is clean.'));
+    list.forEach(x => {
+      const r = el('div','file' + (x.f === curFile ? ' sel' : '')); r.tabIndex = 0;
+      r.append(el('span','st ' + (x.s === 'A' ? 'add' : 'mod'), x.s));
+      const fn = el('span','fn', x.f); fn.title = x.f; r.append(fn);
+      const b = el('button','abtn', x.staged ? 'Unstage' : 'Stage');
+      b.addEventListener('click', e => { e.stopPropagation(); x.staged = !x.staged; renderChanges(); });
+      r.append(b);
+      const pick = () => { curFile = x.f; renderChanges(); };
+      r.addEventListener('click', pick);
+      r.addEventListener('keydown', e => { if (e.key === 'Enter') pick(); });
+      box.append(r);
+    });
+  });
+  const d = $('#diff'); d.textContent = '';
+  const lines = curFile && DIFFS[curFile];
+  if (!lines){ d.append(el('div','dh','Select a file to see its changes.')); }
+  else {
+    d.append(el('div','dh', curFile));
+    lines.forEach(([t, tx, n]) => {
+      const row = el('div','dl' + (t === '+' ? ' p' : t === '-' ? ' m' : t === 'h' ? ' h' : ''));
+      row.append(el('span','ln', t === 'h' ? '' : String(n)), el('span','tx', t === 'h' ? tx : (t === ' ' ? '  ' : t + ' ') + tx));
+      d.append(row);
+    });
+  }
+  updateCommitBtn();
+}
+function updateCommitBtn(){
+  const n = files.filter(x => x.staged).length; const b = $('#commitBtn');
+  b.disabled = !(n && $('#msg').value.trim());
+  b.textContent = n ? 'Commit ' + n + (n === 1 ? ' file' : ' files') : 'Commit';
+}
+$('#msg').addEventListener('input', updateCommitBtn);
+$('#stageAll').addEventListener('click', () => { files.forEach(x => x.staged = true); renderChanges(); });
+$('#commitBtn').addEventListener('click', () => {
+  const n = files.filter(x => x.staged).length;
+  files = files.filter(x => !x.staged);
+  if (!files.find(x => x.f === curFile)) curFile = files[0] ? files[0].f : null;
+  $('#msg').value = '';
+  toast('Committed ' + n + (n === 1 ? ' file' : ' files') + ' to feature/payment-retry');
+  renderChanges();
+});
+$('#pullBtn').addEventListener('click', () => toast('Already up to date with origin/feature/payment-retry'));
+$('#pushBtn').addEventListener('click', () => toast('Pushed feature/payment-retry to origin'));
+
+/* Rebase */
+const TODO0 = [
+  {h:'91be4f0', msg:'Introduce IPaymentClient abstraction', act:'pick'},
+  {h:'c4d0a17', msg:'Add retry policy to PaymentClient', act:'pick'},
+  {h:'2a9e0f4', msg:'Fix typo in RetryPolicy', act:'fixup'},
+  {h:'8c13d55', msg:'WIP tests', act:'reword', newMsg:'Test retry on transient payment failures'}
+];
+let todo = TODO0.map(t => ({...t}));
+const ACTS = [['pick','Pick'],['reword','Reword'],['squash','Squash'],['fixup','Fixup'],['drop','Drop']];
+function rebaseResult(){
+  const out = []; let err = null;
+  todo.forEach((t, i) => {
+    if (t.act === 'drop') return;
+    if (t.act === 'squash' || t.act === 'fixup'){
+      if (!out.length){ err = 'The first commit can’t be squashed or fixed up into anything. Change its action to pick.'; return; }
+      out[out.length - 1].folded.push(t.h + (t.act === 'squash' ? ' (message kept)' : ''));
+      return;
+    }
+    out.push({msg: t.act === 'reword' ? (t.newMsg || t.msg) : t.msg, h: t.h, folded: [], reword: t.act === 'reword'});
+  });
+  return {out, err};
+}
+function renderRebase(){
+  const host = $('#todo'); host.textContent = '';
+  todo.forEach((t, i) => {
+    const r = el('div','trow' + (t.act === 'drop' ? ' drop' : '') + (t.act === 'squash' || t.act === 'fixup' ? ' fold' : ''));
+    const mv = el('div','mv');
+    const up = btn('↑', () => { if (i > 0){ [todo[i-1], todo[i]] = [todo[i], todo[i-1]]; renderRebase(); } }); up.disabled = i === 0; up.setAttribute('aria-label','Move up');
+    const dn = btn('↓', () => { if (i < todo.length - 1){ [todo[i+1], todo[i]] = [todo[i], todo[i+1]]; renderRebase(); } }); dn.disabled = i === todo.length - 1; dn.setAttribute('aria-label','Move down');
+    mv.append(up, dn);
+    const sel = el('select'); sel.setAttribute('aria-label','Action for ' + t.h);
+    ACTS.forEach(([v,l]) => { const o = el('option', null, l); o.value = v; if (v === t.act) o.selected = true; sel.append(o); });
+    sel.addEventListener('change', () => { t.act = sel.value; renderRebase(); });
+    const msgCell = el('div');
+    if (t.act === 'reword'){
+      const inp = el('input'); inp.type = 'text'; inp.value = t.newMsg || t.msg; inp.setAttribute('aria-label','New message for ' + t.h);
+      inp.addEventListener('input', () => { t.newMsg = inp.value; renderPreview(); });
+      msgCell.append(inp);
+    } else msgCell.append(el('div','tm', t.msg));
+    r.append(mv, sel, el('span','h', t.h), msgCell);
+    host.append(r);
+  });
+  renderPreview();
+}
+function renderPreview(){
+  const p = $('#rbPreview'); p.textContent = '';
+  const {out, err} = rebaseResult();
+  p.append(el('h5', null, todo.length + ' commits become ' + out.length));
+  out.forEach(c => {
+    const b = el('div','pc', c.msg);
+    const extra = [];
+    if (c.reword) extra.push('reworded');
+    if (c.folded.length) extra.push('includes ' + c.folded.join(', '));
+    if (extra.length) b.append(el('small', null, extra.join(', ')));
+    p.append(b);
+  });
+  if (err) p.append(el('div','warnbox', err));
+  p.append(el('div','warnbox','feature/payment-retry is already pushed. After the rebase Diffract will push with --force-with-lease, which refuses if someone else pushed in the meantime.'));
+  $('#rbStart').disabled = !!err;
+}
+$('#rbReset').addEventListener('click', () => { todo = TODO0.map(t => ({...t})); renderRebase(); });
+$('#rbStart').addEventListener('click', () => { resetConflicts(); showTab('conflicts'); toast('Rebase started. Stopped at a conflict while applying commit 2.'); });
+
+/* Conflicts */
+const CF0 = [
+  {f:'src/Payments/PaymentClient.cs', hunks:[
+    {before:['    private readonly HttpClient _http;',''],
+     main:['    public PaymentClient(HttpClient http, ILogger<PaymentClient> log)'],
+     mine:['    public PaymentClient(HttpClient http, ResiliencePipeline retry)'],
+     both:['    public PaymentClient(HttpClient http, ILogger<PaymentClient> log, ResiliencePipeline retry)'], pick:null},
+    {before:['    {','        _http = http;','    }','','    public async Task<PaymentResult> ChargeAsync(Charge charge, CancellationToken ct)'],
+     main:['        => await SendAsync(charge, ct).ConfigureAwait(false);'],
+     mine:['        => await _retry.ExecuteAsync(token => SendAsync(charge, token), ct);'],
+     both:['        => await _retry.ExecuteAsync(token => SendAsync(charge, token), ct).ConfigureAwait(false);'], pick:null}
+  ]},
+  {f:'Directory.Packages.props', hunks:[
+    {before:['  <ItemGroup>'],
+     main:['    <PackageVersion Include="Polly.Core" Version="8.5.0" />'],
+     mine:['    <PackageVersion Include="Polly.Core" Version="8.4.2" />'],
+     both:['    <PackageVersion Include="Polly.Core" Version="8.5.0" />','    <PackageVersion Include="Polly.Core" Version="8.4.2" />'], pick:null}
+  ]}
+];
+let cf, cfSel, cfDone;
+function resetConflicts(){ cf = JSON.parse(JSON.stringify(CF0)); cfSel = 0; cfDone = false; renderConflicts(); }
+function unresolved(file){ return file.hunks.filter(h => !h.pick).length; }
+function renderConflicts(){
+  const banner = $('#cBanner'); banner.textContent = '';
+  if (cfDone){
+    banner.append(el('div','t','Rebase finished'), el('div','s','feature/payment-retry is now 3 commits on top of main. Push when you’re ready.'));
+    const bd = $('#cBody'); bd.style.display = 'none';
+    let msg = $('#cDoneMsg');
+    if (!msg){
+      msg = el('div','cdone'); msg.id = 'cDoneMsg';
+      msg.append(el('b', null, 'No operation in progress'), el('div', null, 'Conflicts from merges, rebases and cherry-picks show up here.'));
+      const again = btn('Run the demo again', () => { msg.remove(); $('#cBody').style.display = ''; resetConflicts(); });
+      again.style.marginTop = '14px'; msg.append(again);
+      $('#v-conflicts').append(msg);
+    }
+    return;
+  }
+  const total = cf.reduce((s, f) => s + f.hunks.length, 0);
+  const left = cf.reduce((s, f) => s + unresolved(f), 0);
+  const top = el('div'); top.style.display = 'flex'; top.style.alignItems = 'center'; top.style.gap = '10px';
+  const txt = el('div'); txt.style.flex = '1';
+  txt.append(el('div','t','Rebasing feature/payment-retry onto main, applying commit 2 of 3'),
+             el('div','s','c4d0a17 Add retry policy to PaymentClient. ' + (left ? left + ' of ' + total + ' conflicts left.' : 'All conflicts resolved.')));
+  const abort = btn('Abort rebase', () => { cfDone = false; resetConflicts(); showTab('rebase'); toast('Rebase aborted. Branch is back where it started.'); }, 'danger');
+  const skip = btn('Skip this commit', () => toast('Would skip c4d0a17 and continue with the next commit'));
+  const cont = btn('Continue rebase', () => { cfDone = true; renderConflicts(); toast('Rebase finished. 4 commits became 3.'); }, 'primary');
+  cont.disabled = left > 0;
+  top.append(txt, abort, skip, cont);
+  const prog = el('div','prog'); const bar = el('i'); bar.style.width = (total ? ((total - left) / total) * 100 : 100) + '%'; prog.append(bar);
+  banner.append(top, prog);
+
+  const fl = $('#cFiles'); fl.textContent = '';
+  cf.forEach((file, i) => {
+    const u = unresolved(file);
+    const r = el('div','cfile' + (i === cfSel ? ' sel' : '')); r.tabIndex = 0;
+    const n = el('span', null, file.f.split('/').pop()); n.title = file.f;
+    r.append(n, el('span','b ' + (u ? 'u' : 'r'), u ? u + (u === 1 ? ' conflict' : ' conflicts') : 'Resolved'));
+    const pick = () => { cfSel = i; renderConflicts(); };
+    r.addEventListener('click', pick); r.addEventListener('keydown', e => { if (e.key === 'Enter') pick(); });
+    fl.append(r);
+  });
+
+  const m = $('#cMain'); m.textContent = '';
+  const file = cf[cfSel];
+  const head = el('div'); head.style.margin = '0 0 10px'; head.style.color = 'var(--app-ink-3)'; head.style.fontSize = '12.5px';
+  head.textContent = file.f + '. Pick a side for each conflict. You can edit the result afterwards.';
+  m.append(head);
+  file.hunks.forEach((h, hi) => {
+    const box = el('div','hunk' + (h.pick ? ' resolved' : ''));
+    const hh = el('div','hunk-h'); hh.append(document.createTextNode('Conflict ' + (hi + 1) + ' of ' + file.hunks.length), el('span', null, h.pick ? 'Resolved' : 'Unresolved'));
+    const sides = el('div','sides');
+    const a = el('div','s-main'); a.append(el('div','lab','On main')); h.main.forEach(l => a.append(el('div','cl', l)));
+    const b = el('div','s-mine'); b.append(el('div','lab','Your commit c4d0a17')); h.mine.forEach(l => b.append(el('div','cl', l)));
+    sides.append(a, b);
+    const acts = el('div','hunk-acts');
+    [['main','Use main'],['mine','Use mine'],['both','Use both']].forEach(([k,l]) => {
+      const bb = btn(l, () => { h.pick = h.pick === k ? null : k; renderConflicts(); });
+      bb.setAttribute('aria-pressed', h.pick === k ? 'true' : 'false'); acts.append(bb);
+    });
+    box.append(hh, sides, acts);
+    m.append(box);
+  });
+  const rl = el('div','lab','Result'); rl.style.padding = '6px 0 6px'; m.append(rl);
+  const res = el('div','result');
+  file.hunks.forEach((h, hi) => {
+    h.before.forEach(l => res.append(el('div','cl', l)));
+    if (h.pick) h[h.pick].forEach(l => res.append(el('div','cl rs', l)));
+    else res.append(el('div','cl un', '    // conflict ' + (hi + 1) + ' not resolved yet'));
+  });
+  m.append(res);
+}
+
+/* Settings */
+let scope = 'repo';
+const S0 = {
+  branch:'main', eol:'lf', name:'Johan', email:'johan@example.com', pull:'rebase', prune:true, sign:'off'
+};
+const SRC = {
+  repo: {branch:'Global only, applies to new repositories', eol:'.gitattributes (committed with the repo)', name:'Inherited from ~/.gitconfig', email:'.git/config (overrides global)', pull:'Inherited from ~/.gitconfig', prune:'Not set, Diffract default', sign:'Not set'},
+  global: {branch:'~/.gitconfig', eol:'~/.gitconfig', name:'~/.gitconfig', email:'~/.gitconfig', pull:'~/.gitconfig', prune:'Not set', sign:'Not set'}
+};
+const KEYS = {branch:'init.defaultBranch', eol:'core.autocrlf, .gitattributes', name:'user.name', email:'user.email', pull:'pull.rebase', prune:'fetch.prune', sign:'commit.gpgsign, gpg.format'};
+let S = {...S0}, renorm = true;
+const EOL = [['lf','Normalize to LF in the repo (recommended)'],['crlf','Check out with CRLF on Windows, store LF'],['none','Leave line endings exactly as they are']];
+function cmdsFor(){
+  const out = []; const g = scope === 'global' ? '--global' : '--local';
+  if (S.branch !== S0.branch) out.push('git config --global init.defaultBranch ' + S.branch);
+  if (S.eol !== S0.eol){
+    if (scope === 'repo'){
+      out.push(S.eol === 'none' ? 'remove "* text=auto" from .gitattributes' : 'write "* text=auto' + (S.eol === 'lf' ? ' eol=lf' : '') + '" to .gitattributes');
+      if (renorm) out.push('git add --renormalize . && git commit -m "Normalize line endings"');
+    } else out.push('git config --global core.autocrlf ' + (S.eol === 'crlf' ? 'true' : S.eol === 'lf' ? 'input' : 'false'));
+  }
+  if (S.name !== S0.name) out.push('git config ' + g + ' user.name "' + S.name + '"');
+  if (S.email !== S0.email) out.push('git config ' + g + ' user.email ' + S.email);
+  if (S.pull !== S0.pull) out.push('git config ' + g + ' pull.rebase ' + (S.pull === 'rebase'));
+  if (S.sign !== S0.sign){
+    if (S.sign === 'off') out.push('git config ' + g + ' commit.gpgsign false');
+    else {
+      out.push('git config ' + g + ' gpg.format ' + (S.sign === 'ssh' ? 'ssh' : 'openpgp'));
+      out.push('git config ' + g + ' user.signingkey ' + (S.sign === 'ssh' ? '~/.ssh/id_ed25519.pub' : '<your key id>'));
+      out.push('git config ' + g + ' commit.gpgsign true');
+    }
+  }
+  if (S.prune !== S0.prune) out.push('git config ' + g + ' fetch.prune ' + S.prune);
+  return out;
+}
+function srow(key, title, desc, control){
+  const r = el('div','srow');
+  const l = el('div'); l.append(el('h6', null, title), el('p', null, desc));
+  const src = el('div','src'); const c = el('code', null, KEYS[key]); src.append(c, document.createTextNode('. Set in: ' + SRC[scope][key])); l.append(src);
+  const ctl = el('div','ctl'); ctl.append(control);
+  r.append(l, ctl); return {r, ctl};
+}
+function renderSettings(){
+  const host = $('#stv'); host.textContent = '';
+  const ib = el('input'); ib.type = 'text'; ib.value = S.branch; ib.setAttribute('aria-label','Default branch name');
+  ib.addEventListener('input', () => { S.branch = ib.value.trim() || 'main'; refreshCmds(); });
+  host.append(srow('branch','Default branch for new repositories','Used by git init and the new repository dialog.', ib).r);
+
+  const se = el('select'); se.setAttribute('aria-label','Line endings');
+  EOL.forEach(([v,l]) => { const o = el('option', null, l); o.value = v; if (v === S.eol) o.selected = true; se.append(o); });
+  const eolRow = srow('eol','Line endings','How text files are stored in the repo and checked out on each machine. LF in the repo is the safe default, especially with Linux CI or containers.', se);
+  const note = el('div','note');
+  function eolNote(){
+    note.textContent = '';
+    if (S.eol !== S0.eol && scope === 'repo'){
+      note.append(document.createTextNode('Changing this can make every file show as modified.'));
+      const lab = el('label'); const c = el('input'); c.type = 'checkbox'; c.checked = renorm; c.style.accentColor = 'var(--ok)';
+      c.addEventListener('change', () => { renorm = c.checked; refreshCmds(); });
+      lab.append(c, document.createTextNode('Renormalize all files in one separate commit')); note.append(lab);
+    }
+  }
+  se.addEventListener('change', () => { S.eol = se.value; eolNote(); refreshCmds(); });
+  eolNote(); eolRow.ctl.append(note); host.append(eolRow.r);
+
+  const iname = el('input'); iname.type = 'text'; iname.value = S.name; iname.setAttribute('aria-label','Name');
+  iname.addEventListener('input', () => { S.name = iname.value; refreshCmds(); });
+  host.append(srow('name','Name','Shown as author on your commits.', iname).r);
+  const imail = el('input'); imail.type = 'text'; imail.value = S.email; imail.setAttribute('aria-label','Email');
+  imail.addEventListener('input', () => { S.email = imail.value; refreshCmds(); });
+  host.append(srow('email','Email','Use a work address in work repos and a private one elsewhere.', imail).r);
+
+  const sg = el('select'); sg.setAttribute('aria-label','Commit signing');
+  [['off','Off'],['ssh','Sign with an SSH key'],['gpg','Sign with a GPG key']].forEach(([v,l]) => { const o = el('option', null, l); o.value = v; if (v === S.sign) o.selected = true; sg.append(o); });
+  sg.addEventListener('change', () => { S.sign = sg.value; refreshCmds(); });
+  host.append(srow('sign','Commit signing','Shows a Verified badge on GitHub. SSH signing can reuse the key you already push with.', sg).r);
+
+  const seg = el('div','seg');
+  [['merge','Merge'],['rebase','Rebase']].forEach(([v,l]) => {
+    const b = el('button', null, l); b.setAttribute('aria-pressed', S.pull === v ? 'true' : 'false');
+    b.addEventListener('click', () => { S.pull = v; seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false')); refreshCmds(); });
+    seg.append(b);
+  });
+  host.append(srow('pull','When pulling','Rebase keeps history linear. Merge keeps exactly what happened.', seg).r);
+
+  const pl = el('label','toggle'); const pc = el('input'); pc.type = 'checkbox'; pc.checked = S.prune;
+  pc.addEventListener('change', () => { S.prune = pc.checked; refreshCmds(); });
+  pl.append(pc, document.createTextNode('Remove branches deleted on the remote'));
+  host.append(srow('prune','Prune on fetch','Keeps merged Copilot branches from piling up locally.', pl).r);
+
+  const cm = el('div','cmds'); cm.id = 'cmds'; host.append(cm);
+  refreshCmds();
+}
+function refreshCmds(){
+  const c = cmdsFor(); const box = $('#cmds');
+  if (box) box.textContent = c.length ? 'Saving will run:\n' + c.join('\n') : 'No changes. Every value shows where it comes from, read with git config --show-origin.';
+  $('#saveSettings').disabled = !c.length;
+}
+document.querySelectorAll('.seg[aria-label="Settings scope"] button').forEach(b => b.addEventListener('click', () => {
+  scope = b.dataset.scope;
+  document.querySelectorAll('.seg[aria-label="Settings scope"] button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  renderSettings();
+}));
+$('#saveSettings').addEventListener('click', () => {
+  const n = cmdsFor().length; Object.assign(S0, S); renderSettings();
+  toast('Saved. Ran ' + n + (n === 1 ? ' command' : ' commands') + ', all listed in the operation log.');
+});
+$('#newRepo').addEventListener('click', () => {
+  const field = (label, input) => { const f = el('label','field'); f.append(el('span', null, label), input); return f; };
+  const nm = el('input'); nm.type = 'text'; nm.value = 'order-service';
+  const loc = el('input'); loc.type = 'text'; loc.value = 'C:\\src';
+  const br = el('input'); br.type = 'text'; br.value = S0.branch;
+  const eol = el('select'); EOL.forEach(([v,l]) => { const o = el('option', null, l); o.value = v; if (v === 'lf') o.selected = true; eol.append(o); });
+  const gi = el('select'); ['VisualStudio (.NET)','Node','Python','None'].forEach(v => gi.append(el('option', null, v)));
+  const ic = el('label','chk'); const icc = el('input'); icc.type = 'checkbox'; icc.checked = true; ic.append(icc, document.createTextNode('Create an initial commit with .gitignore and .gitattributes'));
+  openModal('New repository', [field('Name', nm), field('Location', loc), field('Default branch', br), field('Line endings', eol), field('.gitignore template', gi), ic], 'Create repository', () => {
+    toast('Created ' + nm.value + ' on branch ' + (br.value || 'main') + (icc.checked ? ' with an initial commit' : ''));
+  });
+});
+
+/* Open questions */
+const QS = []; const QS_REV4 = [
+  {id:'shell2', q:'Windows only: keep Tauri, or switch to a .NET host with WebView2?', why:'Tauri was picked to cover macOS. On Windows only, a .NET app hosting WebView2 runs the same React UI with no Rust, no sidecar process and no stdio relay. The git layer runs in the same process.', multi:false,
+    opts:[['Switch to a .NET host with WebView2','One language, one process, simplest build and debugging',true],['Keep Tauri','Smaller installer, Rust shell, keeps other platforms possible']]}
+]; const QS_REV2 = [
+  {id:'safety', q:'An agent’s branch has 2 commits that exist nowhere else, and you clean it up. What should happen to those commits?', why:'This is the question from revision 1, made concrete. Removing a worktree and its branch can throw away commits that were never merged anywhere. Diffract can keep a safety copy first.', multi:false,
+    opts:[['Keep a backup tag, then remove','Recoverable under archive/ until you delete the tag',true],['Ask me every time','The dialog lists the commits and you decide'],['Just remove them','Git still keeps them about 30 days through the reflog']]},
+  {id:'layout', q:'Which conflict layout do you prefer?', why:'The prototype shows both sides next to each other with the result below. Many tools use three columns instead.', multi:false,
+    opts:[['Side by side, result below','As in the prototype',true],['Three columns','Main, result and your commit'],['Inline in the file','Accept buttons above each conflict, like VS Code']]},
+  {id:'sidecar', q:'How should the .NET sidecar be built?', why:'Tauri ships it as a separate binary per platform, so size and startup time matter.', multi:false,
+    opts:[['Native AOT','Small single binary, fast start, needs source-generated JSON',true],['Self-contained .NET','No AOT limits, larger per platform']]},
+  {id:'signing', q:'Code signing for Windows and macOS?', why:'Unsigned apps trigger SmartScreen and Gatekeeper warnings. Fine for your own machines, annoying for anyone else.', multi:false,
+    opts:[['Unsigned until others use it','',true],['Signed and notarized from the start','Needs an Apple developer account and a Windows certificate']]},
+  {id:'settings', q:'Which repo settings matter most besides line endings and default branch?', why:'Decides what the settings view covers in v1. Everything else stays reachable through raw git config.', multi:true,
+    opts:[['Identity per repo'],['Commit signing'],['Pull strategy'],['Prune on fetch'],['.gitignore templates']]},
+  {id:'checkpoint', q:'Is the usable checkpoint after milestone 5 the right place to start dogfooding?', why:'From there you’d use Diffract daily and keep Git Extensions only for merges and rebases until milestone 8.', multi:false,
+    opts:[['Yes','',true],['Earlier, after milestone 2'],['No, wait for v1']]}
+];
+const KEY = 'diffract-plan-answers-v1';
+let ans = {};
+try { ans = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch(e){ ans = {}; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(ans)); } catch(e){} }
+function renderQs(){
+  const host = $('#qs'); host.textContent = '';
+  QS.forEach(q => {
+    const a = ans[q.id] || {pick:[], note:''};
+    const answered = a.pick.length > 0 || (a.note || '').trim();
+    const box = el('div','q' + (answered ? ' answered' : ''));
+    const top = el('div','q-top'); top.append(el('h3', null, q.q), el('span','state', answered ? 'Answered' : q.multi ? 'Pick any' : 'Pick one'));
+    box.append(top, el('p','why', q.why));
+    const opts = el('div','opts');
+    q.opts.forEach(([label, hint, rec]) => {
+      const b = el('button','opt'); b.setAttribute('aria-pressed', a.pick.includes(label) ? 'true' : 'false');
+      b.append(document.createTextNode(label));
+      if (rec) b.append(el('span','rec','Recommended'));
+      if (hint) b.append(el('small', null, hint));
+      b.addEventListener('click', () => {
+        const cur = ans[q.id] || {pick:[], note:''};
+        if (q.multi){ cur.pick = cur.pick.includes(label) ? cur.pick.filter(p => p !== label) : cur.pick.concat(label); }
+        else { cur.pick = cur.pick[0] === label ? [] : [label]; }
+        ans[q.id] = cur; save(); renderQs();
+      });
+      opts.append(b);
+    });
+    box.append(opts);
+    const ta = el('textarea'); ta.placeholder = 'Optional note'; ta.value = a.note || ''; ta.setAttribute('aria-label', 'Note for: ' + q.q);
+    ta.addEventListener('input', () => { const cur = ans[q.id] || {pick:[], note:''}; cur.note = ta.value; ans[q.id] = cur; save(); updateCount(); box.classList.toggle('answered', cur.pick.length > 0 || !!cur.note.trim()); });
+    box.append(ta);
+    host.append(box);
+  });
+  updateCount();
+}
+function updateCount(){
+  const n = QS.filter(q => { const a = ans[q.id]; return a && (a.pick.length || (a.note || '').trim()); }).length;
+  $('#answeredCount').textContent = n + ' of ' + QS.length + ' answered';
+}
+function answersText(){
+  const lines = ['Diffract plan, revision 4 answers:'];
+  QS.forEach(q => {
+    const a = ans[q.id];
+    const pick = a && a.pick.length ? a.pick.join(', ') : 'no answer';
+    lines.push('', q.q, '  ' + pick + (a && a.note && a.note.trim() ? '\n  Note: ' + a.note.trim() : ''));
+  });
+  return lines.join('\n');
+}
+$('#copyAnswers').addEventListener('click', async () => {
+  const t = answersText(); const ta = $('#answerText'); ta.value = t; ta.style.display = 'block';
+  try { await navigator.clipboard.writeText(t); toast('Answers copied. Paste them into the chat.'); }
+  catch(e){ ta.focus(); ta.select(); toast('Copy blocked by the browser. The text is selected below.'); }
+});
+$('#resetAnswers').addEventListener('click', () => { ans = {}; save(); $('#answerText').style.display = 'none'; renderQs(); });
+
+renderSideBranches(); renderHistory(); renderAgents(); renderChanges(); renderRebase(); resetConflicts(); renderSettings(); renderQs();
+})();
+</script>
+</body>
+</html>

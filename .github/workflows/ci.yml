@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The job id "build" is a required status check in .github/rulesets/protect-main.json.
+  # Renaming it blocks every PR from merging. Do not rename it.
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git version
+        run: git --version
+
+      - name: Find solution
+        id: sln
+        shell: pwsh
+        run: |
+          $sln = Get-ChildItem -Path . -Filter *.slnx -File | Select-Object -First 1
+          if ($sln) { "path=$($sln.Name)" >> $env:GITHUB_OUTPUT }
+          else { Write-Host "No solution yet. Nothing to build, passing." }
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.sln.outputs.path != ''
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        if: steps.sln.outputs.path != ''
+        run: dotnet build ${{ steps.sln.outputs.path }} -c Release
+
+      - name: Test
+        if: steps.sln.outputs.path != ''
+        run: dotnet test ${{ steps.sln.outputs.path }} -c Release --no-build

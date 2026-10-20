@@ -1,0 +1,22 @@
+{
+  "mainBranch": "auto",
+  "staleAfterDays": 7,
+  "activeWithinMinutes": 10,
+  "archive": {
+    "tagPrefix": "archive/",
+    "reviewAfterDays": 30
+  },
+  "agents": [
+    {
+      "name": "Claude Code",
+      "branchPatterns": [ "claude/*" ],
+      "worktreePathPatterns": [ "**/.claude/worktrees/**" ]
+    },
+    {
+      "name": "GitHub Copilot",
+      "branchPatterns": [ "copilot/*" ],
+      "worktreePathPatterns": [ ]
+    }
+  ],
+  "toolStashPatterns": [ "autostash", "claude", "copilot" ]
+}
