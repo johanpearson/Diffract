@@ -3,10 +3,13 @@ namespace Diffract.Git.Parsing;
 /// <param name="Type">"commit", "tree", "blob" or "tag".</param>
 public sealed record UnreachableObject(string Type, string Id);
 
-/// <summary>Parses <c>git fsck --unreachable --no-reflogs</c>.</summary>
+/// <summary>
+/// Parses <c>git fsck --unreachable</c>. Without <c>--no-reflogs</c>, fsck counts reflog entries as references,
+/// so commits that were reset away or squash-merged are not reported until git expires them from the reflog.
+/// </summary>
 public static class UnreachableParser
 {
-    public static IReadOnlyList<string> Arguments { get; } = ["fsck", "--unreachable", "--no-reflogs", "--no-progress"];
+    public static IReadOnlyList<string> Arguments { get; } = ["fsck", "--unreachable", "--no-progress"];
 
     // fsck has no machine-readable mode, but these lines are stable: "unreachable <type> <id>".
     // Other lines (for example "missing" or "broken link" in a damaged repo) are not about unreachable objects.

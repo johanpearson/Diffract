@@ -1,6 +1,7 @@
 namespace Diffract.Git.Snapshot;
 
 /// <summary>One immutable picture of a repo and all its worktrees.</summary>
+/// <param name="UnreachableCommits">Commits that no ref and no reflog points to. Empty when fsck was skipped.</param>
 public sealed record RepoSnapshot(
     string RepoRoot,
     string MainBranch,

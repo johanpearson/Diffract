@@ -42,7 +42,7 @@ public class FixtureRepoBuilderTests
                 "Clean", "MergedWorktree", "PrunableWorktree", "StaleAgentWorktree", "ActiveAgentWorktree", "LockedWorktree",
                 "UserDirtyWorktree", "AgentBranchMerged", "AgentBranchUnmerged", "RemoteAgentBranch", "ToolStash",
                 "StaleCheckpointSession", "RecentCheckpointSession", "SquashMergedBranch", "PrewarmWorktree",
-                "LeftoverWorktreeFolder", "OrphanedCommit", "OldArchiveTag", "RecentArchiveTag", "AwkwardPaths",
+                "LeftoverWorktreeFolder", "OrphanedCommit", "ReflogOnlyCommit", "OldArchiveTag", "RecentArchiveTag", "AwkwardPaths",
                 "DetachedWorktree", "MasterAsMain",
             ],
             FixtureRepoBuilder.ScenarioNames);
@@ -345,7 +345,18 @@ public class FixtureRepoBuilderTests
 
         var snapshot = await SnapshotAsync(temp, "OrphanedCommit");
 
-        Assert.Single(snapshot.UnreachableCommits);
+        Assert.Equal(2, snapshot.UnreachableCommits.Count);
+        Assert.Single(snapshot.Branches);
+    }
+
+    [Fact]
+    public async Task ReflogOnlyCommit()
+    {
+        using var temp = new TempDirectory();
+
+        var snapshot = await SnapshotAsync(temp, "ReflogOnlyCommit");
+
+        Assert.Empty(snapshot.UnreachableCommits);
         Assert.Single(snapshot.Branches);
     }
 

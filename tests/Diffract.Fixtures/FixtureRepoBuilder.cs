@@ -33,6 +33,7 @@ public sealed class FixtureRepoBuilder(TempDirectory root, DateTimeOffset now)
         ("PrewarmWorktree", b => b.PrewarmWorktreeAsync()),
         ("LeftoverWorktreeFolder", b => b.LeftoverWorktreeFolderAsync()),
         ("OrphanedCommit", b => b.OrphanedCommitAsync()),
+        ("ReflogOnlyCommit", b => b.ReflogOnlyCommitAsync()),
         ("OldArchiveTag", b => b.OldArchiveTagAsync()),
         ("RecentArchiveTag", b => b.RecentArchiveTagAsync()),
         ("AwkwardPaths", b => b.AwkwardPathsAsync()),
@@ -245,9 +246,23 @@ public sealed class FixtureRepoBuilder(TempDirectory root, DateTimeOffset now)
         return Done(repo, (prewarm, DaysAgo(9)));
     }
 
+    /// <summary>
+    /// Two chained commits that no ref or reflog points to, made the way an agent tool makes a
+    /// checkpoint: with commit-tree, which never touches a branch or the reflog.
+    /// </summary>
     public async Task<FixtureScenario> OrphanedCommitAsync()
     {
         var repo = await NewRepoAsync("OrphanedCommit");
+        repo.Clock.Now = DaysAgo(5);
+        var baseline = (await repo.GitAsync("commit-tree", "HEAD^{tree}", "-m", "Agent session - baseline checkpoint")).StandardOutput.Trim();
+        await repo.GitAsync("commit-tree", "HEAD^{tree}", "-p", baseline, "-m", "Agent session - checkpoint 1");
+        return Done(repo);
+    }
+
+    /// <summary>A commit reset away, so only HEAD's reflog still points to it, as after a squash merge.</summary>
+    public async Task<FixtureScenario> ReflogOnlyCommitAsync()
+    {
+        var repo = await NewRepoAsync("ReflogOnlyCommit");
         repo.Clock.Now = DaysAgo(5);
         await repo.CommitAsync("experiment.txt", "try", "Experiment");
         await repo.GitAsync("reset", "-q", "--hard", "HEAD~1");

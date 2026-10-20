@@ -59,7 +59,7 @@ public sealed class RepoSnapshotBuilder
         var mergedTask = ListMergedAsync(call, repoPath, mainRefs, ct);
         var worktreesInfoTask = DescribeWorktreesAsync(call, repoPath, worktreeEntries, mainRefs.FirstOrDefault(), ct);
         var riskTask = CountCommitsAtRiskAsync(call, repoPath, refs, mergedTask, ct);
-        var unreachableTask = FindUnreachableCommitsAsync(call, repoPath, fsckTask, stashes, ct);
+        var unreachableTask = FindUnreachableCommitsAsync(fsckTask);
 
         var merged = await mergedTask.ConfigureAwait(false);
         var risk = await riskTask.ConfigureAwait(false);
@@ -257,27 +257,18 @@ public sealed class RepoSnapshotBuilder
         return newest;
     }
 
-    // fsck --no-reflogs reports stash@{1} and older as unreachable, because they only live in the
-    // stash reflog. Commits that only stashes reach are not orphans, so they are left out.
-    private static async Task<IReadOnlyList<string>> FindUnreachableCommitsAsync(
-        CallContext call, string repoPath, Task<GitResult>? fsckTask, IReadOnlyList<StashEntry> stashes, CancellationToken ct)
+    // fsck counts every reflog as a reference, including the stash reflog (stash@{1} and older) and
+    // each worktree's HEAD reflog. What is left is referenced by nothing at all.
+    private static async Task<IReadOnlyList<string>> FindUnreachableCommitsAsync(Task<GitResult>? fsckTask)
     {
         if (fsckTask is null)
             return [];
 
-        var unreachable = UnreachableParser.Parse((await fsckTask.ConfigureAwait(false)).StandardOutput)
+        return UnreachableParser.Parse((await fsckTask.ConfigureAwait(false)).StandardOutput)
             .Where(o => o.Type == "commit")
             .Select(o => o.Id)
+            .Order(StringComparer.Ordinal)
             .ToList();
-        if (unreachable.Count == 0 || stashes.Count == 0)
-            return unreachable;
-
-        List<string> args = ["rev-list"];
-        args.AddRange(stashes.Select(s => s.CommitId));
-        args.AddRange(["--not", "--branches", "--remotes", "--tags"]);
-        var result = await call.RunAsync(repoPath, args, ct).ConfigureAwait(false);
-        var stashOnly = result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
-        return unreachable.Where(id => !stashOnly.Contains(id)).ToList();
     }
 
     private static List<BranchInfo> BuildBranches(IReadOnlyList<RefEntry> refs, HashSet<string> merged, Dictionary<string, int> risk) =>

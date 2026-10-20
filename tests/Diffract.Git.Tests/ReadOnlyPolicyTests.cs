@@ -15,7 +15,7 @@ public class ReadOnlyPolicyTests
     [InlineData("reflog")]
     [InlineData("reflog -n 50")]
     [InlineData("reflog show HEAD")]
-    [InlineData("fsck --unreachable --no-reflogs --no-progress")]
+    [InlineData("fsck --unreachable --no-progress")]
     [InlineData("config --get init.defaultBranch")]
     [InlineData("config --get-regexp ^remote\\.")]
     [InlineData("config --list")]
