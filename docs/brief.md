@@ -14,6 +14,7 @@ The full visual plan, with a clickable prototype of every main view, is in `visu
 - A full daily driver: commit, merge, interactive rebase and conflict resolution.
 - Repo setup made visible: line endings, default branch, identity, signing, and where each value comes from.
 - Never lose work. Every destructive action has a preview and an undo path.
+- Open a terminal in any worktree, and keep git itself up to date from the app.
 
 ## Not in v1
 
@@ -94,11 +95,11 @@ diffract/
 ## Milestones
 
 1. **Spike: snapshot and rules.** Console app that classifies leftovers in any repo. (Current)
-2. Tauri shell, sidecar and live worktree view.
+2. Tauri shell, sidecar and live worktree view. Includes "Open terminal here" for the repo and each worktree (Windows Terminal, falling back to PowerShell), and a git version check at startup that offers to update Git for Windows through winget when git is older than 2.40 or a newer release exists. The update only runs after the user confirms.
 3. Safe cleanup with backup tags and undo.
 4. History graph.
 5. Changes and commit. *Checkpoint: start dogfooding.*
 6. Repo setup and settings.
 7. Merge and conflict resolution.
 8. Interactive rebase. *v1.*
-9. Visual experiments.
+9. Visual experiments. Includes trying a terminal embedded in the app.
