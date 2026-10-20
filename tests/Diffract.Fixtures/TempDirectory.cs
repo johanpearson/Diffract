@@ -19,12 +19,6 @@ public sealed class TempDirectory : IDisposable
         Directory.CreateDirectory(Path);
     }
 
-    /// <summary>
-    /// Checkpoint refs end up about 160 characters below the output folder, and git for Windows
-    /// cannot write paths over 260 without core.longpaths.
-    /// </summary>
-    public const int MaxFixtureOutputLength = 80;
-
     public string Path { get; }
 
     /// <summary>
@@ -34,9 +28,6 @@ public sealed class TempDirectory : IDisposable
     public static TempDirectory ForFixtureOutput(string path)
     {
         var full = System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(path));
-        if (full.Length > MaxFixtureOutputLength)
-            throw new InvalidOperationException($"The fixture folder path is {full.Length} characters. Git for Windows needs it to be at most {MaxFixtureOutputLength}, for example C:\\temp\\diffract-fixtures.");
-
         if (Directory.Exists(full) && Directory.EnumerateFileSystemEntries(full).Any())
             throw new InvalidOperationException($"The fixture folder must be empty or not exist yet: {full}");
 

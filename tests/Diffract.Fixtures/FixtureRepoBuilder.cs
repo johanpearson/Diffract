@@ -370,7 +370,8 @@ public sealed class FixtureRepoBuilder(TempDirectory root, DateTimeOffset now)
 
     /// <summary>
     /// Nests short folders until the path is exactly <paramref name="length"/> characters (or one short folder past
-    /// <paramref name="start"/> if that is longer). Git for Windows without core.longpaths cannot add a worktree past about 217.
+    /// <paramref name="start"/> if that is longer). <c>git worktree add</c> on Windows refuses paths past about
+    /// 217 characters ("'$GIT_DIR' too big"), even with core.longpaths, so longer worktrees cannot exist.
     /// </summary>
     private static string LongPath(string start, int length)
     {
