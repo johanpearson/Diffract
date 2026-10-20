@@ -24,6 +24,12 @@ public sealed class ReadOnlyViolationException(IReadOnlyList<string> arguments, 
     public string Reason { get; } = reason;
 }
 
+public sealed class NotAGitRepositoryException(string path)
+    : GitException($"Not a git repository: {path}")
+{
+    public string Path { get; } = path;
+}
+
 public sealed class GitVersionTooOldException(GitVersion found)
     : GitException($"Diffract needs git {GitVersion.Minimum} or newer, but found {found}. Update git from https://git-scm.com.")
 {
