@@ -15,6 +15,7 @@ Current milestone: [docs/milestones/m2-shell.md](docs/milestones/m2-shell.md), t
 - [docs/milestones/m1-spike.md](docs/milestones/m1-spike.md): milestone 1 (done), scope and acceptance criteria
 - [docs/findings/agent-leftovers.md](docs/findings/agent-leftovers.md): what Claude Code and Copilot really leave behind in a repo
 - [docs/visual-plan.html](docs/visual-plan.html): the visual plan with a clickable prototype (open locally in a browser)
+- [docs/setup.md](docs/setup.md): what to install to build Diffract on Windows
 - [AGENTS.md](AGENTS.md): rules for coding agents working in this repo
 - [docs/START-PROMPT.md](docs/START-PROMPT.md): the prompt that starts the agent on the current milestone
 - [docs/github.md](docs/github.md): merging PRs, what protects main, and how to get unstuck

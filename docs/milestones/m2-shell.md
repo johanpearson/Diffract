@@ -39,6 +39,8 @@ docs/setup.md                    toolchain for building Diffract on Windows
 
 **Checkpoint:** Johan installs the missing tools and approves the package list.
 
+Found on 2026-10-20: on Johan's machine, .NET 10, Node 24, Git 2.47, WebView2, Windows Terminal and winget were already there. Rust was missing, and so was the C++ workload in both installed copies of Visual Studio. `tauri-plugin-shell` was added to the package list, and so were the React types and `@testing-library/dom`.
+
 ## Phase 1: walking skeleton and installer
 
 The smallest app that proves the whole chain works, built and packaged in CI from the start.
@@ -147,19 +149,23 @@ Tests: Vitest and Testing Library for components, against the contract samples. 
 
 ## Dependencies
 
-AGENTS.md pre-approves NuGet packages only. This milestone needs npm and cargo packages. Proposed list, to be approved in phase 0:
+Approved in phase 0, and added to the pre-approved lists in `AGENTS.md`. Versions are the current major versions on 2026-10-20. The lockfiles (`package-lock.json`, `Cargo.lock`) pin the exact versions.
 
-| Package | Why |
-|---|---|
-| `react`, `react-dom` | UI framework from the brief |
-| `vite`, `@vitejs/plugin-react`, `typescript` | build tooling from the brief |
-| `@tauri-apps/api`, `@tauri-apps/cli` | talk to the Rust core, build the app |
-| `@tauri-apps/plugin-dialog` | the folder picker |
-| `vitest`, `@testing-library/react`, `jsdom` | component tests |
-| `@playwright/test` | end-to-end tests |
-| `tauri`, `tauri-build` (cargo) | the shell |
-| `tauri-plugin-dialog` (cargo) | the folder picker |
-| `serde`, `serde_json` (cargo) | read the line framing |
+| Package | Major | Why |
+|---|---|---|
+| `react`, `react-dom` | 19 | UI framework from the brief |
+| `@types/react`, `@types/react-dom` | 19 | types for React in TypeScript |
+| `vite`, `@vitejs/plugin-react` | 8, 6 | build tooling from the brief |
+| `typescript` | 7 | the UI language from the brief |
+| `@tauri-apps/api`, `@tauri-apps/cli` | 2 | talk to the Rust core, build the app |
+| `@tauri-apps/plugin-dialog` | 2 | the folder picker, from the UI side |
+| `vitest`, `jsdom` | 5, 30 | component tests |
+| `@testing-library/react`, `@testing-library/dom` | 16, 10 | component tests; the second is required by the first |
+| `@playwright/test` | 1 | end-to-end tests |
+| `tauri`, `tauri-build` (cargo) | 2 | the shell |
+| `tauri-plugin-dialog` (cargo) | 2 | the folder picker |
+| `tauri-plugin-shell` (cargo) | 2 | starts and talks to the bundled sidecar, Tauri's documented way |
+| `serde`, `serde_json` (cargo) | 1 | read the line framing |
 
 No UI component library and no state library. The view is small enough without them.
 
