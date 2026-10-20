@@ -6,12 +6,12 @@ Personal project. Windows only.
 
 ## Status
 
-Current milestone: [docs/milestones/m1-spike.md](docs/milestones/m1-spike.md), the spike for the repo snapshot and agent leftover rules. No UI yet.
+Milestone 1, [the spike for the repo snapshot and agent leftover rules](docs/milestones/m1-spike.md), is done. Milestone 2 (Tauri shell, sidecar and live worktree view, see [docs/brief.md](docs/brief.md)) has no milestone doc yet, so there is no current milestone.
 
 ## Docs
 
 - [docs/brief.md](docs/brief.md): what Diffract is, locked decisions, architecture
-- [docs/milestones/m1-spike.md](docs/milestones/m1-spike.md): current milestone, scope and acceptance criteria
+- [docs/milestones/m1-spike.md](docs/milestones/m1-spike.md): milestone 1 (done), scope and acceptance criteria
 - [docs/findings/agent-leftovers.md](docs/findings/agent-leftovers.md): what Claude Code and Copilot really leave behind in a repo
 - [docs/visual-plan.html](docs/visual-plan.html): the visual plan with a clickable prototype (open locally in a browser)
 - [AGENTS.md](AGENTS.md): rules for coding agents working in this repo
