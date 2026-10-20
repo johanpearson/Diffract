@@ -43,6 +43,8 @@ Before writing rules, find out what the agents actually leave behind.
 
 **Checkpoint:** stop and wait for Johan to review the findings and pattern changes.
 
+Done 2026-10-20. The findings and the decisions Johan made on them are in `docs/findings/agent-leftovers.md`. The phases below already include those decisions.
+
 ## Phase 1: solution and CI
 
 - `Diffract.slnx` with the projects above. Use `Directory.Build.props` at the root.
@@ -92,12 +94,15 @@ public sealed record RepoSnapshot(
     IReadOnlyList<StashInfo> Stashes,
     IReadOnlyList<RefInfo> OtherRefs,         // outside heads, tags, remotes, stash
     IReadOnlyList<string> UnreachableCommits,
+    IReadOnlyList<string> LeftoverFolders,    // in worktree container folders, see below
     DateTimeOffset TakenAt);
 ```
 
 - Main branch when config says `auto`: `origin/HEAD` if set, else `init.defaultBranch` if that branch exists, else `main`, else `master`.
 - For each worktree: status (dirty file count, ahead and behind main), last commit time, and last activity time. Last activity is the newest of: last commit time, modification time of changed files from status, and modification time of the worktree's index file. Do not walk the whole worktree.
 - For each branch and tag that rules care about: whether it is merged into main, and **commits at risk**, meaning commits reachable from it and from no other branch, remote-tracking branch or tag. Exclude the ref itself when counting, and do not count reachability through worktree HEADs or reflogs. Prove this with fixture tests.
+- For each local branch: its upstream, and whether the upstream is `gone`. A gone upstream usually means the PR was squash-merged and its branch deleted.
+- Leftover folders: list the subfolders of every folder that matches `worktreeContainerPatterns` in the config. A subfolder that is not a registered worktree and has no `.git` entry goes into `LeftoverFolders`. Never list folders anywhere else, so projects next to the repo are never touched.
 - Run independent git calls in parallel where it helps. Report timing per call when the spike runs with `--timing`.
 
 ## Phase 3: fixtures
@@ -117,8 +122,11 @@ public sealed record RepoSnapshot(
 | `AgentBranchUnmerged` | `copilot/...` branch, no worktree, 3 unmerged commits | Review, 3 at risk |
 | `RemoteAgentBranch` | Local bare "origin" with a merged `copilot/...` branch, fetched | Safe |
 | `ToolStash` | Stash with message containing "autostash" | Review |
-| `CheckpointRefReachable` | Ref under `refs/checkpoints/` pointing into a branch | Safe |
-| `CheckpointRefUnreachable` | Same, pointing at a commit on no branch | Review |
+| `StaleCheckpointSession` | 3 refs under `refs/copilot/checkpoints/<session>/<seq>/<id>`, newest 9 days old | Review, one row for the session |
+| `RecentCheckpointSession` | Same, newest 2 days old | No leftover |
+| `SquashMergedBranch` | Branch with 2 commits pushed to a local bare "origin", squash-merged into main there, remote branch deleted, fetched with prune | Safe, 2 at risk |
+| `PrewarmWorktree` | Clean detached worktree at `copilot-worktrees/<repo>/copilot-prewarm-...` | No leftover |
+| `LeftoverWorktreeFolder` | Folder in `copilot-worktrees/<repo>/` with files but no `.git` entry, next to a real worktree | Review |
 | `OrphanedCommit` | Commit made then reset away | Review |
 | `OldArchiveTag` | `archive/...` tag 45 days old with unique commits | Review |
 | `RecentArchiveTag` | `archive/...` tag 5 days old | No leftover |
@@ -136,7 +144,7 @@ public enum Verdict { SafeToRemove, NeedsReview, InUse }
 public enum LeftoverKind
 {
     Worktree, PrunableWorktree, LocalBranch, RemoteBranch,
-    Stash, CheckpointRef, OrphanedCommit, BackupTag
+    Stash, CheckpointSession, OrphanedCommit, BackupTag, LeftoverFolder
 }
 
 public sealed record Leftover(
@@ -157,6 +165,10 @@ public interface ILeftoverRule
 - One rule per row in the fixture table's verdict logic. Rules are pure: no git calls, no file system.
 - `LeftoverClassifier` runs all rules and resolves overlaps. An item reported by more than one rule appears once, with the most cautious verdict (`InUse` over `NeedsReview` over `SafeToRemove`).
 - The main worktree is never a leftover. The worktree Diffract runs from is never a leftover.
+- Worktrees matching `hiddenWorktreePathPatterns` are never reported, unless they are dirty.
+- Checkpoint refs are grouped by session: everything under the same `<session-id>` is one `CheckpointSession` leftover. Its age is the age of its newest ref.
+- A branch with a gone upstream is "Safe" even when it is not an ancestor of main. Its commits at risk are still counted and shown.
+- Patterns that change what is reported (`checkpointRefPatterns`, `hiddenWorktreePathPatterns`, `worktreeContainerPatterns`) are separate from the agent entries. Agent patterns only fill in the `Agent` hint.
 - `DiffractConfig` is loaded with System.Text.Json source generation. Defaults come from the embedded `diffract.json`. The spike accepts `--config <path>` to override.
 - Glob matching for branch and path patterns: write a small matcher (`*` within a segment, `**` across segments, case-insensitive on Windows paths) with its own tests. No package for this.
 
