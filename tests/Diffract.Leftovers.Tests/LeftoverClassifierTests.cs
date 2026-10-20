@@ -216,6 +216,24 @@ public class LeftoverClassifierTests
     }
 
     [Fact]
+    public void Orphaned_commits_get_one_row_per_agent_even_with_equal_counts()
+    {
+        var repo = Snap.Repo() with
+        {
+            UnreachableCommits =
+            [
+                new("c1", Snap.Now, "Agent host session s - baseline checkpoint"),
+                new("c2", Snap.Now, "Experiment"),
+            ],
+        };
+
+        var rows = Classify(repo);
+
+        Assert.Equal([("1 commit", (string?)null), ("1 commit", "GitHub Copilot")], rows.Select(l => (l.Name, l.Agent)));
+        Assert.All(rows, l => Assert.Equal((LeftoverKind.OrphanedCommit, Verdict.NeedsReview, 1), (l.Kind, l.Verdict, l.CommitsAtRisk)));
+    }
+
+    [Fact]
     public void Rules_can_be_chosen()
     {
         var repo = Snap.Repo(branches: [Snap.Branch("a", merged: true)]);

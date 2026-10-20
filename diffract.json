@@ -11,13 +11,15 @@
       "name": "Claude Code",
       "branchPatterns": [ "claude/*" ],
       "worktreePathPatterns": [ "**/.claude/worktrees/**" ],
-      "refPatterns": [ ]
+      "refPatterns": [ ],
+      "commitSubjectPrefixes": [ ]
     },
     {
       "name": "GitHub Copilot",
       "branchPatterns": [ "copilot/*" ],
       "worktreePathPatterns": [ "**/copilot-worktrees/**" ],
-      "refPatterns": [ "refs/copilot/checkpoints/**" ]
+      "refPatterns": [ "refs/copilot/checkpoints/**" ],
+      "commitSubjectPrefixes": [ "Agent host session " ]
     }
   ],
   "checkpointRefPatterns": [ "refs/copilot/checkpoints/**", "refs/checkpoints/**" ],

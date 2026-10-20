@@ -132,11 +132,16 @@ capture stash-list.bin git stash list -z "--format=$stash_format"
 capture stash-list-empty.bin git -C "$tmp/empty" stash list -z "--format=$stash_format"
 
 # --- unreachable --------------------------------------------------------------
+# A commit that is reset away stays in the reflog, so fsck still counts it as reachable.
+# The dropped stash and the commit-tree chain (how agent tools make checkpoints) are
+# referenced by nothing at all, so fsck reports them.
 commit orphan.txt "orphan" "Commit that gets reset away"
 git reset -q --hard HEAD~1
 git stash drop -q
-capture fsck-unreachable.txt git fsck --unreachable --no-reflogs --no-progress
+baseline="$(git commit-tree "HEAD^{tree}" -m "Agent checkpoint baseline")"
+git commit-tree "HEAD^{tree}" -p "$baseline" -m "Agent checkpoint" > /dev/null
+capture fsck-unreachable.txt git fsck --unreachable --no-progress
 git init -q -b main "$tmp/clean"
-(cd "$tmp/clean" && commit a.txt "a" "Only commit" && capture fsck-clean.txt git fsck --unreachable --no-reflogs --no-progress)
+(cd "$tmp/clean" && commit a.txt "a" "Only commit" && capture fsck-clean.txt git fsck --unreachable --no-progress)
 
 echo "Samples written to $out"

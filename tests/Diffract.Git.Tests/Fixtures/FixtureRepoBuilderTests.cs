@@ -42,7 +42,7 @@ public class FixtureRepoBuilderTests
                 "Clean", "MergedWorktree", "PrunableWorktree", "StaleAgentWorktree", "ActiveAgentWorktree", "LockedWorktree",
                 "UserDirtyWorktree", "AgentBranchMerged", "AgentBranchUnmerged", "RemoteAgentBranch", "ToolStash",
                 "StaleCheckpointSession", "RecentCheckpointSession", "SquashMergedBranch", "PrewarmWorktree",
-                "LeftoverWorktreeFolder", "OrphanedCommit", "OldArchiveTag", "RecentArchiveTag", "AwkwardPaths",
+                "LeftoverWorktreeFolder", "OrphanedCommit", "ReflogOnlyCommit", "OldArchiveTag", "RecentArchiveTag", "AwkwardPaths",
                 "DetachedWorktree", "MasterAsMain",
             ],
             FixtureRepoBuilder.ScenarioNames);
@@ -345,7 +345,21 @@ public class FixtureRepoBuilderTests
 
         var snapshot = await SnapshotAsync(temp, "OrphanedCommit");
 
-        Assert.Single(snapshot.UnreachableCommits);
+        Assert.Equal(
+            ["Agent host session d2061d20-a6c1-46ea-9cc3-fcf61843f825 - baseline checkpoint",
+             "Agent host session d2061d20-a6c1-46ea-9cc3-fcf61843f825 - checkpoint 1", "Experiment"],
+            snapshot.UnreachableCommits.Select(c => c.Subject).Order(StringComparer.Ordinal));
+        Assert.Single(snapshot.Branches);
+    }
+
+    [Fact]
+    public async Task ReflogOnlyCommit()
+    {
+        using var temp = new TempDirectory();
+
+        var snapshot = await SnapshotAsync(temp, "ReflogOnlyCommit");
+
+        Assert.Empty(snapshot.UnreachableCommits);
         Assert.Single(snapshot.Branches);
     }
 

@@ -121,6 +121,9 @@ public sealed record AgentConfig
     public IReadOnlyList<string> WorktreePathPatterns { get; init; } = [];
 
     public IReadOnlyList<string> RefPatterns { get; init; } = [];
+
+    /// <summary>Orphaned commits whose subject starts with one of these, matching case, are this agent's.</summary>
+    public IReadOnlyList<string> CommitSubjectPrefixes { get; init; } = [];
 }
 
 public sealed class ConfigException(string message, Exception? inner = null) : Exception(message, inner);

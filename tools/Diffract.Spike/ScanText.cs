@@ -48,7 +48,7 @@ internal static class ScanText
         LeftoverKind.LocalBranch => "Branch",
         LeftoverKind.RemoteBranch => "Remote branch",
         LeftoverKind.CheckpointSession => "Checkpoint",
-        LeftoverKind.OrphanedCommit => "Orphan commit",
+        LeftoverKind.OrphanedCommit => "Orphans",
         LeftoverKind.BackupTag => "Backup tag",
         LeftoverKind.LeftoverFolder => "Folder",
         _ => kind.ToString(),

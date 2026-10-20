@@ -1,6 +1,7 @@
 namespace Diffract.Git.Snapshot;
 
 /// <summary>One immutable picture of a repo and all its worktrees.</summary>
+/// <param name="UnreachableCommits">Commits that no ref and no reflog points to. Empty when fsck was skipped.</param>
 public sealed record RepoSnapshot(
     string RepoRoot,
     string MainBranch,
@@ -10,7 +11,7 @@ public sealed record RepoSnapshot(
     IReadOnlyList<TagInfo> Tags,
     IReadOnlyList<StashInfo> Stashes,
     IReadOnlyList<RefInfo> OtherRefs,
-    IReadOnlyList<string> UnreachableCommits,
+    IReadOnlyList<UnreachableCommit> UnreachableCommits,
     IReadOnlyList<string> LeftoverFolders,
     DateTimeOffset TakenAt);
 
@@ -63,6 +64,10 @@ public sealed record TagInfo(
     DateTimeOffset? CreatedAt,
     bool IsMergedIntoMain,
     int? CommitsAtRisk);
+
+/// <summary>A commit that no ref and no reflog points to.</summary>
+/// <param name="Subject">The first line of the commit message.</param>
+public sealed record UnreachableCommit(string Id, DateTimeOffset CommittedAt, string Subject);
 
 public sealed record StashInfo(int Index, string Name, string CommitId, DateTimeOffset CreatedAt, string Message);
 

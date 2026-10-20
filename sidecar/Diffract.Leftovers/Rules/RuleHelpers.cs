@@ -15,6 +15,9 @@ internal static class Attribution
     public static string? ForRef(DiffractConfig config, string fullName) =>
         config.Agents.FirstOrDefault(a => GlobMatcher.IsMatchAny(a.RefPatterns, fullName, ignoreCase: false))?.Name;
 
+    public static string? ForCommit(DiffractConfig config, UnreachableCommit commit) =>
+        config.Agents.FirstOrDefault(a => a.CommitSubjectPrefixes.Any(p => commit.Subject.StartsWith(p, StringComparison.Ordinal)))?.Name;
+
     /// <summary>The folder is the more reliable sign, since agents' branches get renamed.</summary>
     public static string? ForWorktree(DiffractConfig config, WorktreeInfo worktree) =>
         ForPath(config, worktree.Path) ?? (worktree.Branch is { } branch ? ForBranch(config, branch) : null);

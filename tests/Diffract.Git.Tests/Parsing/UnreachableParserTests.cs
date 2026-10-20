@@ -9,8 +9,8 @@ public class UnreachableParserTests
     {
         var objects = UnreachableParser.Parse(Sample.Read("fsck-unreachable.txt"));
 
-        Assert.Equal(15, objects.Count);
-        Assert.Equal(5, objects.Count(o => o.Type == "commit"));
+        Assert.Equal(5, objects.Count);
+        Assert.Equal(3, objects.Count(o => o.Type == "commit"));
         Assert.Contains(objects, o => o.Type == "tree");
         Assert.Contains(objects, o => o.Type == "blob");
         Assert.All(objects, o => Assert.Equal(40, o.Id.Length));

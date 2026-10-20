@@ -14,6 +14,10 @@ public class RepoSnapshotBuilderTests
     private static async Task<RepoSnapshot> SnapshotAsync(TempDirectory temp, string path, SnapshotOptions? options = null) =>
         (await BuildAsync(temp, path, options)).Snapshot;
 
+    /// <summary>A commit that no ref or reflog points to, the way agent tools make checkpoints.</summary>
+    private static async Task<string> CommitTreeAsync(FixtureRepo repo, string message = "Checkpoint", string? parent = null) =>
+        (await repo.GitAsync(["commit-tree", "HEAD^{tree}", "-m", message, .. parent is null ? Array.Empty<string>() : ["-p", parent]])).StandardOutput.Trim();
+
     private static async Task<FixtureRepo> RepoWithCommitAsync(TempDirectory temp, string name = "repo", string mainBranch = "main")
     {
         var repo = await FixtureRepo.InitAsync(temp, name, mainBranch);
@@ -448,13 +452,71 @@ public class RepoSnapshotBuilderTests
         await repo.GitAsync("stash", "push", "-q", "-m", "first");
         repo.WriteFile("readme.md", "two");
         await repo.GitAsync("stash", "push", "-q", "-m", "autostash");
-        var orphan = await repo.CommitAsync("orphan.txt", "o", "Reset away");
-        await repo.GitAsync("reset", "-q", "--hard", "HEAD~1");
+        var orphan = await CommitTreeAsync(repo);
 
         var snapshot = await SnapshotAsync(temp, repo.Path);
 
         Assert.Equal(["On main: autostash", "On main: first"], snapshot.Stashes.Select(s => s.Message));
-        Assert.Equal([orphan], snapshot.UnreachableCommits);
+        Assert.Equal([orphan], snapshot.UnreachableCommits.Select(c => c.Id));
+    }
+
+    [Fact]
+    public async Task Commits_still_in_a_reflog_are_not_unreachable()
+    {
+        using var temp = new TempDirectory();
+        var repo = await RepoWithCommitAsync(temp);
+        await repo.CommitAsync("reset.txt", "r", "Reset away");
+        await repo.GitAsync("reset", "-q", "--hard", "HEAD~1");
+        await repo.GitAsync("switch", "-q", "-c", "squashed");
+        await repo.CommitAsync("squashed.txt", "s", "Squash-merged elsewhere");
+        await repo.GitAsync("switch", "-q", "main");
+        await repo.GitAsync("branch", "-q", "-D", "squashed");
+
+        var snapshot = await SnapshotAsync(temp, repo.Path);
+
+        Assert.Empty(snapshot.UnreachableCommits);
+    }
+
+    [Fact]
+    public async Task Commits_only_in_a_linked_worktree_reflog_are_not_unreachable()
+    {
+        using var temp = new TempDirectory();
+        var repo = await RepoWithCommitAsync(temp);
+        var path = temp.Combine("linked");
+        await repo.GitAsync("worktree", "add", "-q", "--detach", path);
+        var worktree = repo.At(path);
+        await worktree.CommitAsync("detached.txt", "d", "Detached work");
+        await worktree.GitAsync("checkout", "-q", "--detach", "main");
+
+        var snapshot = await SnapshotAsync(temp, repo.Path);
+
+        Assert.Empty(snapshot.UnreachableCommits);
+    }
+
+    [Fact]
+    public async Task Unreachable_commits_are_sorted_by_id()
+    {
+        using var temp = new TempDirectory();
+        var repo = await RepoWithCommitAsync(temp);
+        var baseline = await CommitTreeAsync(repo);
+        var child = await CommitTreeAsync(repo, parent: baseline);
+
+        var snapshot = await SnapshotAsync(temp, repo.Path);
+
+        Assert.Equal(new[] { baseline, child }.Order(StringComparer.Ordinal), snapshot.UnreachableCommits.Select(c => c.Id));
+    }
+
+    [Fact]
+    public async Task Unreachable_commits_have_subject_and_date()
+    {
+        using var temp = new TempDirectory();
+        var repo = await RepoWithCommitAsync(temp);
+        repo.Clock.Now = Jan15.AddDays(2);
+        var orphan = await CommitTreeAsync(repo, "Agent host session x - baseline checkpoint");
+
+        var snapshot = await SnapshotAsync(temp, repo.Path);
+
+        Assert.Equal(new UnreachableCommit(orphan, Jan15.AddDays(2), "Agent host session x - baseline checkpoint"), Assert.Single(snapshot.UnreachableCommits));
     }
 
     [Fact]
@@ -462,8 +524,7 @@ public class RepoSnapshotBuilderTests
     {
         using var temp = new TempDirectory();
         var repo = await RepoWithCommitAsync(temp);
-        await repo.CommitAsync("orphan.txt", "o", "Reset away");
-        await repo.GitAsync("reset", "-q", "--hard", "HEAD~1");
+        await CommitTreeAsync(repo);
 
         var result = await BuildAsync(temp, repo.Path, new SnapshotOptions { IncludeUnreachable = false });
 

@@ -115,13 +115,19 @@ public sealed class CheckpointSessionRule : ILeftoverRule
     }
 }
 
-/// <summary>A commit on no branch, tag or stash, found by <c>git fsck --unreachable</c>.</summary>
+/// <summary>
+/// Commits that no ref and no reflog points to, found by <c>git fsck --unreachable</c>: one row per agent
+/// their subjects point to, and one for the rest. Commits still in a reflog, such as the originals of
+/// squash-merged branches, are not reported.
+/// </summary>
 public sealed class OrphanedCommitRule : ILeftoverRule
 {
     public IEnumerable<Leftover> Evaluate(RepoSnapshot repo, DiffractConfig config, TimeProvider time) =>
-        from id in repo.UnreachableCommits
-        select new Leftover(LeftoverKind.OrphanedCommit, id[..Math.Min(12, id.Length)], null, null,
-            Verdict.NeedsReview, 1, "Commit is on no branch, tag or stash");
+        from commit in repo.UnreachableCommits
+        group commit by Attribution.ForCommit(config, commit) into byAgent
+        let count = byAgent.Count()
+        select new Leftover(LeftoverKind.OrphanedCommit, Describe.Count(count, "commit"), null, byAgent.Key, Verdict.NeedsReview, count,
+            $"Not on any branch, tag, stash or reflog, so git may delete {(count == 1 ? "it" : "them")} in its next cleanup");
 }
 
 /// <summary>A backup tag under <c>archive.tagPrefix</c> older than <c>archive.reviewAfterDays</c>.</summary>
