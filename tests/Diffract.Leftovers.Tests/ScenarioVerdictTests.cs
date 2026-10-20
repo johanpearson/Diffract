@@ -73,7 +73,9 @@ public class ScenarioVerdictTests(ScenarioSnapshots snapshots)
     public Task LeftoverWorktreeFolder() => AssertLeftoversAsync("LeftoverWorktreeFolder", (LeftoverFolder, "dev-expert-robot", NeedsReview, 0, Copilot));
 
     [Fact]
-    public Task OrphanedCommit() => AssertLeftoversAsync("OrphanedCommit", (LeftoverKind.OrphanedCommit, "2 commits", NeedsReview, 2, null));
+    public Task OrphanedCommit() => AssertLeftoversAsync("OrphanedCommit",
+        (LeftoverKind.OrphanedCommit, "1 commit", NeedsReview, 1, null),
+        (LeftoverKind.OrphanedCommit, "2 commits", NeedsReview, 2, Copilot));
 
     [Fact]
     public Task ReflogOnlyCommit() => AssertLeftoversAsync("ReflogOnlyCommit");

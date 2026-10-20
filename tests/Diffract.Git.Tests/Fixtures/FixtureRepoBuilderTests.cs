@@ -345,7 +345,10 @@ public class FixtureRepoBuilderTests
 
         var snapshot = await SnapshotAsync(temp, "OrphanedCommit");
 
-        Assert.Equal(2, snapshot.UnreachableCommits.Count);
+        Assert.Equal(
+            ["Agent host session d2061d20-a6c1-46ea-9cc3-fcf61843f825 - baseline checkpoint",
+             "Agent host session d2061d20-a6c1-46ea-9cc3-fcf61843f825 - checkpoint 1", "Experiment"],
+            snapshot.UnreachableCommits.Select(c => c.Subject).Order(StringComparer.Ordinal));
         Assert.Single(snapshot.Branches);
     }
 

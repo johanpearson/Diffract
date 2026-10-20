@@ -66,6 +66,14 @@ Ref layout: `refs/copilot/checkpoints/<session-id>/<sequence>/<checkpoint-id>`
 
 Each checkpoint commit is a snapshot of the working tree, so it never sits on a branch itself. Listing every ref as its own leftover would mean 146 rows in Repo A.
 
+### Agent host checkpoint commits
+
+Found on 2026-10-20 in phase 6, scanning Diffract itself after Johan used Copilot agent sessions in VS Code that day.
+
+- One commit with no parent and no ref: `Agent host session <session-id> - baseline checkpoint`, where `<session-id>` is a UUID.
+- It sits on no branch, tag or reflog, so only `git fsck --unreachable` finds it.
+- It most likely comes from the VS Code Agent Host, which runs Copilot sessions. Johan confirmed he used it that day.
+
 ### Stashes
 
 One stash in Repo B, with git's default `WIP on <branch>` message, made by Johan. No stash matched `autostash`, `claude` or `copilot`.
@@ -85,6 +93,8 @@ No traces in these repos. Johan thinks Claude Code was used in them, so its left
 7. `toolStashPatterns` unchanged. Nothing seen confirms or rules them out.
 8. `remoteBranchPatterns` (added in phase 4): a merged remote-tracking branch is reported only when its name after the remote matches, by default `claude/*` and `copilot/*`. Work repos can have hundreds of merged remote branches, and listing them all would bury the agent leftovers.
 
+9. Per-agent `commitSubjectPrefixes` (added in phase 6) is for attribution only: an orphaned commit whose subject starts with `Agent host session ` gets the GitHub Copilot hint.
+
 Items 3, 5, 6 and 8 are separate from the agent entries on purpose. The brief says attribution is a hint and never decides anything, so patterns that change what is reported get their own keys.
 
 ## Decisions
@@ -95,8 +105,9 @@ Johan agreed to these on 2026-10-20 when reviewing phase 0. The milestone doc is
 - **A branch whose upstream is `gone` counts as probably merged.** This catches squash merges. It is "Safe", and its unique commits are still counted as at risk so the cleanup in milestone 3 keeps a backup tag for them.
 - **Prewarm worktrees are hidden** through `hiddenWorktreePathPatterns`, unless they are dirty. Dirty means someone is working in them.
 - **Leftover worktree folders are reported** as "Needs review". The snapshot lists the subfolders of each folder that matches `worktreeContainerPatterns`. A subfolder that is not a registered worktree and has no `.git` entry is a leftover. Only container folders are searched, so other projects next to a repo are never touched.
+- **Orphaned commits ignore the reflog and are grouped** (phase 6). Only commits that no ref and no reflog points to are reported, as one row per agent hint plus one for the rest. The first scan of Diffract listed 12 orphans, 9 of them the original commits of squash-merged PRs that git still kept in the reflog. It now shows two rows: 1 Copilot checkpoint and 2 other commits.
 - **Claude Code patterns stay untested** until a repo with Claude Code leftovers turns up. Phase 6 is the next chance.
 
 ## Still open
 
-- **Unreachable commits are noisy.** Repo A has 386. Where they come from was not checked, since that needs commands outside the phase 0 list. Rebases and squash merges are the likely source. Phase 6 will show whether one row per chain tip is readable enough.
+- **Unreachable commits in Repo A.** Phase 0 counted 386 with `--no-reflogs`. Diffract now leaves out commits still in a reflog and groups the rest, so the count should drop a lot. Phase 6 will confirm on Repo A.

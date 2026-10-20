@@ -15,8 +15,8 @@ public class RepoSnapshotBuilderTests
         (await BuildAsync(temp, path, options)).Snapshot;
 
     /// <summary>A commit that no ref or reflog points to, the way agent tools make checkpoints.</summary>
-    private static async Task<string> CommitTreeAsync(FixtureRepo repo, params string[] extra) =>
-        (await repo.GitAsync(["commit-tree", "HEAD^{tree}", "-m", "Checkpoint", .. extra])).StandardOutput.Trim();
+    private static async Task<string> CommitTreeAsync(FixtureRepo repo, string message = "Checkpoint", string? parent = null) =>
+        (await repo.GitAsync(["commit-tree", "HEAD^{tree}", "-m", message, .. parent is null ? Array.Empty<string>() : ["-p", parent]])).StandardOutput.Trim();
 
     private static async Task<FixtureRepo> RepoWithCommitAsync(TempDirectory temp, string name = "repo", string mainBranch = "main")
     {
@@ -457,7 +457,7 @@ public class RepoSnapshotBuilderTests
         var snapshot = await SnapshotAsync(temp, repo.Path);
 
         Assert.Equal(["On main: autostash", "On main: first"], snapshot.Stashes.Select(s => s.Message));
-        Assert.Equal([orphan], snapshot.UnreachableCommits);
+        Assert.Equal([orphan], snapshot.UnreachableCommits.Select(c => c.Id));
     }
 
     [Fact]
@@ -499,11 +499,24 @@ public class RepoSnapshotBuilderTests
         using var temp = new TempDirectory();
         var repo = await RepoWithCommitAsync(temp);
         var baseline = await CommitTreeAsync(repo);
-        var child = await CommitTreeAsync(repo, "-p", baseline);
+        var child = await CommitTreeAsync(repo, parent: baseline);
 
         var snapshot = await SnapshotAsync(temp, repo.Path);
 
-        Assert.Equal(new[] { baseline, child }.Order(StringComparer.Ordinal), snapshot.UnreachableCommits);
+        Assert.Equal(new[] { baseline, child }.Order(StringComparer.Ordinal), snapshot.UnreachableCommits.Select(c => c.Id));
+    }
+
+    [Fact]
+    public async Task Unreachable_commits_have_subject_and_date()
+    {
+        using var temp = new TempDirectory();
+        var repo = await RepoWithCommitAsync(temp);
+        repo.Clock.Now = Jan15.AddDays(2);
+        var orphan = await CommitTreeAsync(repo, "Agent host session x - baseline checkpoint");
+
+        var snapshot = await SnapshotAsync(temp, repo.Path);
+
+        Assert.Equal(new UnreachableCommit(orphan, Jan15.AddDays(2), "Agent host session x - baseline checkpoint"), Assert.Single(snapshot.UnreachableCommits));
     }
 
     [Fact]

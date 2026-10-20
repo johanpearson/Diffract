@@ -247,15 +247,17 @@ public sealed class FixtureRepoBuilder(TempDirectory root, DateTimeOffset now)
     }
 
     /// <summary>
-    /// Two chained commits that no ref or reflog points to, made the way an agent tool makes a
-    /// checkpoint: with commit-tree, which never touches a branch or the reflog.
+    /// Commits that no ref or reflog points to, made with commit-tree, which never touches a branch or the reflog.
+    /// Two chained ones look like the VS Code agent host's checkpoints; the third is a plain commit.
     /// </summary>
     public async Task<FixtureScenario> OrphanedCommitAsync()
     {
         var repo = await NewRepoAsync("OrphanedCommit");
         repo.Clock.Now = DaysAgo(5);
-        var baseline = (await repo.GitAsync("commit-tree", "HEAD^{tree}", "-m", "Agent session - baseline checkpoint")).StandardOutput.Trim();
-        await repo.GitAsync("commit-tree", "HEAD^{tree}", "-p", baseline, "-m", "Agent session - checkpoint 1");
+        const string session = "Agent host session d2061d20-a6c1-46ea-9cc3-fcf61843f825";
+        var baseline = await CommitTreeAsync(repo, "-m", $"{session} - baseline checkpoint");
+        await CommitTreeAsync(repo, "-p", baseline, "-m", $"{session} - checkpoint 1");
+        await CommitTreeAsync(repo, "-m", "Experiment");
         return Done(repo);
     }
 
@@ -347,6 +349,9 @@ public sealed class FixtureRepoBuilder(TempDirectory root, DateTimeOffset now)
         await repo.GitAsync("remote", "set-head", "origin", "main");
         return repo;
     }
+
+    private static async Task<string> CommitTreeAsync(FixtureRepo repo, params string[] args) =>
+        (await repo.GitAsync(["commit-tree", "HEAD^{tree}", .. args])).StandardOutput.Trim();
 
     private static string ClaudeWorktree(FixtureRepo repo, string name) =>
         Path.Combine(repo.Path, ".claude", "worktrees", name);

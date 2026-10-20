@@ -15,6 +15,7 @@ public sealed class RepoSnapshotBuilder
     private const string Tags = "refs/tags/";
     private const string Stash = "refs/stash";
     private const string OriginHead = "refs/remotes/origin/HEAD";
+    private const int UnreachableBatchSize = 200;
 
     private readonly GitRunnerOptions _runnerOptions;
     private readonly SnapshotOptions _options;
@@ -59,7 +60,7 @@ public sealed class RepoSnapshotBuilder
         var mergedTask = ListMergedAsync(call, repoPath, mainRefs, ct);
         var worktreesInfoTask = DescribeWorktreesAsync(call, repoPath, worktreeEntries, mainRefs.FirstOrDefault(), ct);
         var riskTask = CountCommitsAtRiskAsync(call, repoPath, refs, mergedTask, ct);
-        var unreachableTask = FindUnreachableCommitsAsync(fsckTask);
+        var unreachableTask = FindUnreachableCommitsAsync(call, repoPath, fsckTask, ct);
 
         var merged = await mergedTask.ConfigureAwait(false);
         var risk = await riskTask.ConfigureAwait(false);
@@ -259,17 +260,33 @@ public sealed class RepoSnapshotBuilder
 
     // fsck counts every reflog as a reference, including the stash reflog (stash@{1} and older) and
     // each worktree's HEAD reflog. What is left is referenced by nothing at all.
-    private static async Task<IReadOnlyList<string>> FindUnreachableCommitsAsync(Task<GitResult>? fsckTask)
+    // Ids are passed on the command line, so they go in batches to stay well under Windows' length limit.
+    private static async Task<IReadOnlyList<UnreachableCommit>> FindUnreachableCommitsAsync(
+        CallContext call, string repoPath, Task<GitResult>? fsckTask, CancellationToken ct)
     {
         if (fsckTask is null)
             return [];
 
-        return UnreachableParser.Parse((await fsckTask.ConfigureAwait(false)).StandardOutput)
+        var ids = UnreachableParser.Parse((await fsckTask.ConfigureAwait(false)).StandardOutput)
             .Where(o => o.Type == "commit")
             .Select(o => o.Id)
             .Order(StringComparer.Ordinal)
             .ToList();
+
+        var batches = await Task.WhenAll(ids.Chunk(UnreachableBatchSize).Select(async batch =>
+        {
+            List<string> args = ["log", "--no-walk=unsorted", "--format=%H%x1f%ct%x1f%s"];
+            args.AddRange(batch);
+            var result = await call.RunAsync(repoPath, args, ct).ConfigureAwait(false);
+            return result.StandardOutput
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Split('\x1f', 3))
+                .Select(p => new UnreachableCommit(p[0], DateTimeOffset.FromUnixTimeSeconds(long.Parse(p[1], CultureInfo.InvariantCulture)), p[2]));
+        })).ConfigureAwait(false);
+
+        return [.. batches.SelectMany(b => b).OrderBy(c => c.Id, StringComparer.Ordinal)];
     }
+
 
     private static List<BranchInfo> BuildBranches(IReadOnlyList<RefEntry> refs, HashSet<string> merged, Dictionary<string, int> risk) =>
         refs.Where(r => r.SymrefTarget is null && (r.Name.StartsWith(Heads, StringComparison.Ordinal) || r.Name.StartsWith(Remotes, StringComparison.Ordinal)))

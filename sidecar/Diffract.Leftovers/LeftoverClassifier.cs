@@ -6,7 +6,9 @@ namespace Diffract.Leftovers;
 
 /// <summary>
 /// Runs every rule and resolves overlaps: an item reported by several rules appears once,
-/// with the most cautious verdict. Results are sorted by verdict, kind and name.
+/// with the most cautious verdict. Results are sorted by verdict, kind, name and agent.
+/// An item is identified by kind, path (or name) and agent hint. Every rule derives the hint from
+/// the item the same way, so it never splits one item; it keeps apart rows such as "1 commit" per agent.
 /// </summary>
 public sealed class LeftoverClassifier(IReadOnlyList<ILeftoverRule> rules)
 {
@@ -37,7 +39,7 @@ public sealed class LeftoverClassifier(IReadOnlyList<ILeftoverRule> rules)
     /// <param name="runningFrom">The folder Diffract runs from. The worktree that contains it is never a leftover.</param>
     public IReadOnlyList<Leftover> Classify(RepoSnapshot repo, DiffractConfig config, TimeProvider time, string? runningFrom = null)
     {
-        var kept = new Dictionary<(LeftoverKind, string), Leftover>();
+        var kept = new Dictionary<(LeftoverKind, string, string?), Leftover>();
         foreach (var rule in rules)
         {
             foreach (var leftover in rule.Evaluate(repo, config, time))
@@ -45,13 +47,13 @@ public sealed class LeftoverClassifier(IReadOnlyList<ILeftoverRule> rules)
                 if (IsExcluded(leftover, repo, config, runningFrom))
                     continue;
 
-                var key = (leftover.Kind, leftover.Path ?? leftover.Name);
+                var key = (leftover.Kind, leftover.Path ?? leftover.Name, leftover.Agent);
                 if (!kept.TryGetValue(key, out var existing) || leftover.Verdict > existing.Verdict)
                     kept[key] = leftover;
             }
         }
 
-        return [.. kept.Values.OrderBy(l => l.Verdict).ThenBy(l => l.Kind).ThenBy(l => l.Name, StringComparer.Ordinal)];
+        return [.. kept.Values.OrderBy(l => l.Verdict).ThenBy(l => l.Kind).ThenBy(l => l.Name, StringComparer.Ordinal).ThenBy(l => l.Agent, StringComparer.Ordinal)];
     }
 
     private static bool IsExcluded(Leftover leftover, RepoSnapshot repo, DiffractConfig config, string? runningFrom)

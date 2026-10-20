@@ -127,7 +127,7 @@ public sealed record RepoSnapshot(
 | `SquashMergedBranch` | Branch with 2 commits pushed to a local bare "origin", squash-merged into main there, remote branch deleted, fetched with prune | Safe, 2 at risk |
 | `PrewarmWorktree` | Clean detached worktree at `copilot-worktrees/<repo>/copilot-prewarm-...` | No leftover |
 | `LeftoverWorktreeFolder` | Folder in `copilot-worktrees/<repo>/` with files but no `.git` entry, next to a real worktree | Review |
-| `OrphanedCommit` | Two chained commits made with `commit-tree`, on no ref or reflog, like an agent checkpoint | Review, one row, 2 at risk |
+| `OrphanedCommit` | Three commits made with `commit-tree`, on no ref or reflog: two chained "Agent host session ..." checkpoints and one plain commit | Review: one row of 2 for GitHub Copilot, one row of 1 with no agent |
 | `ReflogOnlyCommit` | Commit made then reset away, so only the reflog has it | No leftover |
 | `OldArchiveTag` | `archive/...` tag 45 days old with unique commits | Review |
 | `RecentArchiveTag` | `archive/...` tag 5 days old | No leftover |
@@ -168,7 +168,7 @@ public interface ILeftoverRule
 - The main worktree is never a leftover. The worktree Diffract runs from is never a leftover.
 - Worktrees matching `hiddenWorktreePathPatterns` are never reported, unless they are dirty.
 - Checkpoint refs are grouped by session: everything under the same `<session-id>` is one `CheckpointSession` leftover. Its age is the age of its newest ref.
-- Orphaned commits are commits that no ref **and no reflog** points to. They are reported as one row per repo, not one row per commit. Commits that only a reflog still has, such as the original commits of a squash-merged PR, are not reported: git keeps them for about 90 days and they are usually already on main in another form. Decided 2026-10-20 after the first scan of Diffract itself showed 12 such rows.
+- Orphaned commits are commits that no ref **and no reflog** points to. They are reported as one row per agent hint (from `commitSubjectPrefixes`) plus one for the rest, not one row per commit. Commits that only a reflog still has, such as the original commits of a squash-merged PR, are not reported: git keeps them for about 90 days and they are usually already on main in another form. Decided 2026-10-20 after the first scan of Diffract itself showed 12 such rows.
 - A branch with a gone upstream is "Safe" even when it is not an ancestor of main. Its commits at risk are still counted and shown.
 - Patterns that change what is reported (`checkpointRefPatterns`, `hiddenWorktreePathPatterns`, `worktreeContainerPatterns`) are separate from the agent entries. Agent patterns only fill in the `Agent` hint.
 - `DiffractConfig` is loaded with System.Text.Json source generation. Defaults come from the embedded `diffract.json`. The spike accepts `--config <path>` to override.
