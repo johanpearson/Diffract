@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Diffract.Spike.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\sidecar\Diffract.Git\Diffract.Git.csproj" />
     <ProjectReference Include="..\..\sidecar\Diffract.Leftovers\Diffract.Leftovers.csproj" />
     <ProjectReference Include="..\..\tests\Diffract.Fixtures\Diffract.Fixtures.csproj" />
