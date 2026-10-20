@@ -102,6 +102,23 @@ public class GitRunnerTests
     }
 
     [Fact]
+    public async Task Status_never_starts_an_fsmonitor_daemon()
+    {
+        using var temp = new TempDirectory();
+        var writable = IsolatedGit.WritableRunner(temp, temp.Path);
+        await writable.RunAsync(["init", "-q", "-b", "main"], Ct);
+        await writable.RunAsync(["config", "core.fsmonitor", "true"], Ct);
+        File.WriteAllText(temp.Combine("a.txt"), "changed");
+
+        var status = await IsolatedGit.ReadOnlyRunner(temp, temp.Path).RunAsync(["status", "--porcelain=v2", "-z"], Ct);
+        var setting = await IsolatedGit.ReadOnlyRunner(temp, temp.Path).RunAsync(["config", "--get", "core.fsmonitor"], Ct);
+
+        Assert.Contains("a.txt", status.StandardOutput);
+        Assert.Equal("false", setting.StandardOutput.Trim());
+        Assert.False(Directory.Exists(temp.Combine(".git", "fsmonitor--daemon")));
+    }
+
+    [Fact]
     public async Task Times_out_and_kills_the_process()
     {
         using var temp = new TempDirectory();

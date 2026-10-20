@@ -23,8 +23,11 @@ public class RuleTests(ScenarioSnapshots snapshots)
         ("ToolStashRule", "ToolStash", LeftoverKind.Stash, Verdict.NeedsReview),
         ("CheckpointSessionRule", "StaleCheckpointSession", LeftoverKind.CheckpointSession, Verdict.NeedsReview),
         ("OrphanedCommitRule", "OrphanedCommit", LeftoverKind.OrphanedCommit, Verdict.NeedsReview),
+        ("OrphanedCommitRule", "DroppedCheckpointCommits", LeftoverKind.OrphanedCommit, Verdict.SafeToRemove),
         ("OldBackupTagRule", "OldArchiveTag", LeftoverKind.BackupTag, Verdict.NeedsReview),
         ("LeftoverFolderRule", "LeftoverWorktreeFolder", LeftoverKind.LeftoverFolder, Verdict.NeedsReview),
+        ("LeftoverFolderRule", "EmptyLeftoverFolder", LeftoverKind.LeftoverFolder, Verdict.SafeToRemove),
+        ("LeftoverFolderRule", "ForgottenWorktreeFolder", LeftoverKind.LeftoverFolder, Verdict.NeedsReview),
     ];
 
     private static readonly string[] RuleNames = [.. LeftoverClassifier.DefaultRules.Select(r => r.GetType().Name)];

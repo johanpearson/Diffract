@@ -29,7 +29,8 @@ internal static class Describe
     public static string Age(TimeSpan age) =>
         age.TotalDays >= 1 ? Count((int)age.TotalDays, "day")
         : age.TotalHours >= 1 ? Count((int)age.TotalHours, "hour")
-        : Count(Math.Max(0, (int)age.TotalMinutes), "minute");
+        : age.TotalMinutes >= 1 ? Count((int)age.TotalMinutes, "minute")
+        : "less than a minute";
 
     public static string AtRisk(int commits) => commits switch
     {

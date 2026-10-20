@@ -71,7 +71,7 @@ internal sealed record SnapshotSummary(
     int Stashes,
     int OtherRefs,
     int UnreachableCommits,
-    IReadOnlyList<string> LeftoverFolders);
+    IReadOnlyList<LeftoverFolderInfo> LeftoverFolders);
 
 internal sealed record LeftoverSummary(int Total, int SafeToRemove, int NeedsReview, int InUse);
 

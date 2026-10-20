@@ -19,10 +19,11 @@
       "branchPatterns": [ "copilot/*" ],
       "worktreePathPatterns": [ "**/copilot-worktrees/**" ],
       "refPatterns": [ "refs/copilot/checkpoints/**" ],
-      "commitSubjectPrefixes": [ "Agent host session " ]
+      "commitSubjectPrefixes": [ "Agent host session ", "copilot checkpoint: ", "copilot:dirty-archive:" ]
     }
   ],
   "checkpointRefPatterns": [ "refs/copilot/checkpoints/**", "refs/checkpoints/**" ],
+  "checkpointCommitPrefixes": [ "copilot checkpoint: ", "copilot:dirty-archive:" ],
   "hiddenWorktreePathPatterns": [ "**/copilot-worktrees/*/copilot-prewarm-*" ],
   "worktreeContainerPatterns": [ "**/copilot-worktrees/*", "**/.claude/worktrees" ],
   "toolStashPatterns": [ "autostash", "claude", "copilot" ],

@@ -54,6 +54,13 @@ internal static class ScanText
         _ => kind.ToString(),
     };
 
+    /// <summary>
+    /// The commit count, or "-" for a folder: git does not know it, so nothing about it can be counted,
+    /// and "0" would wrongly read as "nothing to lose".
+    /// </summary>
+    public static string AtRiskLabel(Leftover leftover) =>
+        leftover.Kind == LeftoverKind.LeftoverFolder ? "-" : leftover.CommitsAtRisk.ToString(CultureInfo.InvariantCulture);
+
     /// <summary>"4 leftovers: 2 safe, 1 needs review, 1 in use". Verdicts with no leftovers are left out.</summary>
     public static string Summary(IReadOnlyList<Leftover> leftovers)
     {
@@ -71,7 +78,7 @@ internal static class ScanText
             .Select(l => new[]
             {
                 VerdictLabel(l.Verdict), KindLabel(l.Kind), l.Name, l.Agent ?? "-",
-                l.CommitsAtRisk.ToString(CultureInfo.InvariantCulture), l.Reason,
+                AtRiskLabel(l), l.Reason,
             })
             .Prepend(Headers)
             .ToList();
@@ -87,7 +94,7 @@ internal static class ScanText
     {
         output.WriteLine("Git calls, slowest first:");
         foreach (var call in timings.OrderByDescending(t => t.Duration))
-            output.WriteLine($"{Ms(call.Duration),9}  {call.Command}");
+            output.WriteLine($"{Ms(call.Duration),9}  {Shorten(call.Command)}");
 
         var fsck = timings.Where(IsFsck).ToList();
         var others = timings.Where(t => !IsFsck(t)).ToList();
@@ -97,6 +104,21 @@ internal static class ScanText
             ? "Other calls: none"
             : $"Other calls: {others.Count}, slowest {Ms(others.Max(t => t.Duration))}");
     }
+
+    /// <summary>Keeps the first commit id of a command and counts the rest, since some calls pass hundreds.</summary>
+    public static string Shorten(string command)
+    {
+        var parts = command.Split(' ');
+        var ids = parts.Count(IsCommitId);
+        if (ids <= 1)
+            return command;
+
+        var firstId = Array.FindIndex(parts, IsCommitId);
+        var kept = parts.Where((p, i) => i <= firstId || !IsCommitId(p));
+        return $"{string.Join(' ', kept)} (+{ids - 1} more ids)";
+    }
+
+    private static bool IsCommitId(string part) => part.Length == 40 && part.All(char.IsAsciiHexDigitLower);
 
     private static bool IsFsck(GitCallTiming timing) => timing.Command.StartsWith("git fsck", StringComparison.Ordinal);
 

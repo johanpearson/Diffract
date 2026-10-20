@@ -78,9 +78,17 @@ Found on 2026-10-20 in phase 6, scanning Diffract itself after Johan used Copilo
 
 One stash in Repo B, with git's default `WIP on <branch>` message, made by Johan. No stash matched `autostash`, `claude` or `copilot`.
 
+### Dropped checkpoint commits
+
+Found in phase 6. Copilot deletes the checkpoint refs of older sessions itself, but the commits stay in the repo with nothing pointing to them. In Repo A, 280 of 369 orphaned commits were `copilot checkpoint: <session-id> @ <checkpoint-id>` commits from 27 sessions that no longer had any refs, and 2 more were `copilot:dirty-archive:<uuid>`. The 8 sessions that still had refs all had a checkpoint in the last 6 days.
+
 ## Claude Code
 
-No traces in these repos. Johan thinks Claude Code was used in them, so its leftovers may already have been cleaned up. The current patterns (`claude/*` branches, `**/.claude/worktrees/**` paths) come from the spec and have not been checked against real data.
+No traces in the phase 0 repos. Johan thinks Claude Code was used in them, so its leftovers may already have been cleaned up. The current patterns (`claude/*` branches, `**/.claude/worktrees/**` paths) come from the spec and have not been checked against real data.
+
+### Found in phase 6
+
+A third repo, used with both agents, had one Claude Code leftover: an empty folder in `.claude/worktrees/`, left after the worktree itself was removed. Its name was `<repo>-<topic>-<6 hex digits>`, and no `claude/*` branch was left. Next to the repo were two worktree folders, named `<repo>-claude` and `<repo>-copilot`, whose records in `.git/worktrees/` were gone. Who removed those records is unknown.
 
 ## Pattern set in `diffract.json`
 
@@ -93,9 +101,10 @@ No traces in these repos. Johan thinks Claude Code was used in them, so its left
 7. `toolStashPatterns` unchanged. Nothing seen confirms or rules them out.
 8. `remoteBranchPatterns` (added in phase 4): a merged remote-tracking branch is reported only when its name after the remote matches, by default `claude/*` and `copilot/*`. Work repos can have hundreds of merged remote branches, and listing them all would bury the agent leftovers.
 
-9. Per-agent `commitSubjectPrefixes` (added in phase 6) is for attribution only: an orphaned commit whose subject starts with `Agent host session ` gets the GitHub Copilot hint.
+9. Per-agent `commitSubjectPrefixes` (added in phase 6) is for attribution only. For GitHub Copilot: `Agent host session `, `copilot checkpoint: ` and `copilot:dirty-archive:`.
+10. `checkpointCommitPrefixes` (added in phase 6) decides which orphaned commits are dropped agent checkpoints, reported as "Safe": `copilot checkpoint: ` and `copilot:dirty-archive:`.
 
-Items 3, 5, 6 and 8 are separate from the agent entries on purpose. The brief says attribution is a hint and never decides anything, so patterns that change what is reported get their own keys.
+Items 3, 5, 6, 8 and 10 are separate from the agent entries on purpose. The brief says attribution is a hint and never decides anything, so patterns that change what is reported get their own keys.
 
 ## Decisions
 
@@ -106,8 +115,15 @@ Johan agreed to these on 2026-10-20 when reviewing phase 0. The milestone doc is
 - **Prewarm worktrees are hidden** through `hiddenWorktreePathPatterns`, unless they are dirty. Dirty means someone is working in them.
 - **Leftover worktree folders are reported** as "Needs review". The snapshot lists the subfolders of each folder that matches `worktreeContainerPatterns`. A subfolder that is not a registered worktree and has no `.git` entry is a leftover. Only container folders are searched, so other projects next to a repo are never touched.
 - **Orphaned commits ignore the reflog and are grouped** (phase 6). Only commits that no ref and no reflog points to are reported, as one row per agent hint plus one for the rest. The first scan of Diffract listed 12 orphans, 9 of them the original commits of squash-merged PRs that git still kept in the reflog. It now shows two rows: 1 Copilot checkpoint and 2 other commits.
-- **Claude Code patterns stay untested** until a repo with Claude Code leftovers turns up. Phase 6 is the next chance.
+- **Dropped checkpoint commits are "Safe"** (phase 6), through their own `checkpointCommitPrefixes` setting, not through the agent hint.
+- **Empty leftover folders are "Safe"** (phase 6). A folder with no files holds no work.
+- **Forgotten worktree folders next to the repo are found** (phase 6). Only their `.git` file is read, and they are reported only when it points into this repo's worktree records. This relaxes "only container folders are searched" in a narrow way.
+- **Git calls are capped instead of timed** (phase 6). Starting a git process costs 170 to 360 ms on Johan's laptop, so the acceptance criterion now caps the number of calls.
+- **Claude Code patterns are only partly checked.** Phase 6 found one real Claude Code folder, in `.claude/worktrees/`, which the container pattern matches. The `claude/*` branch pattern has still not been seen in a real repo.
 
 ## Still open
 
-- **Unreachable commits in Repo A.** Phase 0 counted 386 with `--no-reflogs`. Diffract now leaves out commits still in a reflog and groups the rest, so the count should drop a lot. Phase 6 will confirm on Repo A.
+- **How to clean up orphaned commits (milestone 3).** Git deletes them by itself once they are older than two weeks, the next time its automatic cleanup (`git gc`) runs. Diffract could offer two actions. "Clean up now" runs that cleanup on purpose after a preview; it cannot be undone, which the brief only allows with a preview. "Keep these" saves the commits under an `archive/` tag first, as the brief already does for unmerged work. To decide when milestone 3 is specified.
+- **Checking what a forgotten worktree folder holds (milestone 3).** Diffract cannot tell whether such a folder holds anything not in git, so it shows "Needs review" and "-" as the risk. It could compare each file with the repo's history, as was done by hand in phase 6: both forgotten folders held only a README that was already committed.
+
+- **The other orphaned commits in Repo A.** After the dropped checkpoints, 87 remain: mostly earlier versions of commits that were later rebased or squashed, and a few from dropped stashes. They are probably left from worktrees that were removed, since removing a worktree also removes its reflog. They show as one "Needs review" row.

@@ -38,6 +38,14 @@ public class LeftoverClassifierTests
     }
 
     [Fact]
+    public void Activity_under_a_minute_ago_reads_naturally()
+    {
+        var repo = Snap.Repo([Snap.Worktree(Wt, "claude/agent") with { LastActivityAt = Snap.Now.AddSeconds(-20) }], [Snap.Branch("claude/agent")]);
+
+        Assert.Equal("Files changed less than a minute ago", Assert.Single(Classify(repo)).Reason);
+    }
+
+    [Fact]
     public void Sorted_by_verdict_then_kind_then_name()
     {
         var repo = Snap.Repo(
@@ -231,6 +239,19 @@ public class LeftoverClassifierTests
 
         Assert.Equal([("1 commit", (string?)null), ("1 commit", "GitHub Copilot")], rows.Select(l => (l.Name, l.Agent)));
         Assert.All(rows, l => Assert.Equal((LeftoverKind.OrphanedCommit, Verdict.NeedsReview, 1), (l.Kind, l.Verdict, l.CommitsAtRisk)));
+    }
+
+    [Fact]
+    public void Dropped_checkpoint_commits_are_safe_only_through_their_own_setting()
+    {
+        var repo = Snap.Repo() with { UnreachableCommits = [new("c1", Snap.Now, "copilot checkpoint: s @ 1")] };
+        var hintOnly = Config with { CheckpointCommitPrefixes = [] };
+
+        var withSetting = Assert.Single(Classify(repo));
+        var without = Assert.Single(new LeftoverClassifier().Classify(repo, hintOnly, Time));
+
+        Assert.Equal(("1 checkpoint commit", Verdict.SafeToRemove, "GitHub Copilot"), (withSetting.Name, withSetting.Verdict, withSetting.Agent));
+        Assert.Equal(("1 commit", Verdict.NeedsReview, "GitHub Copilot"), (without.Name, without.Verdict, without.Agent));
     }
 
     [Fact]

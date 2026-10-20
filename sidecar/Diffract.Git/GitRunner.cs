@@ -76,9 +76,13 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
         // Same as `-c core.longpaths=true`: git for Windows can then reach paths over 260 characters,
         // whatever the user's config says. It changes how paths are opened, never what is written.
-        psi.Environment["GIT_CONFIG_COUNT"] = "1";
+        // And `-c core.fsmonitor=false`: with fsmonitor on, even `git status` starts a background
+        // daemon that writes into .git and keeps running. It makes no difference to the output.
+        psi.Environment["GIT_CONFIG_COUNT"] = "2";
         psi.Environment["GIT_CONFIG_KEY_0"] = "core.longpaths";
         psi.Environment["GIT_CONFIG_VALUE_0"] = "true";
+        psi.Environment["GIT_CONFIG_KEY_1"] = "core.fsmonitor";
+        psi.Environment["GIT_CONFIG_VALUE_1"] = "false";
         return psi;
     }
 
