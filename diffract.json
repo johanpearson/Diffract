@@ -23,5 +23,6 @@
   "checkpointRefPatterns": [ "refs/copilot/checkpoints/**", "refs/checkpoints/**" ],
   "hiddenWorktreePathPatterns": [ "**/copilot-worktrees/*/copilot-prewarm-*" ],
   "worktreeContainerPatterns": [ "**/copilot-worktrees/*", "**/.claude/worktrees" ],
-  "toolStashPatterns": [ "autostash", "claude", "copilot" ]
+  "toolStashPatterns": [ "autostash", "claude", "copilot" ],
+  "remoteBranchPatterns": [ "claude/*", "copilot/*" ]
 }

@@ -83,8 +83,9 @@ No traces in these repos. Johan thinks Claude Code was used in them, so its left
 5. `hiddenWorktreePathPatterns` lists worktrees that are never reported: `**/copilot-worktrees/*/copilot-prewarm-*`. A prewarm worktree is detached, so it has no branch name to match and is recognized by its folder.
 6. `worktreeContainerPatterns` lists folders that hold only worktrees: `**/copilot-worktrees/*` and `**/.claude/worktrees`. Only these are searched for leftover folders.
 7. `toolStashPatterns` unchanged. Nothing seen confirms or rules them out.
+8. `remoteBranchPatterns` (added in phase 4): a merged remote-tracking branch is reported only when its name after the remote matches, by default `claude/*` and `copilot/*`. Work repos can have hundreds of merged remote branches, and listing them all would bury the agent leftovers.
 
-Items 3, 5 and 6 are separate from the agent entries on purpose. The brief says attribution is a hint and never decides anything, so patterns that change what is reported get their own keys.
+Items 3, 5, 6 and 8 are separate from the agent entries on purpose. The brief says attribution is a hint and never decides anything, so patterns that change what is reported get their own keys.
 
 ## Decisions
 

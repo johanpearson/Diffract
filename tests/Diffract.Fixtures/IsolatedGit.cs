@@ -14,8 +14,17 @@ public static class IsolatedGit
     public static IReadOnlyDictionary<string, string> Environment(TempDirectory temp, DateTimeOffset? date = null)
     {
         var globalConfig = temp.Combine(".gitconfig-isolated");
-        if (!File.Exists(globalConfig))
-            File.WriteAllText(globalConfig, "");
+        try
+        {
+            // CreateNew, not "write if missing": parallel callers share one temp folder while git reads the file.
+            using (new FileStream(globalConfig, FileMode.CreateNew, FileAccess.Write, FileShare.ReadWrite))
+            {
+            }
+        }
+        catch (IOException) when (File.Exists(globalConfig))
+        {
+            // Another caller created it first.
+        }
 
         var when = (date ?? DefaultDate).ToString("yyyy-MM-ddTHH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture);
         return new Dictionary<string, string>
