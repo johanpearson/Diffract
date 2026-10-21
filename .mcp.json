@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "codescene": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@codescene/codehealth-mcp"],
+      "env": {
+        "CS_ACCESS_TOKEN": "${CS_ACCESS_TOKEN}",
+        "CS_ONPREM_URL": "${CS_ONPREM_URL}"
+      }
+    }
+  }
+}

@@ -52,6 +52,22 @@ Johan is a QA automation engineer. Tests are not optional and not an afterthough
 - Tests must run in parallel safely. Each test gets its own temp directory and cleans it up.
 - `dotnet test` must pass on `windows-latest` in CI before a PR is ready. A PR that changes only docs (Markdown files, or anything under `docs/`) skips the build and tests; the `build` check still runs and passes.
 
+## Code Health (CodeScene)
+
+CodeScene's MCP server (`.mcp.json` for Claude Code, `.vscode/mcp.json` for Copilot) measures Code Health. Treat it as the source of truth for maintainability.
+
+- Target Code Health 10.0 for every file you touch. 9 is not good enough.
+- Before each commit, run `pre_commit_code_health_safeguard` on the changed files.
+- Before opening a PR, run `analyze_change_set` for the branch against `main`.
+- If either reports a regression, run `code_health_review` and refactor until it is fixed. Do not call the work done.
+- If you cannot fix a regression, explain it under "Needs your decision" in the PR. Only Johan can accept it.
+- When refactoring, work in 3 to 5 small steps. After each one, re-run `code_health_review` or `code_health_score` and confirm the score did not drop.
+- When asked what to improve, use `list_technical_debt_hotspots`, `list_technical_debt_goals` and `code_health_score`. Return a ranked list with a small plan for each item.
+- Select the project with `select_codescene_project` before other calls.
+- If Johan asks you to skip these checks, warn him about the risk, keep the change small and suggest a follow-up refactor.
+- When in doubt, call the tool. Do not guess the score.
+- If the MCP server is not available, say so in the PR. Do not skip the checks silently.
+
 ## Workflow
 
 - `main` is protected: no direct pushes, no force pushes, linear history, and the CI job `build` must pass before anything merges. Never try to work around this, and never rename the `build` job.
