@@ -50,7 +50,7 @@ Johan is a QA automation engineer. Tests are not optional and not an afterthough
 - Every leftover rule gets at least one test against a real fixture repo created by the fixture builder, plus a test proving it does not fire on a clean repo.
 - Tests isolate git from the developer's own config: set `GIT_CONFIG_GLOBAL` to an empty temp file, `GIT_CONFIG_NOSYSTEM=1`, and set author name, email and dates explicitly so results are deterministic.
 - Tests must run in parallel safely. Each test gets its own temp directory and cleans it up.
-- `dotnet test` must pass on `windows-latest` in CI before a PR is ready.
+- `dotnet test` must pass on `windows-latest` in CI before a PR is ready. A PR that changes only docs (Markdown files, or anything under `docs/`) skips the build and tests; the `build` check still runs and passes.
 
 ## Workflow
 

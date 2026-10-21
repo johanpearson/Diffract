@@ -48,4 +48,5 @@ This disables "Protect main" without deleting it. Do what you need, then run `se
 ## Rules to keep
 
 - **Never rename the CI job `build`.** The ruleset requires a check with exactly that name.
+- **Docs-only PRs skip the build.** When a PR changes only Markdown files or files under `docs/`, the `build` job passes in under a minute without building or testing. It still runs, so the required check is always reported. Pushes to main always run everything.
 - **Don't add a bypass for yourself.** Agents push using your credentials, so a bypass for you is a bypass for them.
