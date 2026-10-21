@@ -112,6 +112,8 @@ Keep the snapshot current without rebuilding it.
 
 Tests: unit tests drive the debouncer with `FakeTimeProvider`. Fixture repo tests change a file, a ref and a worktree, and assert which refresh ran and which git calls it made. A call budget test per row of the table above, as in milestone 1.
 
+**Done** 2026-10-21 in #20, with a flaky-test fix in #21. The debounce is per repo, not per source. Johan agreed that a HEAD or index change may take a third git call when HEAD moved to a commit no branch points at; the table above says so. On his laptop, the built sidecar reported a file change 0.6 seconds after the write.
+
 ## Phase 4: Worktrees and agents view
 
 The read-only version of the "Worktrees and agents" view in `docs/visual-plan.html`. It is a mock to look at, not code to reuse.
