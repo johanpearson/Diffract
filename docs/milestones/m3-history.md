@@ -33,7 +33,9 @@ From the visual plan:
 2. Build a fixture repo with 50,000 commits and many branches and merges with `git fast-import`, in a temp folder, for the performance tests.
 3. Settle the decisions below.
 
-**Checkpoint:** Johan decides the open questions below. Decided on 2026-10-21; steps 1 and 2 are still to do.
+**Checkpoint:** Johan decides the open questions below. Decided on 2026-10-21.
+
+**Done** 2026-10-21. The measurements are in `docs/findings/history.md`. Repo A has only 115 commits, so a generated 50,000-commit repo is the performance test: git reads all of it in under a second. Without a commit-graph, which Diffract cannot write, `--topo-order` reads every commit before printing the first, so history is read with one streamed call instead of one call per page. The budgets: the first rows on screen within a second for 50,000 commits, and lane layout under 300 ms on a CI runner. Starting git through its `cmd\git.exe` launcher costs about twice as much as starting the real git; Johan decided that Diffract starts the real git directly, which is done in #31, and that keeping a commit-graph becomes a setting in milestone 6.
 
 ### Decisions
 
@@ -46,8 +48,8 @@ Johan decided these on 2026-10-21, in #30.
 
 ## Phase 1: reading history in the sidecar
 
-- One streamed `git log` call per page, with `-z` and a `--format` that has explicit separators: hash, parents, author, committer, dates, subject. Refs come from the snapshot milestone 1 already builds, not from `--decorate`.
-- The first page (proposal: 500 commits) comes back as fast as git can produce it. Later pages are requested as the user scrolls, so a 50,000-commit repo never sends everything at once.
+- One streamed `git log --topo-order` call for the whole history, with `-z` and a `--format` that has explicit separators: hash, parents, author, dates, subject. Refs come from the snapshot milestone 1 already builds, not from `--decorate`.
+- The sidecar parses the output as it arrives. The first page (500 commits) goes to the UI as soon as it is parsed, and the rest follow in pages, so the UI never waits for all of it and never gets 7 MB in one message.
 - Commit details with one call: body, committer and changed files (`git show` or `git diff-tree` with `-z`).
 - A file's two sides for the diff, one call each (`git show <commit>^:<path>` and `git show <commit>:<path>`), with added, deleted, renamed and binary files handled. Large files are refused with a plain message instead of being sent whole.
 - Tests: parsers against captured real output in `Samples/`, including merges, octopus merges, root commits, non-ASCII names and subjects, and empty subjects. Call budget tests per page and per details request.

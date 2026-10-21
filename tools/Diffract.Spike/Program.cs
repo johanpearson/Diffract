@@ -30,7 +30,7 @@ internal static class Program
     public static int Usage(TextWriter error)
     {
         error.WriteLine("usage: diffract-spike scan <repo-path> [--json] [--timing] [--config <path>]");
-        error.WriteLine("       diffract-spike fixtures <output-dir> [--scenario <name>]");
+        error.WriteLine("       diffract-spike fixtures <output-dir> [--scenario <name> | --large-history <commits>]");
         return ExitCodes.Error;
     }
 }

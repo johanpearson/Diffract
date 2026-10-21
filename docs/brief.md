@@ -99,7 +99,7 @@ diffract/
 3. History graph. History becomes the view a repo opens on, because using a repo comes first and cleanup second. Opening a repo shows history and status first; the leftover scan, `git fsck` included, runs in the background and never makes the user wait.
 4. Changes and commit. *Checkpoint: start dogfooding.*
 5. Safe cleanup with backup tags and undo.
-6. Repo setup and settings.
+6. Repo setup and settings. Includes a setting that turns on git's own background maintenance, so git keeps a commit-graph file that makes history load faster (see `docs/findings/history.md`).
 7. Merge and conflict resolution.
 8. Interactive rebase. *v1.*
 9. Visual experiments. Includes trying a terminal embedded in the app.

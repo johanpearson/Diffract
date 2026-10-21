@@ -70,6 +70,8 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
             psi.ArgumentList.Add(arg);
         foreach (var (name, value) in Options.Environment)
             psi.Environment[name] = value;
+        if (Options.PathPrefix is { } prefix)
+            psi.Environment["PATH"] = psi.Environment.TryGetValue("PATH", out var path) && !string.IsNullOrEmpty(path) ? prefix + System.IO.Path.PathSeparator + path : prefix;
 
         // Set last so options can never turn them off.
         psi.Environment["GIT_OPTIONAL_LOCKS"] = "0";

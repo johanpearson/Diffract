@@ -12,5 +12,8 @@ public sealed record GitRunnerOptions
 
     public string GitExecutable { get; init; } = "git";
 
+    /// <summary>Folders put in front of PATH for every git process. See <see cref="GitInstallation.PathPrefix"/>.</summary>
+    public string? PathPrefix { get; init; }
+
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 }
