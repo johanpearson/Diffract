@@ -3,15 +3,21 @@ using Diffract.Git;
 
 namespace Diffract.Spike;
 
-/// <summary><c>fixtures &lt;output-dir&gt; [--scenario &lt;name&gt;]</c>: builds fixture repos to inspect by hand, dated from the real clock.</summary>
+/// <summary>
+/// <c>fixtures &lt;output-dir&gt; [--scenario &lt;name&gt; | --large-history &lt;commits&gt;]</c>: builds fixture repos to inspect
+/// by hand, dated from the real clock, or one repo with a long generated history for trying history performance.
+/// </summary>
 internal static class FixturesCommand
 {
     public static async Task<int> RunAsync(string outputDir, ReadOnlyMemory<string> options)
     {
         string? scenario = null;
+        int? largeHistory = null;
         var rest = options.Span;
         if (rest is ["--scenario", var requested])
             scenario = requested;
+        else if (rest is ["--large-history", var count] && int.TryParse(count, out var commits) && commits > 0)
+            largeHistory = commits;
         else if (!rest.IsEmpty)
             return Program.Usage();
 
@@ -30,6 +36,13 @@ internal static class FixturesCommand
         {
             Console.Error.WriteLine(e.Message);
             return 1;
+        }
+
+        if (largeHistory is { } size)
+        {
+            var large = await LargeHistory.BuildAsync(root, "large-history", size);
+            Console.WriteLine($"{large.Commits} commits, {large.Merges} merges, {large.Branches} branches, {large.Tags} tags: {large.Path}");
+            return 0;
         }
 
         var builder = new FixtureRepoBuilder(root, TimeProvider.System.GetUtcNow());
