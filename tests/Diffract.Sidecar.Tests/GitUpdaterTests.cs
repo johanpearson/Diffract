@@ -203,9 +203,12 @@ public sealed class GitUpdaterTests : IDisposable
         File.WriteAllText(fakeGit, "@echo git version 2.47.1.windows.1\r\n");
         return new SidecarMethods(
             new GitRunnerOptions { GitExecutable = fakeGit, Environment = IsolatedGit.Environment(_temp) },
-            machine: Machine,
-            commands: commands,
-            processes: processes);
+            new SidecarDependencies
+            {
+                Machine = Machine,
+                Commands = commands,
+                Processes = (IProcessStarter?)processes ?? new ProcessStarter(),
+            });
     }
 
     [Fact]

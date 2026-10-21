@@ -36,7 +36,7 @@ public sealed class OpenTerminalTests : IDisposable
 
     private SidecarMethods Methods(MachineLayout machine)
     {
-        var methods = new SidecarMethods(new GitRunnerOptions(), processes: _processes, machine: machine);
+        var methods = new SidecarMethods(new GitRunnerOptions(), new SidecarDependencies { Processes = _processes, Machine = machine });
         _created.Add(methods);
         return methods;
     }

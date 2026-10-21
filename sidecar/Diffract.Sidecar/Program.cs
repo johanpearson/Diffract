@@ -20,7 +20,7 @@ internal static class Program
         RpcHost? host = null;
         // The real git, not Git for Windows' launcher, which costs a second process start on every call.
         var runnerOptions = GitInstallation.ForThisMachine().Apply(new GitRunnerOptions());
-        using var methods = new SidecarMethods(runnerOptions, notify: (method, parameters) => host!.NotifyAsync(method, parameters), log: Console.Error);
+        using var methods = new SidecarMethods(runnerOptions, new SidecarDependencies { Notify = (method, parameters) => host!.NotifyAsync(method, parameters), Log = Console.Error });
         host = new RpcHost(input, output, methods.Dispatch, Console.Error);
         await host.RunAsync(CancellationToken.None);
         return 0;

@@ -28,11 +28,14 @@ public sealed class LiveNotificationTests : IAsyncDisposable
         var repo = (await new FixtureRepoBuilder(_temp).StaleAgentWorktreeAsync()).RepoPath;
         _methods = new SidecarMethods(
             new GitRunnerOptions { Environment = IsolatedGit.Environment(_temp) },
-            notify: (method, parameters) => _host.Host.NotifyAsync(method, parameters),
-            log: _log,
-            machine: machine,
-            commands: commands,
-            running: new FakeProcessTable());
+            new SidecarDependencies
+            {
+                Notify = (method, parameters) => _host.Host.NotifyAsync(method, parameters),
+                Log = _log,
+                Machine = machine ?? MachineLayout.Current,
+                Commands = commands,
+                Running = new FakeProcessTable(),
+            });
         _host = new HostHarness(_methods.Dispatch);
 
         _host.Send($$$"""{"jsonrpc":"2.0","id":1,"method":"repo.open","params":{"path":{{{JsonSerializer.Serialize(repo)}}}}}""");

@@ -24,10 +24,12 @@ public sealed class HistoryReaderTests : IDisposable
 
     private HistoryReader Reader => new(Options);
 
+    private HistoryReader ReaderWithPages(int pageSize) => new(Options, pageSize);
+
     private async Task<(int Total, List<IReadOnlyList<CommitEntry>> Pages)> ReadAllAsync(string repo, IEnumerable<string> heads, int pageSize = HistoryReader.PageSize)
     {
         List<IReadOnlyList<CommitEntry>> pages = [];
-        var total = await Reader.ReadAsync(repo, heads, pageSize, page =>
+        var total = await ReaderWithPages(pageSize).ReadAsync(repo, heads, page =>
         {
             pages.Add(page);
             return Task.CompletedTask;
@@ -66,7 +68,7 @@ public sealed class HistoryReaderTests : IDisposable
         TimeSpan? firstPage = null;
         var pages = 0;
 
-        var total = await Reader.ReadAsync(large.Path, [], HistoryReader.PageSize, page =>
+        var total = await Reader.ReadAsync(large.Path, [], page =>
         {
             firstPage ??= clock.Elapsed;
             pages++;
@@ -133,7 +135,7 @@ public sealed class HistoryReaderTests : IDisposable
         _calls.Clear();
         var pages = 0;
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Reader.ReadAsync(large.Path, [], 100, async _ =>
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ReaderWithPages(100).ReadAsync(large.Path, [], async _ =>
         {
             if (++pages == 2)
                 await cancel.CancelAsync();

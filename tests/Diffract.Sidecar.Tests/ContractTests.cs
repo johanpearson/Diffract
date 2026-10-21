@@ -124,6 +124,12 @@ public class ContractTests
     }
 
     [Fact]
+    public void Every_listed_method_has_a_handler_and_every_handler_is_listed()
+    {
+        Assert.Equal(SidecarMethods.Names.Order(), Methods.HandledMethods.Order());
+    }
+
+    [Fact]
     public void Every_error_kind_has_a_sample()
     {
         var kinds = Samples.Where(s => s.Key.StartsWith("error.", StringComparison.Ordinal))

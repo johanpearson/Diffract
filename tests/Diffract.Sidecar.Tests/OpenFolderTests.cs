@@ -14,7 +14,7 @@ public sealed class OpenFolderTests : IDisposable
 
     public OpenFolderTests()
     {
-        _methods = new SidecarMethods(new GitRunnerOptions(), processes: _processes);
+        _methods = new SidecarMethods(new GitRunnerOptions(), new SidecarDependencies { Processes = _processes });
     }
 
     public void Dispose()

@@ -66,16 +66,12 @@ public static class CommitDetailsParser
         if (f.Length < HeaderFields)
             throw new FormatException($"Expected {HeaderFields} commit fields, got {f.Length}.");
 
-        // After the format's own NUL, git writes a newline before the first file, and the output ends with a NUL.
-        var files = f.Skip(HeaderFields).ToList();
-        if (files.Count > 0 && files[^1].Length == 0)
-            files.RemoveAt(files.Count - 1);
-        if (files.Count > 0 && files[0].StartsWith('\n'))
-            files[0] = files[0][1..];
-        var rest = new Queue<string>(files);
-
-        var raw = ReadRaw(rest);
-        var numstat = ReadNumstat(rest, raw.Count);
+        var tokens = new DiffTokens(f.Skip(HeaderFields));
+        var raw = new List<FileChange>();
+        while (tokens.NextIsRaw())
+            raw.Add(ReadRaw(tokens));
+        var files = raw.Select(file => WithNumstat(file, tokens)).ToList();
+        tokens.ExpectEnd();
 
         return new CommitDetails(
             Id: ObjectId.Parse(f[0]),
@@ -88,84 +84,105 @@ public static class CommitDetailsParser
             CommittedAt: IsoTime(f[7]),
             Subject: f[8],
             Body: f[9].TrimEnd('\n'),
-            Files: raw.Select((r, i) => r with { Additions = numstat[i].Additions, Deletions = numstat[i].Deletions, IsBinary = numstat[i].IsBinary }).ToList());
+            Files: files);
     }
 
-    // ":<old mode> <new mode> <old id> <new id> <status>", then the path, and the new path for renames and copies.
-    private static List<FileChange> ReadRaw(Queue<string> tokens)
+    private static readonly Dictionary<char, FileChangeKind> Kinds = new()
     {
-        List<FileChange> files = [];
-        while (tokens.TryPeek(out var token) && token.StartsWith(':'))
-        {
-            tokens.Dequeue();
-            var p = token[1..].Split(' ');
-            if (p.Length != 5 || p[4].Length == 0)
-                throw new FormatException($"Unexpected raw diff entry: '{token}'.");
+        ['A'] = FileChangeKind.Added,
+        ['D'] = FileChangeKind.Deleted,
+        ['M'] = FileChangeKind.Modified,
+        ['R'] = FileChangeKind.Renamed,
+        ['C'] = FileChangeKind.Copied,
+        ['T'] = FileChangeKind.TypeChanged,
+    };
 
-            var kind = p[4][0] switch
-            {
-                'A' => FileChangeKind.Added,
-                'D' => FileChangeKind.Deleted,
-                'M' => FileChangeKind.Modified,
-                'R' => FileChangeKind.Renamed,
-                'C' => FileChangeKind.Copied,
-                'T' => FileChangeKind.TypeChanged,
-                _ => FileChangeKind.Unknown,
-            };
-            var twoPaths = kind is FileChangeKind.Renamed or FileChangeKind.Copied;
-            var first = Next(tokens, token);
-            var path = twoPaths ? Next(tokens, token) : first;
+    // ":<old mode> <new mode> <old id> <new id> <status>", then the path, and the new path for renames and copies.
+    private static FileChange ReadRaw(DiffTokens tokens)
+    {
+        var entry = tokens.Take();
+        var p = entry[1..].Split(' ');
+        if (p.Length != 5 || p[4].Length == 0)
+            throw new FormatException($"Unexpected raw diff entry: '{entry}'.");
 
-            files.Add(new FileChange(
-                Kind: kind,
-                Path: path,
-                OldPath: twoPaths ? first : null,
-                OldId: Blob(p[2]),
-                NewId: Blob(p[3]),
-                Similarity: twoPaths && int.TryParse(p[4].AsSpan(1), CultureInfo.InvariantCulture, out var score) ? score : null,
-                Additions: null,
-                Deletions: null,
-                IsBinary: false,
-                IsSubmodule: p[0] == SubmoduleMode || p[1] == SubmoduleMode));
-        }
-        return files;
+        var status = p[4];
+        var kind = Kinds.GetValueOrDefault(status[0], FileChangeKind.Unknown);
+        var twoPaths = kind is FileChangeKind.Renamed or FileChangeKind.Copied;
+        var first = tokens.Take();
+        return new FileChange(
+            Kind: kind,
+            Path: twoPaths ? tokens.Take() : first,
+            OldPath: twoPaths ? first : null,
+            OldId: Blob(p[2]),
+            NewId: Blob(p[3]),
+            Similarity: twoPaths ? Similarity(status.AsSpan(1)) : null,
+            Additions: null,
+            Deletions: null,
+            IsBinary: false,
+            IsSubmodule: p[0] == SubmoduleMode || p[1] == SubmoduleMode);
     }
 
     // "<added>\t<deleted>\t<path>", or "<added>\t<deleted>\t" followed by the old and new path. "-" for binary files.
-    private static List<(int? Additions, int? Deletions, bool IsBinary)> ReadNumstat(Queue<string> tokens, int count)
+    private static FileChange WithNumstat(FileChange file, DiffTokens tokens)
     {
-        List<(int?, int?, bool)> stats = [];
-        for (var i = 0; i < count; i++)
-        {
-            var token = tokens.Count > 0 ? tokens.Dequeue() : throw new FormatException($"Expected {count} numstat entries, got {i}.");
-            var p = token.Split('\t', 3);
-            if (p.Length != 3)
-                throw new FormatException($"Unexpected numstat entry: '{token}'.");
-            if (p[2].Length == 0)
-            {
-                Next(tokens, token);
-                Next(tokens, token);
-            }
+        var entry = tokens.Take();
+        var p = entry.Split('\t', 3);
+        if (p.Length != 3)
+            throw new FormatException($"Unexpected numstat entry: '{entry}'.");
+        if (p[2].Length == 0)
+            tokens.Skip(2);
 
-            var binary = p[0] == "-" && p[1] == "-";
-            stats.Add((binary ? null : Count(p[0]), binary ? null : Count(p[1]), binary));
-        }
-
-        if (tokens.Count > 0)
-            throw new FormatException($"Unexpected output after the changed files: '{tokens.Peek()}'.");
-        return stats;
+        return p[0] == "-" && p[1] == "-"
+            ? file with { IsBinary = true }
+            : file with { Additions = Count(p[0]), Deletions = Count(p[1]) };
     }
 
-    private static string Next(Queue<string> tokens, string entry) =>
-        tokens.Count > 0 ? tokens.Dequeue() : throw new FormatException($"A path is missing after '{entry}'.");
+    // The digits after the letter in "R085": how alike the two sides of a rename or copy are.
+    private static int? Similarity(ReadOnlySpan<char> score) =>
+        int.TryParse(score, CultureInfo.InvariantCulture, out var value) ? value : null;
 
     private static string? Blob(string id) => ObjectId.IsZero(id) ? null : ObjectId.Parse(id);
 
-    private static int Count(string value) =>
-        int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : throw new FormatException($"Expected a line count, got '{value}'.");
+    private static int Count(ReadOnlySpan<char> value) =>
+        int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : throw new FormatException($"Expected a line count, got '{value.ToString()}'.");
 
-    private static DateTimeOffset IsoTime(string value) =>
+    private static DateTimeOffset IsoTime(ReadOnlySpan<char> value) =>
         DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time)
             ? time
-            : throw new FormatException($"Expected a date, got '{value}'.");
+            : throw new FormatException($"Expected a date, got '{value.ToString()}'.");
+
+    /// <summary>The NUL-separated fields after the commit's own, in order.</summary>
+    private sealed class DiffTokens
+    {
+        private readonly Queue<string> _tokens;
+
+        public DiffTokens(IEnumerable<string> fields)
+        {
+            // After the format's own NUL, git writes a newline before the first file, and the output ends with a NUL.
+            var list = fields.ToList();
+            if (list.Count > 0 && list[^1].Length == 0)
+                list.RemoveAt(list.Count - 1);
+            if (list.Count > 0)
+                list[0] = list[0].TrimStart('\n');
+            _tokens = new Queue<string>(list);
+        }
+
+        /// <summary>Raw entries start with ':' and come before every numstat entry.</summary>
+        public bool NextIsRaw() => _tokens.TryPeek(out var token) && token.StartsWith(':');
+
+        public string Take() =>
+            _tokens.TryDequeue(out var token) ? token : throw new FormatException("The changed files end too early.");
+
+        public void Skip(int count)
+        {
+            for (var i = 0; i < count; i++)
+                Take();
+        }
+
+        public void ExpectEnd()
+        {
+            if (_tokens.TryPeek(out var extra))
+                throw new FormatException($"Unexpected output after the changed files: '{extra}'.");
+        }
+    }
 }

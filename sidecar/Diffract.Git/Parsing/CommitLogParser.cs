@@ -44,35 +44,70 @@ public static class CommitLogParser
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
         var reader = new NulFieldReader(output);
+        var pages = new Pager(pageSize, onPage);
+        while (await ReadCommitAsync(reader, ct).ConfigureAwait(false) is { } commit)
+            await pages.AddAsync(commit).ConfigureAwait(false);
+        return await pages.FinishAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>The next commit, or null at the end of the stream.</summary>
+    private static async ValueTask<CommitEntry?> ReadCommitAsync(NulFieldReader reader, CancellationToken ct)
+    {
+        if (await RecordStartAsync(reader, ct).ConfigureAwait(false) is not { } first)
+            return null;
+
         var fields = new string[FieldCount];
-        var page = new List<CommitEntry>(Math.Min(pageSize, PageCapacity));
-        var total = 0;
-
-        while (await reader.ReadAsync(ct).ConfigureAwait(false) is { } first)
+        fields[0] = first;
+        for (var i = 1; i < FieldCount; i++)
         {
-            // A stray newline between records is all git ever adds. Nothing at all ends the stream.
-            if (first.Length == 0 || first == "\n")
-                continue;
+            fields[i] = await reader.ReadAsync(ct).ConfigureAwait(false)
+                ?? throw new FormatException($"The history ended in the middle of commit {first}.");
+        }
+        return Parse(fields);
+    }
 
-            fields[0] = first;
-            for (var i = 1; i < FieldCount; i++)
-            {
-                fields[i] = await reader.ReadAsync(ct).ConfigureAwait(false)
-                    ?? throw new FormatException($"The history ended in the middle of commit {first}.");
-            }
+    /// <summary>The first field of the next commit. A stray newline between records is all git ever adds.</summary>
+    private static async ValueTask<string?> RecordStartAsync(NulFieldReader reader, CancellationToken ct)
+    {
+        string? field;
+        do
+        {
+            field = await reader.ReadAsync(ct).ConfigureAwait(false);
+        }
+        while (field is "" or "\n");
+        return field;
+    }
 
-            page.Add(Parse(fields));
-            total++;
-            if (page.Count == pageSize)
-            {
-                await onPage(page).ConfigureAwait(false);
-                page = new List<CommitEntry>(Math.Min(pageSize, PageCapacity));
-            }
+    /// <summary>Collects commits and hands each full page on, then whatever is left at the end.</summary>
+    private sealed class Pager(int pageSize, Func<IReadOnlyList<CommitEntry>, Task> onPage)
+    {
+        private List<CommitEntry> _page = NewPage(pageSize);
+        private int _total;
+
+        public async Task AddAsync(CommitEntry commit)
+        {
+            _page.Add(commit);
+            _total++;
+            if (_page.Count == pageSize)
+                await FlushAsync().ConfigureAwait(false);
         }
 
-        if (page.Count > 0)
-            await onPage(page).ConfigureAwait(false);
-        return total;
+        /// <returns>How many commits there were.</returns>
+        public async Task<int> FinishAsync()
+        {
+            if (_page.Count > 0)
+                await FlushAsync().ConfigureAwait(false);
+            return _total;
+        }
+
+        private async Task FlushAsync()
+        {
+            var full = _page;
+            _page = NewPage(pageSize);
+            await onPage(full).ConfigureAwait(false);
+        }
+
+        private static List<CommitEntry> NewPage(int pageSize) => new(Math.Min(pageSize, PageCapacity));
     }
 
     /// <summary>Parses complete output, such as a captured sample.</summary>

@@ -287,8 +287,11 @@ public sealed class GitUpdateCheckTests : IDisposable
         var commands = new FakeCommands((_, _) => Ok(Sample("winget-list-git-update-available.txt")));
         using var methods = new SidecarMethods(
             new GitRunnerOptions { GitExecutable = fakeGit, Environment = IsolatedGit.Environment(_temp) },
-            machine: Machine(),
-            commands: commands);
+            new SidecarDependencies
+            {
+                Machine = Machine(),
+                Commands = commands,
+            });
 
         var result = await methods.Dispatch("git.checkUpdate", null, TestContext.Current.CancellationToken);
 

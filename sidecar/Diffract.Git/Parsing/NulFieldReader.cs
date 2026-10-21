@@ -20,32 +20,35 @@ public sealed class NulFieldReader(Stream stream, int bufferSize = 64 * 1024)
     public async ValueTask<string?> ReadAsync(CancellationToken ct)
     {
         var searched = 0;
-        while (true)
+        int nul;
+        while ((nul = Array.IndexOf(_buffer, (byte)0, _start + searched, _end - _start - searched)) < 0)
         {
-            var nul = Array.IndexOf(_buffer, (byte)0, _start + searched, _end - _start - searched);
-            if (nul >= 0)
-            {
-                var field = Encoding.UTF8.GetString(_buffer, _start, nul - _start);
-                _start = nul + 1;
-                return field;
-            }
-
             if (_ended)
-            {
-                if (_start == _end)
-                    return null;
-                var rest = Encoding.UTF8.GetString(_buffer, _start, _end - _start);
-                _start = _end;
-                return rest;
-            }
-
+                return TakeRest();
             searched = _end - _start;
-            MakeRoom();
-            var read = await stream.ReadAsync(_buffer.AsMemory(_end), ct).ConfigureAwait(false);
-            if (read == 0)
-                _ended = true;
-            _end += read;
+            await FillAsync(ct).ConfigureAwait(false);
         }
+        return Take(nul - _start, skip: 1);
+    }
+
+    /// <summary>Whatever is left after the last NUL, or null when nothing is.</summary>
+    private string? TakeRest() => _start == _end ? null : Take(_end - _start, skip: 0);
+
+    /// <summary>Decodes the next <paramref name="length"/> bytes and moves past them and <paramref name="skip"/> more.</summary>
+    private string Take(int length, int skip)
+    {
+        var field = Encoding.UTF8.GetString(_buffer, _start, length);
+        _start += length + skip;
+        return field;
+    }
+
+    /// <summary>Reads more of the stream into the buffer. Notes when the stream has ended.</summary>
+    private async ValueTask FillAsync(CancellationToken ct)
+    {
+        MakeRoom();
+        var read = await stream.ReadAsync(_buffer.AsMemory(_end), ct).ConfigureAwait(false);
+        _ended = read == 0;
+        _end += read;
     }
 
     // Moves the unread part to the front, and grows the buffer when one field fills it.
