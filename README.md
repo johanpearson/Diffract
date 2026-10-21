@@ -14,6 +14,7 @@ Current milestone: [docs/milestones/m2-shell.md](docs/milestones/m2-shell.md), t
 - [docs/milestones/m2-shell.md](docs/milestones/m2-shell.md): current milestone, scope and acceptance criteria
 - [docs/milestones/m1-spike.md](docs/milestones/m1-spike.md): milestone 1 (done), scope and acceptance criteria
 - [docs/findings/agent-leftovers.md](docs/findings/agent-leftovers.md): what Claude Code and Copilot really leave behind in a repo
+- [docs/findings/winget.md](docs/findings/winget.md): how Diffract asks winget about Git for Windows
 - [docs/visual-plan.html](docs/visual-plan.html): the visual plan with a clickable prototype (open locally in a browser)
 - [docs/setup.md](docs/setup.md): what to install to build Diffract on Windows
 - [AGENTS.md](AGENTS.md): rules for coding agents working in this repo

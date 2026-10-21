@@ -2,9 +2,11 @@ import {
   changeKinds,
   terminalKinds,
   errorKinds,
+  gitUpdateStatuses,
   leftoverKinds,
   verdicts,
   type AppInfo,
+  type GitUpdateCheck,
   type Leftover,
   type LeftoverFolderInfo,
   type LeftoverSummary,
@@ -87,6 +89,13 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "system.openFolder": nullValue,
   "system.listTerminals": arrayOf(object<TerminalInfo>({ id: oneOf(terminalKinds), name: string })),
   "system.openTerminal": nullValue,
+  "git.checkUpdate": object<GitUpdateCheck>({
+    status: oneOf(gitUpdateStatuses),
+    installedVersion: nullable(string),
+    availableVersion: nullable(string),
+    problem: nullable(string),
+    downloadPage: string,
+  }),
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {

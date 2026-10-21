@@ -151,6 +151,8 @@ Tests: Vitest and Testing Library for components, against the contract samples. 
 
 **Checkpoint:** Johan reviews how the update check works before it is wired into the UI.
 
+The spike's result, and the proposal for `git.update`, are in `docs/findings/winget.md`.
+
 ## Phase 7: real-world check
 
 1. Johan installs the build from CI and opens his busiest repos.

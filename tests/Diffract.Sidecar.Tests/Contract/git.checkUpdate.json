@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "status": "UpdateAvailable",
+    "installedVersion": "2.47.1",
+    "availableVersion": "2.55.0.5",
+    "problem": null,
+    "downloadPage": "https://gitforwindows.org/"
+  }
+}

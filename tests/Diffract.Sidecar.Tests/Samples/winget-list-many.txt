@@ -1,0 +1,9 @@
+Name                                                         Id                                       Version              Available
+------------------------------------------------------------------------------------------------------------------------------------------
+Git                                                          Git.Git                                  2.47.1               2.55.0.5
+Git Extensions 7.2.1.7                                       GitExtensionsTeam.GitExtensions          7.2.1.7              
+GitHub CLI                                                   GitHub.cli                               2.102.0              2.102.1
+KDiff3 (remove only)                                         KDE.KDiff3                               Unknown              1.12.4
+Microsoft .Net Native Runtime Package 2.2                    Microsoft.DotNet.Native.Runtime          2.2.28604.0          
+Microsoft .Net Native Runtime Package 2.2                    Microsoft.DotNet.Native.Runtime          2.2.28604.0          
+Microsoft .NET SDK 8.0.206 (x64)                             Microsoft.DotNet.SDK.8                   8.0.206              8.0.426

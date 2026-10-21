@@ -36,6 +36,24 @@ export interface TerminalInfo {
   name: string;
 }
 
+/** Whether a newer Git for Windows can be installed through winget. */
+export const gitUpdateStatuses = ["UpToDate", "UpdateAvailable", "Unknown"] as const;
+export type GitUpdateStatus = (typeof gitUpdateStatuses)[number];
+
+/** Result of `git.checkUpdate`. */
+export interface GitUpdateCheck {
+  /** UpdateAvailable only when winget can install the update over the git Diffract uses. */
+  status: GitUpdateStatus;
+  /** The git Diffract uses, for example "2.47.1". */
+  installedVersion: string | null;
+  /** winget's newest Git for Windows, for example "2.55.0.5". */
+  availableVersion: string | null;
+  /** Why Diffract cannot tell or cannot update, in plain English. */
+  problem: string | null;
+  /** Where to update by hand when winget cannot. */
+  downloadPage: string;
+}
+
 /** Result of `app.info`. */
 export interface AppInfo {
   sidecarVersion: string;
@@ -144,6 +162,8 @@ export interface Methods {
   "system.listTerminals": { params: undefined; result: TerminalInfo[] };
   /** Opens a terminal in an existing folder. Without `terminal`, Windows Terminal, or PowerShell when it is not installed. */
   "system.openTerminal": { params: { path: string; terminal?: TerminalKind }; result: null };
+  /** Asks winget whether a newer Git for Windows is available. Installs nothing. Can take several seconds. */
+  "git.checkUpdate": { params: undefined; result: GitUpdateCheck };
 }
 
 /** Every notification the sidecar sends, with its params. */
