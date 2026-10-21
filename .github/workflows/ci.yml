@@ -14,14 +14,14 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Git version
         run: git --version
 
       # --- .NET: libraries, sidecar and their tests ---------------------------
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -37,7 +37,7 @@ jobs:
 
       # --- UI ---------------------------------------------------------------
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -53,6 +53,27 @@ jobs:
           npm run typecheck
           npm test
 
+      # Playwright's Chromium is about 150 MB. The lockfile pins Playwright, so it only changes with it.
+      - name: Cache Playwright's browser
+        uses: actions/cache@v6
+        with:
+          path: ~\AppData\Local\ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('ui/package-lock.json') }}
+
+      - name: End-to-end tests (Playwright)
+        working-directory: ui
+        run: |
+          npx playwright install chromium
+          npm run e2e
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: ui/playwright-report
+          if-no-files-found: ignore
+
       # --- Tauri app and installer -------------------------------------------
 
       # GitHub scopes caches by branch: a PR can read main's cache, but not another PR's.
@@ -60,7 +81,7 @@ jobs:
       # The key includes Cargo.toml, because a profile change makes every cached crate useless.
       - name: Restore the Rust build cache
         id: cargo-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.cargo/registry
@@ -80,7 +101,7 @@ jobs:
 
       - name: Save the Rust build cache
         if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/.cargo/registry
@@ -89,7 +110,7 @@ jobs:
           key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
       - name: Upload the installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: diffract-installer
           path: src-tauri/target/release/bundle/nsis/*.exe

@@ -112,6 +112,8 @@ Then, from `ui\`:
 npm ci                    # once, and after package changes
 npm run tauri dev         # the app, reloading the UI as you edit it
 npm test                  # UI tests
+npx playwright install chromium   # once, for the end-to-end tests
+npm run e2e               # end-to-end tests: the built UI in Chromium against a fake sidecar
 npm run tauri build       # the installer, in src-tauri\target\release\bundle\nsis\
 ```
 

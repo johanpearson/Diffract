@@ -15,7 +15,7 @@ public class ScenarioVerdictTests(ScenarioSnapshots snapshots)
         new LeftoverClassifier().Classify(
             await snapshots.GetAsync(scenario), DiffractConfig.Default, new FakeTimeProvider(FixtureRepoBuilder.DefaultNow));
 
-    private async Task AssertLeftoversAsync(string scenario, params (LeftoverKind Kind, string Name, Verdict Verdict, int AtRisk, string? Agent)[] expected)
+    private async Task AssertLeftoversAsync(string scenario, params (LeftoverKind Kind, string Name, Verdict Verdict, int? AtRisk, string? Agent)[] expected)
     {
         var actual = await ClassifyAsync(scenario);
 
@@ -70,7 +70,7 @@ public class ScenarioVerdictTests(ScenarioSnapshots snapshots)
     public Task PrewarmWorktree() => AssertLeftoversAsync("PrewarmWorktree");
 
     [Fact]
-    public Task LeftoverWorktreeFolder() => AssertLeftoversAsync("LeftoverWorktreeFolder", (LeftoverFolder, "dev-expert-robot", NeedsReview, 0, Copilot));
+    public Task LeftoverWorktreeFolder() => AssertLeftoversAsync("LeftoverWorktreeFolder", (LeftoverFolder, "dev-expert-robot", NeedsReview, null, Copilot));
 
     [Fact]
     public Task OrphanedCommit() => AssertLeftoversAsync("OrphanedCommit",
@@ -82,11 +82,11 @@ public class ScenarioVerdictTests(ScenarioSnapshots snapshots)
 
     [Fact]
     public Task EmptyLeftoverFolder() =>
-        AssertLeftoversAsync("EmptyLeftoverFolder", (LeftoverFolder, "repo-product-plan-205c69", SafeToRemove, 0, Claude));
+        AssertLeftoversAsync("EmptyLeftoverFolder", (LeftoverFolder, "repo-product-plan-205c69", SafeToRemove, null, Claude));
 
     [Fact]
     public Task ForgottenWorktreeFolder() =>
-        AssertLeftoversAsync("ForgottenWorktreeFolder", (LeftoverFolder, "repo-claude", NeedsReview, 0, null));
+        AssertLeftoversAsync("ForgottenWorktreeFolder", (LeftoverFolder, "repo-claude", NeedsReview, null, null));
 
     [Fact]
     public Task DroppedCheckpointCommits() =>

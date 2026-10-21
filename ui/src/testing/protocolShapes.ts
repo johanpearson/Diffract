@@ -58,7 +58,7 @@ const leftover = object<Leftover>({
   path: nullable(string),
   agent: nullable(string),
   verdict: oneOf(verdicts),
-  commitsAtRisk: number,
+  commitsAtRisk: nullable(number),
   reason: string,
 });
 
@@ -82,6 +82,7 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "repo.refresh": repoState,
   "repo.close": nullValue,
   "app.shutdown": nullValue,
+  "system.openFolder": nullValue,
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {

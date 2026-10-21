@@ -8,5 +8,7 @@ export default defineConfig({
   clearScreen: false,
   server: { port: 5173, strictPort: true },
   build: { target: "es2022" },
-  test: { environment: "jsdom" },
+  // No persistent module cache: it bakes the list of contract samples into the cached test file,
+  // so a sample added later would go unchecked until the cache happened to be cleared.
+  test: { environment: "jsdom", fsModuleCache: false, include: ["src/**/*.test.{ts,tsx}"] },
 });

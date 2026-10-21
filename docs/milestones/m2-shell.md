@@ -69,6 +69,7 @@ JSON-RPC 2.0 over the sidecar's stdin and stdout.
 | `repo.open` | `path` | `repoId`, snapshot summary, leftovers. Starts watching. |
 | `repo.refresh` | `repoId`, `includeUnreachable` | the same as `repo.open`. A full rebuild, with `fsck` only when asked. |
 | `repo.close` | `repoId` | stops watching |
+| `system.openFolder` | `path` | none. Opens an existing folder in Explorer (phase 4) |
 | `system.openTerminal` | `path` | none (phase 5) |
 | `git.checkUpdate` | none | installed and available Git for Windows versions (phase 6) |
 | `git.update` | none | starts the winget update (phase 6) |

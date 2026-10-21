@@ -37,6 +37,7 @@ public class ContractTests
         ["repo.open"] = () => Response(State("1")),
         ["repo.refresh"] = () => Response(State("1")),
         ["repo.close"] = () => Response(RpcResponse.NullResult),
+        ["system.openFolder"] = () => Response(RpcResponse.NullResult),
         ["app.shutdown"] = () => Response(RpcResponse.NullResult),
         ["repo.changed"] = () => Notification("repo.changed", new RepoChanged(
             [new RepoChange(ChangeKind.WorktreeFiles, AgentWorktree), new RepoChange(ChangeKind.Refs, null)],
@@ -191,7 +192,7 @@ public class ContractTests
 
         IReadOnlyList<Leftover> leftovers =
         [
-            new(LeftoverKind.LeftoverFolder, "old-task", @"C:\src\shop\.claude\worktrees\old-task", "Claude Code", Verdict.SafeToRemove, 0,
+            new(LeftoverKind.LeftoverFolder, "old-task", @"C:\src\shop\.claude\worktrees\old-task", "Claude Code", Verdict.SafeToRemove, null,
                 "Empty folder left in a worktree container. Removing it loses nothing."),
             new(LeftoverKind.LocalBranch, "copilot/fix-login", null, "GitHub Copilot", Verdict.NeedsReview, 2,
                 "Not merged into main and untouched for 21 days."),

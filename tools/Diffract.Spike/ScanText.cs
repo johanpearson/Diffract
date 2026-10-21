@@ -59,7 +59,7 @@ internal static class ScanText
     /// and "0" would wrongly read as "nothing to lose".
     /// </summary>
     public static string AtRiskLabel(Leftover leftover) =>
-        leftover.Kind == LeftoverKind.LeftoverFolder ? "-" : leftover.CommitsAtRisk.ToString(CultureInfo.InvariantCulture);
+        leftover.CommitsAtRisk?.ToString(CultureInfo.InvariantCulture) ?? "-";
 
     /// <summary>"4 leftovers: 2 safe, 1 needs review, 1 in use". Verdicts with no leftovers are left out.</summary>
     public static string Summary(IReadOnlyList<Leftover> leftovers)

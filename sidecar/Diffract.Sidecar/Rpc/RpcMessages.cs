@@ -100,6 +100,7 @@ internal static class RpcJson
 [JsonSerializable(typeof(RepoOpenParams))]
 [JsonSerializable(typeof(RepoRefreshParams))]
 [JsonSerializable(typeof(RepoCloseParams))]
+[JsonSerializable(typeof(OpenFolderParams))]
 [JsonSerializable(typeof(RepoState))]
 [JsonSerializable(typeof(RepoChanged))]
 internal sealed partial class RpcJsonContext : JsonSerializerContext;

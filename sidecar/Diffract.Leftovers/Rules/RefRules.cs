@@ -150,7 +150,7 @@ public sealed class OldBackupTagRule : ILeftoverRule
                 || now - created < TimeSpan.FromDays(config.Archive.ReviewAfterDays))
                 continue;
 
-            yield return new(LeftoverKind.BackupTag, t.Name, null, null, Verdict.NeedsReview, t.CommitsAtRisk ?? 0,
+            yield return new(LeftoverKind.BackupTag, t.Name, null, null, Verdict.NeedsReview, t.CommitsAtRisk,
                 $"Backup tag is {Describe.Age(now - created)} old, {Describe.AtRisk(t.CommitsAtRisk ?? 0)}");
         }
     }
@@ -169,5 +169,5 @@ public sealed class LeftoverFolderRule : ILeftoverRule
             : folder.HoldsNoFiles ? "Empty folder left where a worktree was"
             : "Folder sits with the worktrees, but git does not know it"
         select new Leftover(LeftoverKind.LeftoverFolder, Path.GetFileName(folder.Path), folder.Path,
-            Attribution.ForPath(config, folder.Path), verdict, 0, reason);
+            Attribution.ForPath(config, folder.Path), verdict, null, reason);
 }

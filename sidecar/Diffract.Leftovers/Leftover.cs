@@ -12,7 +12,10 @@ public enum LeftoverKind
 }
 
 /// <param name="Agent">The agent the config patterns point to. A hint only: it never changes the verdict.</param>
-/// <param name="CommitsAtRisk">Commits that exist nowhere else and would be lost on removal without a backup.</param>
+/// <param name="CommitsAtRisk">
+/// Commits that exist nowhere else and would be lost on removal without a backup.
+/// Null when they could not be counted, or when the item holds no commits, as a leftover folder.
+/// </param>
 /// <param name="Reason">One plain-English sentence.</param>
 public sealed record Leftover(
     LeftoverKind Kind,
@@ -20,7 +23,7 @@ public sealed record Leftover(
     string? Path,
     string? Agent,
     Verdict Verdict,
-    int CommitsAtRisk,
+    int? CommitsAtRisk,
     string Reason);
 
 /// <summary>A pure check over a snapshot: no git calls, no file system.</summary>
