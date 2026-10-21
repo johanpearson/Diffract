@@ -70,7 +70,8 @@ JSON-RPC 2.0 over the sidecar's stdin and stdout.
 | `repo.refresh` | `repoId`, `includeUnreachable` | the same as `repo.open`. A full rebuild, with `fsck` only when asked. |
 | `repo.close` | `repoId` | stops watching |
 | `system.openFolder` | `path` | none. Opens an existing folder in Explorer (phase 4) |
-| `system.openTerminal` | `path` | none (phase 5) |
+| `system.listTerminals` | none | the installed terminals, the default first (phase 5) |
+| `system.openTerminal` | `path`, optional `terminal` | none (phase 5) |
 | `git.checkUpdate` | none | installed and available Git for Windows versions (phase 6) |
 | `git.update` | none | starts the winget update (phase 6) |
 | `app.shutdown` | none | none, then the sidecar exits |
@@ -135,6 +136,8 @@ Tests: Vitest and Testing Library for components, against the contract samples. 
 - Opens Windows Terminal (`wt.exe -d <path>`) when it is installed, otherwise PowerShell with its working directory set to the path. Never `cmd /c` with a built command string. Arguments go through `ProcessStartInfo.ArgumentList`, as with git.
 - Implemented in the sidecar as `system.openTerminal`, so the Rust core stays thin.
 - Tests: which program and which arguments are chosen, with a fake process starter. One test opens nothing real.
+
+**Done** 2026-10-21 in #22 and #23. Johan tried it from the installer. At his request, as in Git Extensions, the user can also choose the terminal: Windows Terminal, Windows PowerShell, PowerShell 7, Command Prompt or Git Bash, whichever are installed. The last choice is remembered. Git Bash opens in its own window.
 
 ## Phase 6: git version check and update
 
