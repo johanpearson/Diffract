@@ -1,6 +1,6 @@
 # Milestone 3: history graph
 
-**Status:** in progress. Johan made the phase 0 decisions on 2026-10-21; the spike is still to do.
+**Status:** in progress. Phases 0 and 1 are done; phase 2, lane layout, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** opening Johan's busiest repo shows its history within a second or two, scrolling stays smooth on a repo with 50,000 commits, and the graph keeps up while agents add commits.
 
@@ -53,6 +53,8 @@ Johan decided these on 2026-10-21, in #30.
 - Commit details with one call: body, committer and changed files (`git show` or `git diff-tree` with `-z`).
 - A file's two sides for the diff, one call each (`git show <commit>^:<path>` and `git show <commit>:<path>`), with added, deleted, renamed and binary files handled. Large files are refused with a plain message instead of being sent whole.
 - Tests: parsers against captured real output in `Samples/`, including merges, octopus merges, root commits, non-ASCII names and subjects, and empty subjects. Call budget tests per page and per details request.
+
+**Done** 2026-10-21. The sidecar answers `history.read` (pages as `history.page` notifications, then the totals), `history.refs`, `history.details` and `history.file`. Through the published sidecar, the first page of the 50,000-commit repo arrives in about 0.35 seconds and all of it in about 0.8 seconds. A merge's files are its changes against its first parent. File sides are read with `git cat-file blob`, which hands over the stored bytes without running filters, and files over 5 MB are refused. Measurements are in `docs/findings/history.md`.
 
 ## Phase 2: lane layout
 
