@@ -35,5 +35,10 @@
     "PowerShell7",
     "CommandPrompt",
     "GitBash"
+  ],
+  "gitUpdateStatus": [
+    "UpToDate",
+    "UpdateAvailable",
+    "Unknown"
   ]
 }

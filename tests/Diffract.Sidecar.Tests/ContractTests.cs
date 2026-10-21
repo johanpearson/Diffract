@@ -41,6 +41,7 @@ public class ContractTests
         ["system.listTerminals"] = () => Response<IReadOnlyList<TerminalInfo>>(
             [new(TerminalKind.WindowsTerminal, "Windows Terminal"), new(TerminalKind.WindowsPowerShell, "Windows PowerShell"), new(TerminalKind.GitBash, "Git Bash")]),
         ["system.openTerminal"] = () => Response(RpcResponse.NullResult),
+        ["git.checkUpdate"] = () => Response(new GitUpdateCheck(GitUpdateStatus.UpdateAvailable, "2.47.1", "2.55.0.5", null, GitUpdateChecker.DownloadPage)),
         ["app.shutdown"] = () => Response(RpcResponse.NullResult),
         ["repo.changed"] = () => Notification("repo.changed", new RepoChanged(
             [new RepoChange(ChangeKind.WorktreeFiles, AgentWorktree), new RepoChange(ChangeKind.Refs, null)],
@@ -165,6 +166,7 @@ public class ContractTests
         ["errorKind"] = Values<ErrorKind>(),
         ["changeKind"] = Values<ChangeKind>(),
         ["terminalKind"] = Values<TerminalKind>(),
+        ["gitUpdateStatus"] = Values<GitUpdateStatus>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

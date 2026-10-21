@@ -1,5 +1,5 @@
 import openSample from "../../../tests/Diffract.Sidecar.Tests/Contract/repo.open.json";
-import type { AppInfo, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
+import type { AppInfo, GitUpdateCheck, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
 import { FakeTransport } from "./fakeTransport";
 
 /** The repo in the repo.open contract sample, which the sidecar's own tests write. */
@@ -26,6 +26,13 @@ export class FakeSidecar {
     { id: "WindowsPowerShell", name: "Windows PowerShell" },
     { id: "GitBash", name: "Git Bash" },
   ];
+  gitUpdate: GitUpdateCheck = {
+    status: "UpToDate",
+    installedVersion: "2.47.1",
+    availableVersion: null,
+    problem: null,
+    downloadPage: "https://gitforwindows.org/",
+  };
   /** Requests with these methods get no answer until `release` is called, like a slow sidecar. */
   readonly held = new Set<keyof Methods>();
   /** Set to make the next request to that method fail. */
@@ -92,6 +99,8 @@ export class FakeSidecar {
       case "system.openTerminal":
         this.openedTerminals.push(p.terminal ? `${p.path} in ${p.terminal}` : (p.path ?? ""));
         return null;
+      case "git.checkUpdate":
+        return this.gitUpdate;
       case "repo.close":
       case "app.shutdown":
         return null;

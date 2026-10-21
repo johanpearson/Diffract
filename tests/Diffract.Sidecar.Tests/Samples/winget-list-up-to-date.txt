@@ -1,0 +1,3 @@
+Name                   Id                              Version
+--------------------------------------------------------------
+Git Extensions 7.2.1.7 GitExtensionsTeam.GitExtensions 7.2.1.7

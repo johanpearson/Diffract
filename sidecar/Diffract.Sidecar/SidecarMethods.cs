@@ -16,27 +16,31 @@ internal sealed record AppInfo(string SidecarVersion, string? GitVersion, bool G
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate"];
 
     private readonly RepoSessions _repos;
     private readonly IProcessStarter _processes;
     private readonly TerminalLauncher _terminal;
+    private readonly GitUpdateChecker _updates;
 
     /// <param name="notify">Sends a notification to the app, such as <c>repo.changed</c>. Tests may leave it out.</param>
     /// <param name="log">Where problems with no request to answer are reported.</param>
     /// <param name="processes">Starts Explorer and terminals. Tests pass a fake.</param>
-    /// <param name="machine">Where Windows keeps its programs, for finding terminals. Tests describe their own.</param>
+    /// <param name="machine">Where Windows keeps its programs, for finding terminals and winget. Tests describe their own.</param>
+    /// <param name="commands">Runs winget and waits for its answer. Tests pass a fake.</param>
     public SidecarMethods(
         GitRunnerOptions runnerOptions,
         DiffractConfig? config = null,
         Func<string, JsonElement, Task>? notify = null,
         TextWriter? log = null,
         IProcessStarter? processes = null,
-        MachineLayout? machine = null)
+        MachineLayout? machine = null,
+        ICommandRunner? commands = null)
     {
         RunnerOptions = runnerOptions with { ReadOnly = true };
         _processes = processes ?? new ProcessStarter();
         _terminal = new TerminalLauncher(_processes, machine ?? MachineLayout.Current);
+        _updates = new GitUpdateChecker(commands ?? new CommandRunner(RunnerOptions.TimeProvider), machine ?? MachineLayout.Current);
         notify ??= (_, _) => Task.CompletedTask;
         _repos = new RepoSessions(
             RunnerOptions,
@@ -86,6 +90,9 @@ internal sealed class SidecarMethods : IDisposable
                     var terminal = Params<OpenTerminalParams>(parameters);
                     OpenTerminal(ExistingFolder(Required(terminal.Path, "path")), terminal.Terminal);
                     return RpcResponse.NullResult;
+
+                case "git.checkUpdate":
+                    return Result(await _updates.CheckAsync(await InstalledGitAsync(ct).ConfigureAwait(false), ct).ConfigureAwait(false));
 
                 default:
                     throw new RpcException(RpcErrorCodes.MethodNotFound, $"Unknown method '{method}'");
@@ -147,6 +154,19 @@ internal sealed class SidecarMethods : IDisposable
         catch (Exception e) when (e is GitException or FormatException)
         {
             return new AppInfo(SidecarVersion, null, false, e.Message);
+        }
+    }
+
+    /// <summary>The git Diffract uses, or null when it cannot be run or its answer cannot be read.</summary>
+    private async Task<GitVersion?> InstalledGitAsync(CancellationToken ct)
+    {
+        try
+        {
+            return await GitVersion.DetectAsync(new GitRunner(AppContext.BaseDirectory, RunnerOptions), ct).ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is Win32Exception or GitException or FormatException)
+        {
+            return null;
         }
     }
 
