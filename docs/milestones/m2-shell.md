@@ -39,7 +39,7 @@ docs/setup.md                    toolchain for building Diffract on Windows
 
 **Checkpoint:** Johan installs the missing tools and approves the package list.
 
-Found on 2026-10-20: on Johan's machine, .NET 10, Node 24, Git 2.47, WebView2, Windows Terminal and winget were already there. Rust was missing, and so was the C++ workload in both installed copies of Visual Studio. `tauri-plugin-shell` was added to the package list, and so were the React types and `@testing-library/dom`.
+**Done** 2026-10-20 in #14 and #15. Found on Johan's machine, .NET 10, Node 24, Git 2.47, WebView2, Windows Terminal and winget were already there. Rust was missing, and so was the C++ workload in both installed copies of Visual Studio. `tauri-plugin-shell` was added to the package list, and so were the React types and `@testing-library/dom`.
 
 ## Phase 1: walking skeleton and installer
 
@@ -52,6 +52,8 @@ The smallest app that proves the whole chain works, built and packaged in CI fro
 - CI: the `build` job also installs Node and Rust, runs the UI and Rust tests, publishes the sidecar with Native AOT, and builds the installer. The installer is uploaded as a workflow artifact. Cache npm, cargo and NuGet so the job stays under about 10 minutes. The job id stays `build`.
 
 **Checkpoint:** Johan downloads the installer from a CI run, installs it, and sees both versions on screen.
+
+**Done** 2026-10-21 in #16. Johan installed the CI build and saw both versions. Notes for later phases: the Tauri CLI only finds the app from the repo root, so `npm run tauri` in `ui/` changes there first. A shell started before the C++ tools were installed cannot link Native AOT; open a new one. A clean CI run takes about 9 minutes, most of it compiling Tauri.
 
 ## Phase 2: the sidecar protocol
 
