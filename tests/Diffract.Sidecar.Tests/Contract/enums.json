@@ -45,5 +45,24 @@
     "Updated",
     "RestartNeeded",
     "Failed"
+  ],
+  "historyRefKind": [
+    "Branch",
+    "RemoteBranch",
+    "Tag"
+  ],
+  "fileChangeKind": [
+    "Added",
+    "Deleted",
+    "Modified",
+    "Renamed",
+    "Copied",
+    "TypeChanged",
+    "Unknown"
+  ],
+  "fileContentKind": [
+    "Text",
+    "Binary",
+    "TooLarge"
   ]
 }

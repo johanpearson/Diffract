@@ -172,6 +172,99 @@ export interface RepoChanged {
   state: RepoState;
 }
 
+export const historyRefKinds = ["Branch", "RemoteBranch", "Tag"] as const;
+export type HistoryRefKind = (typeof historyRefKinds)[number];
+
+export const fileChangeKinds = ["Added", "Deleted", "Modified", "Renamed", "Copied", "TypeChanged", "Unknown"] as const;
+export type FileChangeKind = (typeof fileChangeKinds)[number];
+
+export const fileContentKinds = ["Text", "Binary", "TooLarge"] as const;
+export type FileContentKind = (typeof fileContentKinds)[number];
+
+/** One commit as the history list shows it. */
+export interface CommitEntry {
+  id: string;
+  /** First parent first. Empty for a root commit. */
+  parentIds: string[];
+  authorName: string;
+  authorEmail: string;
+  authoredAt: string;
+  committedAt: string;
+  /** The first line of the message. Can be empty. */
+  subject: string;
+}
+
+/** Params of the `history.page` notification. Every page of a read arrives before its result. */
+export interface HistoryPage {
+  /** The token the UI passed to `history.read`. */
+  token: string;
+  /** 0 for the first page, then 1, 2 and so on. */
+  index: number;
+  /** In topological order, continuing the previous page. */
+  commits: CommitEntry[];
+}
+
+/** Result of `history.read`, sent after its last page. */
+export interface HistoryReadResult {
+  commits: number;
+  pages: number;
+}
+
+/** A ref history shows by default. Worktree HEADs are in the repo state. */
+export interface HistoryRef {
+  /** Short name: "feature/x", "origin/feature/x" or "v1.0". */
+  name: string;
+  kind: HistoryRefKind;
+  /** The commit it points at, after peeling annotated tags. */
+  targetId: string;
+}
+
+/** One changed file in a commit, compared with its first parent. */
+export interface FileChange {
+  kind: FileChangeKind;
+  path: string;
+  /** The path before a rename or copy. */
+  oldPath: string | null;
+  /** The blob before the change, for `history.file`. Null when the file was added. */
+  oldId: string | null;
+  /** The blob after the change, for `history.file`. Null when the file was deleted. */
+  newId: string | null;
+  /** 0 to 100 for renames and copies. */
+  similarity: number | null;
+  /** Null for binary files. */
+  additions: number | null;
+  deletions: number | null;
+  isBinary: boolean;
+  /** A submodule commit has no content in this repo, so never ask for it. */
+  isSubmodule: boolean;
+}
+
+/** Result of `history.details`. */
+export interface CommitDetails {
+  id: string;
+  parentIds: string[];
+  authorName: string;
+  authorEmail: string;
+  authoredAt: string;
+  committerName: string;
+  committerEmail: string;
+  committedAt: string;
+  subject: string;
+  /** The message after the subject. Can be empty. */
+  body: string;
+  /** Changes against the first parent. */
+  files: FileChange[];
+}
+
+/** Result of `history.file`: one side of a file's diff. */
+export interface HistoryFile {
+  kind: FileContentKind;
+  /** The content when `kind` is Text. */
+  text: string | null;
+  /** Why there is no text, in plain English. Null for text. */
+  message: string | null;
+}
+
 /** Every method the sidecar answers, with its params and result. */
 export interface Methods {
   "app.info": { params: undefined; result: AppInfo };
@@ -197,9 +290,21 @@ export interface Methods {
   "git.inUse": { params: undefined; result: GitInUse[] };
   /** Opens gitforwindows.org in the browser. */
   "git.openDownloadPage": { params: undefined; result: null };
+  /**
+   * Streams the whole history as `history.page` notifications carrying `token`, then answers with the totals.
+   * One git call. Cancel the request to stop it.
+   */
+  "history.read": { params: { repoId: string; token: string }; result: HistoryReadResult };
+  /** Branches, remote branches and tags, from the repo's snapshot. Starts no git. */
+  "history.refs": { params: { repoId: string }; result: HistoryRef[] };
+  /** One commit's message, committer and changed files. */
+  "history.details": { params: { repoId: string; commitId: string }; result: CommitDetails };
+  /** One side of a file's diff, by the `oldId` or `newId` from `history.details`. Binary and large files come without text. */
+  "history.file": { params: { repoId: string; blobId: string }; result: HistoryFile };
 }
 
 /** Every notification the sidecar sends, with its params. */
 export interface Notifications {
   "repo.changed": RepoChanged;
+  "history.page": HistoryPage;
 }

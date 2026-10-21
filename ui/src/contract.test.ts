@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { changeKinds, errorKinds, gitUpdateOutcomes, gitUpdateStatuses, leftoverKinds, terminalKinds, verdicts, type Methods, type Notifications, type RepoChanged } from "./protocol";
+import {
+  changeKinds,
+  errorKinds,
+  fileChangeKinds,
+  fileContentKinds,
+  gitUpdateOutcomes,
+  gitUpdateStatuses,
+  historyRefKinds,
+  leftoverKinds,
+  terminalKinds,
+  verdicts,
+  type HistoryPage,
+  type Methods,
+  type Notifications,
+  type RepoChanged,
+} from "./protocol";
 import { RpcClient, RpcError } from "./rpc";
 import { FakeTransport } from "./testing/fakeTransport";
 import { check } from "./testing/shapes";
@@ -50,6 +65,9 @@ describe("contract samples from the sidecar", () => {
       terminalKind: [...terminalKinds],
       gitUpdateStatus: [...gitUpdateStatuses],
       gitUpdateOutcome: [...gitUpdateOutcomes],
+      historyRefKind: [...historyRefKinds],
+      fileChangeKind: [...fileChangeKinds],
+      fileContentKind: [...fileContentKinds],
     });
   });
 
@@ -83,5 +101,15 @@ describe("contract samples from the sidecar", () => {
     transport.emit(JSON.stringify(sample("repo.changed")));
 
     expect(received).toEqual([(sample("repo.changed") as { params: RepoChanged }).params]);
+  });
+
+  it("history.page: the client hands the params to the listener", () => {
+    const transport = new FakeTransport();
+    const received: HistoryPage[] = [];
+    new RpcClient(transport).onNotification("history.page", (params) => received.push(params));
+
+    transport.emit(JSON.stringify(sample("history.page")));
+
+    expect(received).toEqual([(sample("history.page") as { params: HistoryPage }).params]);
   });
 });

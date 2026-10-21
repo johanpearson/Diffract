@@ -1,5 +1,8 @@
 import {
   changeKinds,
+  fileChangeKinds,
+  fileContentKinds,
+  historyRefKinds,
   terminalKinds,
   errorKinds,
   gitUpdateOutcomes,
@@ -7,9 +10,16 @@ import {
   leftoverKinds,
   verdicts,
   type AppInfo,
+  type CommitDetails,
+  type CommitEntry,
+  type FileChange,
   type GitInUse,
   type GitUpdateCheck,
   type GitUpdateResult,
+  type HistoryFile,
+  type HistoryPage,
+  type HistoryReadResult,
+  type HistoryRef,
   type Leftover,
   type LeftoverFolderInfo,
   type LeftoverSummary,
@@ -84,6 +94,43 @@ const gitInUse = object<GitInUse>({ program: string, startedBy: nullable(string)
 
 const repoChange = object<RepoChange>({ kind: oneOf(changeKinds), path: nullable(string) });
 
+const commitEntry = object<CommitEntry>({
+  id: string,
+  parentIds: arrayOf(string),
+  authorName: string,
+  authorEmail: string,
+  authoredAt: date,
+  committedAt: date,
+  subject: string,
+});
+
+const fileChange = object<FileChange>({
+  kind: oneOf(fileChangeKinds),
+  path: string,
+  oldPath: nullable(string),
+  oldId: nullable(string),
+  newId: nullable(string),
+  similarity: nullable(number),
+  additions: nullable(number),
+  deletions: nullable(number),
+  isBinary: boolean,
+  isSubmodule: boolean,
+});
+
+const commitDetails = object<CommitDetails>({
+  id: string,
+  parentIds: arrayOf(string),
+  authorName: string,
+  authorEmail: string,
+  authoredAt: date,
+  committerName: string,
+  committerEmail: string,
+  committedAt: date,
+  subject: string,
+  body: string,
+  files: arrayOf(fileChange),
+});
+
 /** The result of every method. Adding a method to `Methods` without a shape here fails the type check. */
 export const resultShapes: { [M in keyof Methods]: Shape } = {
   "app.info": appInfo,
@@ -104,10 +151,15 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "git.update": object<GitUpdateResult>({ outcome: oneOf(gitUpdateOutcomes), message: string, inUse: arrayOf(gitInUse) }),
   "git.inUse": arrayOf(gitInUse),
   "git.openDownloadPage": nullValue,
+  "history.read": object<HistoryReadResult>({ commits: number, pages: number }),
+  "history.refs": arrayOf(object<HistoryRef>({ name: string, kind: oneOf(historyRefKinds), targetId: string })),
+  "history.details": commitDetails,
+  "history.file": object<HistoryFile>({ kind: oneOf(fileContentKinds), text: nullable(string), message: nullable(string) }),
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {
   "repo.changed": object<RepoChanged>({ changes: arrayOf(repoChange), state: repoState }),
+  "history.page": object<HistoryPage>({ token: string, index: number, commits: arrayOf(commitEntry) }),
 };
 
 export const responseShape = (result: Shape) => object<{ jsonrpc: string; id: number; result: unknown }>({ jsonrpc: string, id: number, result });

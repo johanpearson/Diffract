@@ -1,3 +1,5 @@
+using Diffract.Git.History;
+using Diffract.Git.Parsing;
 using Diffract.Git.Snapshot;
 using Diffract.Leftovers;
 
@@ -14,6 +16,16 @@ internal sealed record RepoRefreshParams(string? RepoId, bool IncludeUnreachable
 internal sealed record RepoCloseParams(string? RepoId);
 
 internal sealed record OpenFolderParams(string? Path);
+
+/// <param name="Token">Chosen by the UI and sent back with every <c>history.page</c>, so it knows which read a page belongs to.</param>
+internal sealed record HistoryReadParams(string? RepoId, string? Token);
+
+internal sealed record HistoryRefsParams(string? RepoId);
+
+internal sealed record HistoryDetailsParams(string? RepoId, string? CommitId);
+
+/// <param name="BlobId">The <c>oldId</c> or <c>newId</c> of a file in <c>history.details</c>.</param>
+internal sealed record HistoryFileParams(string? RepoId, string? BlobId);
 
 /// <param name="Terminal">Null for the default: Windows Terminal when installed, otherwise Windows PowerShell.</param>
 internal sealed record OpenTerminalParams(string? Path, TerminalKind? Terminal);
@@ -107,4 +119,41 @@ internal enum ChangeKind
 
     /// <summary>The watcher lost track and everything was rebuilt.</summary>
     Everything,
+}
+
+/// <summary>
+/// The params of the <c>history.page</c> notification: the next commits of a <c>history.read</c>, in topological order.
+/// Every page arrives before the read's own result.
+/// </summary>
+/// <param name="Index">0 for the first page, then 1, 2 and so on.</param>
+internal sealed record HistoryPage(string Token, int Index, IReadOnlyList<CommitEntry> Commits);
+
+/// <summary>The result of <c>history.read</c>, sent after its last page.</summary>
+internal sealed record HistoryReadResult(int Commits, int Pages);
+
+internal enum HistoryRefKind { Branch, RemoteBranch, Tag }
+
+/// <summary>A ref history shows by default. Worktree HEADs are in the repo state.</summary>
+/// <param name="Name">Short name: "feature/x", "origin/feature/x" or "v1.0".</param>
+/// <param name="TargetId">The commit it points at, after peeling annotated tags.</param>
+internal sealed record HistoryRef(string Name, HistoryRefKind Kind, string TargetId)
+{
+    public static IReadOnlyList<HistoryRef> From(RepoSnapshot s) =>
+    [
+        .. s.Branches.Select(b => new HistoryRef(b.Name, b.IsRemote ? HistoryRefKind.RemoteBranch : HistoryRefKind.Branch, b.TargetId)),
+        .. s.Tags.Select(t => new HistoryRef(t.Name, HistoryRefKind.Tag, t.TargetId)),
+    ];
+}
+
+/// <summary>The result of <c>history.file</c>: one side of a file's diff.</summary>
+/// <param name="Text">The content, when <see cref="Kind"/> is Text.</param>
+/// <param name="Message">Why there is no text to show, in plain English. Null for text.</param>
+internal sealed record HistoryFile(FileContentKind Kind, string? Text, string? Message)
+{
+    public static HistoryFile From(FileContent content) => new(content.Kind, content.Text, content.Kind switch
+    {
+        FileContentKind.Binary => "This is a binary file, so there is no text to show.",
+        FileContentKind.TooLarge => $"This file is larger than {HistoryReader.MaxFileBytes / (1024 * 1024)} MB, so Diffract does not show it.",
+        _ => null,
+    });
 }

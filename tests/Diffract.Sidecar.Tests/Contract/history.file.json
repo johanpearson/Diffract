@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "kind": "Text",
+    "text": "namespace Shop;\r\n",
+    "message": null
+  }
+}
