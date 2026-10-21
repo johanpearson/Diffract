@@ -1,0 +1,31 @@
+{
+  "jsonrpc": "2.0",
+  "method": "history.page",
+  "params": {
+    "token": "read-1",
+    "index": 0,
+    "commits": [
+      {
+        "id": "9fceb02d0ae598e95dc970b74767f19372d61af8",
+        "parentIds": [
+          "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "e83c5163316f89bfbde7d9ab23ca2e25604af290"
+        ],
+        "authorName": "Åsa Öberg",
+        "authorEmail": "åsa@exempel.se",
+        "authoredAt": "2026-10-21T06:30:00+02:00",
+        "committedAt": "2026-10-21T07:30:00+02:00",
+        "subject": "Merge branch 'claude/räksmörgås-fix'"
+      },
+      {
+        "id": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+        "parentIds": [],
+        "authorName": "GitHub Copilot",
+        "authorEmail": "198982749+Copilot@users.noreply.github.com",
+        "authoredAt": "2026-10-19T09:30:00+02:00",
+        "committedAt": "2026-10-19T09:30:00+02:00",
+        "subject": ""
+      }
+    ]
+  }
+}

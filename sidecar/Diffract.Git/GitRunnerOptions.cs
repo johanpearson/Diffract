@@ -16,4 +16,7 @@ public sealed record GitRunnerOptions
     public string? PathPrefix { get; init; }
 
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
+    /// <summary>Called after every git process ends, however it ended. Tests use it to count calls against a budget.</summary>
+    public Action<GitCall>? OnCall { get; init; }
 }

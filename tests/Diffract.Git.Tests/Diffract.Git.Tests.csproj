@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Samples\*.bin;Samples\*.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Samples\*.bin;Samples\*.txt;Samples\*.sh" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

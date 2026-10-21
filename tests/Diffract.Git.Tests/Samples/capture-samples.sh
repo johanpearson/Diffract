@@ -88,6 +88,7 @@ git stash push -q --include-untracked -m "autostash"
 
 git init -q -b main "$tmp/empty"
 (cd "$tmp/empty" && echo "x" > first.txt && capture status-initial.bin git status --porcelain=v2 --branch -z)
+(cd "$tmp/empty" && capture worktree-list-unborn.bin git worktree list --porcelain -z)
 
 git init -q -b main "$tmp/conflict"
 (

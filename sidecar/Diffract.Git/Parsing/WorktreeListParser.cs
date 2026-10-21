@@ -47,7 +47,8 @@ public static class WorktreeListParser
             // Unknown attributes are ignored so newer git versions do not break parsing.
             current = key switch
             {
-                "HEAD" => current with { Head = value },
+                // An unborn branch has no commit yet: git prints a HEAD of all zeros.
+                "HEAD" => current with { Head = value is { Length: > 0 } && !ObjectId.IsZero(value) ? value : null },
                 "branch" => current with { Branch = value },
                 "bare" => current with { IsBare = true },
                 "detached" => current with { IsDetached = true },

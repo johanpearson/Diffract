@@ -3,6 +3,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Diffract.Fixtures;
 using Diffract.Git;
+using Diffract.Git.History;
+using Diffract.Git.Parsing;
 using Diffract.Git.Snapshot;
 using Diffract.Leftovers;
 using Diffract.Sidecar.Rpc;
@@ -49,6 +51,21 @@ public class ContractTests
         ["repo.changed"] = () => Notification("repo.changed", new RepoChanged(
             [new RepoChange(ChangeKind.WorktreeFiles, AgentWorktree), new RepoChange(ChangeKind.Refs, null)],
             State("1"))),
+        ["history.read"] = () => Response(new HistoryReadResult(Commits: 1203, Pages: 3)),
+        ["history.page"] = () => Notification("history.page", new HistoryPage("read-1", 0,
+        [
+            new CommitEntry(Merge, [Parent, Side], "Åsa Öberg", "åsa@exempel.se", Now.AddHours(-3), Now.AddHours(-2), "Merge branch 'claude/räksmörgås-fix'"),
+            new CommitEntry(Parent, [], "GitHub Copilot", "198982749+Copilot@users.noreply.github.com", Now.AddDays(-2), Now.AddDays(-2), ""),
+        ])),
+        ["history.refs"] = () => Response<IReadOnlyList<HistoryRef>>(
+            [new("main", HistoryRefKind.Branch, Merge), new("origin/main", HistoryRefKind.RemoteBranch, Parent), new("v1.0", HistoryRefKind.Tag, Parent)]),
+        ["history.details"] = () => Response(new CommitDetails(Merge, [Parent, Side], "Åsa Öberg", "åsa@exempel.se", Now.AddHours(-3),
+            "GitHub", "noreply@github.com", Now.AddHours(-2), "Merge branch 'claude/räksmörgås-fix'", "Fixes the cart.\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+            [
+                new FileChange(FileChangeKind.Renamed, "src/räksmörgås.cs", "src/cart.cs", BlobA, BlobB, 92, 3, 1, IsBinary: false, IsSubmodule: false),
+                new FileChange(FileChangeKind.Added, "docs/logo.png", null, null, BlobC, null, null, null, IsBinary: true, IsSubmodule: false),
+            ])),
+        ["history.file"] = () => Response(HistoryFile.From(new FileContent(FileContentKind.Text, "namespace Shop;\r\n"))),
         ["error.not-a-repo"] = () => Error(new NotAGitRepositoryException(@"C:\Users\johan\Downloads")),
         ["error.git-too-old"] = () => Error(new GitVersionTooOldException(new GitVersion(2, 39, 5))),
         ["error.git-failed"] = () => Error(new GitCommandException(["status", "--porcelain=v2", "-z"], 128, "fatal: unable to read tree\n")),
@@ -61,6 +78,13 @@ public class ContractTests
 
     private static IReadOnlyList<GitInUse> InUse =>
         [new("CodeScene cs-ide tool for windows", "Visual Studio Code", 2), new("Git Bash", null, 3)];
+
+    private const string Merge = "9fceb02d0ae598e95dc970b74767f19372d61af8";
+    private const string Parent = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+    private const string Side = "e83c5163316f89bfbde7d9ab23ca2e25604af290";
+    private const string BlobA = "8ab686eafeb1f44702738c8b0f24f2567c36da6d";
+    private const string BlobB = "d670460b4b4aece5915caf5c68d12f560a9fe3e4";
+    private const string BlobC = "3b18e512dba79e4c8300dd08aeb37f8e728b8dad";
 
     private const string MainWorktree = @"C:\src\shop";
     private const string AgentWorktree = @"C:\src\shop\.claude\worktrees\räksmörgås fix";
@@ -174,6 +198,9 @@ public class ContractTests
         ["terminalKind"] = Values<TerminalKind>(),
         ["gitUpdateStatus"] = Values<GitUpdateStatus>(),
         ["gitUpdateOutcome"] = Values<GitUpdateOutcome>(),
+        ["historyRefKind"] = Values<HistoryRefKind>(),
+        ["fileChangeKind"] = Values<FileChangeKind>(),
+        ["fileContentKind"] = Values<FileContentKind>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

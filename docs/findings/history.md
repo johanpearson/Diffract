@@ -56,3 +56,15 @@ What the launcher does differently, checked by printing the environment git hand
 **Decided** by Johan on 2026-10-21: Diffract starts the real git. It looks at the first `git.exe` on PATH, as Windows would. When that is Git for Windows' launcher (`cmd\git.exe` or `bin\git.exe`) or the real git, it starts `mingw64\bin\git.exe` and puts `mingw64\bin` and `usr\bin` in front of PATH, which makes the environment match the launcher's. Anything else on PATH, such as a package manager's shim, is started as before.
 
 Opening Repo A through the sidecar took 6.5 to 14 seconds both before and after the change, on a laptop busy enough that a single git start took over a second. Differences of a few hundred milliseconds disappear in that noise, so the end-to-end gain is not proven yet. Phase 7 checks it on Johan's laptop.
+
+## Through the sidecar
+
+Measured in phase 1 on 2026-10-21, with the published Native AOT sidecar driven over stdio the way the app drives it. Times are from sending `history.read` to receiving the first `history.page`, and to receiving the result after the last page.
+
+| Repo | Commits | First page | All of it | JSON sent |
+|---|---|---|---|---|
+| Large test repo | 50,000 in 100 pages | 336 / 332 ms | 0.76 / 0.81 s | 14.8 MB |
+| Repo A | 118 | 78 ms | the same | under 0.1 MB |
+| Johan's two projects | 83 and 14 | under 0.2 s | the same | under 0.1 MB |
+
+A commit's details took 60 to 120 ms, one git call each. The JSON is about 300 bytes per commit, so a page of 500 is about 150 KB.

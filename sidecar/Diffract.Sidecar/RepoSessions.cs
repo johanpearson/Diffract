@@ -93,6 +93,9 @@ internal sealed class RepoSessions(
         return session;
     }
 
+    /// <summary>The repo's latest snapshot. History reads its refs and worktree HEADs from it, so it starts no git.</summary>
+    public RepoSnapshot SnapshotOf(string repoId) => Get(repoId).Snapshot ?? throw UnknownRepo(repoId);
+
     private RepoSession Get(string repoId) => _byId.TryGetValue(repoId, out var session) ? session : throw UnknownRepo(repoId);
 
     private static RpcException UnknownRepo(string repoId) =>

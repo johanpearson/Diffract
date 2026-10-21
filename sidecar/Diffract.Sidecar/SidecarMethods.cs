@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Text.Json;
 using Diffract.Git;
+using Diffract.Git.History;
 using Diffract.Leftovers;
 using Diffract.Sidecar.Rpc;
 
@@ -16,13 +17,15 @@ internal sealed record AppInfo(string SidecarVersion, string? GitVersion, bool G
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.refs", "history.details", "history.file"];
 
     private readonly RepoSessions _repos;
     private readonly IProcessStarter _processes;
     private readonly TerminalLauncher _terminal;
     private readonly GitUpdateChecker _updates;
     private readonly GitUpdater _updater;
+    private readonly HistoryReader _history;
+    private readonly Func<string, JsonElement, Task> _notify;
 
     /// <param name="notify">Sends a notification to the app, such as <c>repo.changed</c>. Tests may leave it out.</param>
     /// <param name="log">Where problems with no request to answer are reported.</param>
@@ -42,6 +45,8 @@ internal sealed class SidecarMethods : IDisposable
     {
         RunnerOptions = runnerOptions with { ReadOnly = true };
         notify ??= (_, _) => Task.CompletedTask;
+        _notify = notify;
+        _history = new HistoryReader(RunnerOptions);
         machine ??= MachineLayout.Current;
         _processes = processes ?? new ProcessStarter();
         _terminal = new TerminalLauncher(_processes, machine);
@@ -86,6 +91,23 @@ internal sealed class SidecarMethods : IDisposable
                     _repos.Close(Required(Params<RepoCloseParams>(parameters).RepoId, "repoId"));
                     return RpcResponse.NullResult;
 
+                case "history.read":
+                    var read = Params<HistoryReadParams>(parameters);
+                    return Result(await ReadHistoryAsync(Required(read.RepoId, "repoId"), Required(read.Token, "token"), ct).ConfigureAwait(false));
+
+                case "history.refs":
+                    return Result(HistoryRef.From(_repos.SnapshotOf(Required(Params<HistoryRefsParams>(parameters).RepoId, "repoId"))));
+
+                case "history.details":
+                    var details = Params<HistoryDetailsParams>(parameters);
+                    var commitRepo = _repos.SnapshotOf(Required(details.RepoId, "repoId")).RepoRoot;
+                    return Result(await _history.ReadDetailsAsync(commitRepo, RequiredObjectId(details.CommitId, "commitId"), ct).ConfigureAwait(false));
+
+                case "history.file":
+                    var file = Params<HistoryFileParams>(parameters);
+                    var fileRepo = _repos.SnapshotOf(Required(file.RepoId, "repoId")).RepoRoot;
+                    return Result(HistoryFile.From(await _history.ReadFileAsync(fileRepo, RequiredObjectId(file.BlobId, "blobId"), ct).ConfigureAwait(false)));
+
                 case "system.openFolder":
                     OpenFolder(Required(Params<OpenFolderParams>(parameters).Path, "path"));
                     return RpcResponse.NullResult;
@@ -121,6 +143,19 @@ internal sealed class SidecarMethods : IDisposable
         {
             throw rpc;
         }
+    }
+
+    /// <summary>
+    /// Streams the whole history as <c>history.page</c> notifications, then answers with the totals. One git call,
+    /// whatever the size. Cancelling the request stops git.
+    /// </summary>
+    private async Task<HistoryReadResult> ReadHistoryAsync(string repoId, string token, CancellationToken ct)
+    {
+        var snapshot = _repos.SnapshotOf(repoId);
+        var pages = 0;
+        var commits = await _history.ReadAsync(snapshot.RepoRoot, HistoryReader.HeadsOf(snapshot), HistoryReader.PageSize,
+            page => _notify("history.page", Result(new HistoryPage(token, pages++, page))), ct).ConfigureAwait(false);
+        return new HistoryReadResult(commits, pages);
     }
 
     private void OpenTerminal(string folder, TerminalKind? terminal)
@@ -226,6 +261,9 @@ internal sealed class SidecarMethods : IDisposable
             throw new RpcException(RpcErrorCodes.InvalidParams, $"Params are not valid: {e.Message}");
         }
     }
+
+    private static string RequiredObjectId(string? value, string name) =>
+        ObjectId.IsValid(value) ? value! : throw new RpcException(RpcErrorCodes.InvalidParams, $"'{name}' must be a full commit or file id");
 
     private static string Required(string? value, string name) =>
         string.IsNullOrWhiteSpace(value) ? throw new RpcException(RpcErrorCodes.InvalidParams, $"'{name}' is required") : value;

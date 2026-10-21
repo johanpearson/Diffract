@@ -54,6 +54,20 @@ public class RepoSnapshotBuilderTests
     }
 
     [Fact]
+    public async Task A_repo_with_no_commits_yet()
+    {
+        using var temp = new TempDirectory();
+        var repo = await FixtureRepo.InitAsync(temp, "empty");
+        repo.WriteFile("first.txt", "not committed");
+
+        var snapshot = await SnapshotAsync(temp, repo.Path);
+
+        var main = Assert.Single(snapshot.Worktrees);
+        Assert.Equal(("main", null, null, 1), (main.Branch, main.Head, main.LastCommitAt, main.DirtyFileCount));
+        Assert.Empty(snapshot.Branches);
+    }
+
+    [Fact]
     public async Task Taken_at_comes_from_the_time_provider()
     {
         using var temp = new TempDirectory();
