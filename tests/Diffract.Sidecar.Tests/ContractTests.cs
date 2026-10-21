@@ -38,6 +38,8 @@ public class ContractTests
         ["repo.refresh"] = () => Response(State("1")),
         ["repo.close"] = () => Response(RpcResponse.NullResult),
         ["system.openFolder"] = () => Response(RpcResponse.NullResult),
+        ["system.listTerminals"] = () => Response<IReadOnlyList<TerminalInfo>>(
+            [new(TerminalKind.WindowsTerminal, "Windows Terminal"), new(TerminalKind.WindowsPowerShell, "Windows PowerShell"), new(TerminalKind.GitBash, "Git Bash")]),
         ["system.openTerminal"] = () => Response(RpcResponse.NullResult),
         ["app.shutdown"] = () => Response(RpcResponse.NullResult),
         ["repo.changed"] = () => Notification("repo.changed", new RepoChanged(
@@ -162,6 +164,7 @@ public class ContractTests
         ["leftoverKind"] = Values<LeftoverKind>(),
         ["errorKind"] = Values<ErrorKind>(),
         ["changeKind"] = Values<ChangeKind>(),
+        ["terminalKind"] = Values<TerminalKind>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

@@ -120,10 +120,24 @@ test("opens a terminal from the sidebar's menu with the keyboard", async ({ page
 
   const menu = page.getByRole("menu", { name: "Actions for claude/räksmörgås-fix" });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Open terminal here" })).toBeFocused();
+  await expect(menu.getByRole("menuitem", { name: "Open in Windows Terminal" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitem", { name: "Open in Git Bash" })).toBeFocused();
   await page.keyboard.press("Enter");
 
   await expect(menu).toBeHidden();
   await expect(entry).toBeFocused();
-  expect(await page.evaluate(() => window.diffractTest.sidecar.openedTerminals)).toEqual([String.raw`C:\src\shop\.claude\worktrees\räksmörgås fix`]);
+  expect(await page.evaluate(() => window.diffractTest.sidecar.openedTerminals)).toEqual([String.raw`C:\src\shop\.claude\worktrees\räksmörgås fix in GitBash`]);
+  await expect(page.getByRole("button", { name: "Open in Git Bash" })).toBeVisible();
+});
+
+test("chooses a terminal from the arrow next to the button", async ({ page }) => {
+  await openRepo(page);
+
+  await page.getByRole("button", { name: "Choose terminal" }).click();
+  await page.getByRole("menuitemradio", { name: "Windows PowerShell" }).click();
+
+  expect(await page.evaluate(() => window.diffractTest.sidecar.openedTerminals)).toEqual([String.raw`C:\src\shop in WindowsPowerShell`]);
+  await expect(page.getByRole("button", { name: "Open in Windows PowerShell" })).toBeVisible();
 });

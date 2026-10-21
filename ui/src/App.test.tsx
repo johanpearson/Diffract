@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { App, LastRepoKey } from "./App";
+import { App, LastRepoKey, TerminalKey } from "./App";
 import type { AppHost, SidecarEvent } from "./host";
 import { RpcClient } from "./rpc";
 import { FakeSidecar, sampleState } from "./testing/fakeSidecar";
@@ -10,8 +10,10 @@ afterEach(cleanup);
 const repoRoot = sampleState.repoRoot;
 
 /** Renders the app against a fake sidecar. `last` is the repo remembered from the previous run. */
-function setup({ last = null as string | null, sidecar = new FakeSidecar(), folder = repoRoot as string | null } = {}) {
+/** `terminal` is the one remembered from the previous run. */
+function setup({ last = null as string | null, sidecar = new FakeSidecar(), folder = repoRoot as string | null, terminal = null as string | null } = {}) {
   const stored = new Map<string, string>(last ? [[LastRepoKey, last]] : []);
+  if (terminal) stored.set(TerminalKey, terminal);
   const handlers = new Set<(event: SidecarEvent) => void>();
   const host: AppHost = {
     transport: sidecar.transport,
@@ -149,13 +151,74 @@ describe("App", () => {
     await screen.findByRole("list", { name: "Leftovers" });
     const worktree = sampleState.snapshot.worktrees[1]!.path;
 
-    fireEvent.click(screen.getByRole("button", { name: "Open terminal" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open in Windows Terminal" }));
     fireEvent.click(within(row("räksmörgås fix")).getByRole("button", { name: /Open terminal in/ }));
     fireEvent.contextMenu(screen.getByRole("listitem", { name: "claude/räksmörgås-fix" }), { clientX: 40, clientY: 80 });
-    fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Open terminal here" }));
+    fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Open in Windows Terminal" }));
 
-    await waitFor(() => expect(sidecar.openedTerminals).toEqual([repoRoot, worktree, worktree]));
+    await waitFor(() =>
+      expect(sidecar.openedTerminals).toEqual([`${repoRoot} in WindowsTerminal`, `${worktree} in WindowsTerminal`, `${worktree} in WindowsTerminal`]),
+    );
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("lists every installed terminal in the sidebar menu, the current one first", async () => {
+    setup({ last: repoRoot, terminal: "GitBash" });
+    await screen.findByRole("button", { name: "Open in Git Bash" });
+
+    fireEvent.contextMenu(screen.getByRole("listitem", { name: "main" }), { clientX: 40, clientY: 80 });
+
+    expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Open in Git Bash",
+      "Open in Windows Terminal",
+      "Open in Windows PowerShell",
+      "Open folder",
+    ]);
+  });
+
+  it("opens the chosen terminal from the arrow menu and remembers it", async () => {
+    const { sidecar, stored } = setup({ last: repoRoot });
+    fireEvent.click(await screen.findByRole("button", { name: "Choose terminal" }));
+
+    const chooser = screen.getByRole("menu", { name: "Choose terminal" });
+    expect(within(chooser).getByRole("menuitemradio", { name: "Windows Terminal" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(within(chooser).getByRole("menuitemradio", { name: "Git Bash" }));
+
+    await waitFor(() => expect(sidecar.openedTerminals).toEqual([`${repoRoot} in GitBash`]));
+    expect(stored.get(TerminalKey)).toBe("GitBash");
+    expect(screen.getByRole("button", { name: "Open in Git Bash" })).toBeTruthy();
+    expect(within(row("räksmörgås fix")).getByRole("button", { name: /Open terminal in/ }).textContent).toBe("Open in Git Bash");
+  });
+
+  it("a terminal chosen in the sidebar menu becomes the current one", async () => {
+    const { stored } = setup({ last: repoRoot });
+    await screen.findByRole("button", { name: "Open in Windows Terminal" });
+
+    fireEvent.contextMenu(screen.getByRole("listitem", { name: "main" }), { clientX: 40, clientY: 80 });
+    fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Open in Windows PowerShell" }));
+
+    expect(stored.get(TerminalKey)).toBe("WindowsPowerShell");
+    expect(screen.getByRole("button", { name: "Open in Windows PowerShell" })).toBeTruthy();
+  });
+
+  it("falls back to the default when the remembered terminal is no longer installed", async () => {
+    const sidecar = new FakeSidecar();
+    sidecar.terminals = [{ id: "WindowsPowerShell", name: "Windows PowerShell" }, { id: "CommandPrompt", name: "Command Prompt" }];
+    setup({ sidecar, last: repoRoot, terminal: "GitBash" });
+
+    expect(await screen.findByRole("button", { name: "Open in Windows PowerShell" })).toBeTruthy();
+  });
+
+  it("still opens the default terminal when the sidecar cannot list them", async () => {
+    const sidecar = new FakeSidecar();
+    sidecar.failures.set("system.listTerminals", { error: { code: -32603, message: "Something broke" } });
+    setup({ sidecar, last: repoRoot });
+    await screen.findByRole("list", { name: "Leftovers" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open terminal" }));
+
+    expect(screen.queryByRole("button", { name: "Choose terminal" })).toBeNull();
+    await waitFor(() => expect(sidecar.openedTerminals).toEqual([repoRoot]));
   });
 
   it("offers a terminal only on worktree rows, not on folders or branches", async () => {
@@ -174,11 +237,13 @@ describe("App", () => {
 
     fireEvent.contextMenu(entry);
     const menu = screen.getByRole("menu", { name: "Actions for main" });
-    expect(document.activeElement?.textContent).toBe("Open terminal here");
-    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement?.textContent).toBe("Open in Windows Terminal");
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
     expect(document.activeElement?.textContent).toBe("Open folder");
     fireEvent.keyDown(menu, { key: "ArrowDown" });
-    expect(document.activeElement?.textContent).toBe("Open terminal here");
+    expect(document.activeElement?.textContent).toBe("Open in Windows Terminal");
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement?.textContent).toBe("Open in Windows PowerShell");
     fireEvent.keyDown(menu, { key: "Escape" });
 
     expect(screen.queryByRole("menu")).toBeNull();
@@ -212,7 +277,7 @@ describe("App", () => {
     await screen.findByRole("list", { name: "Leftovers" });
     sidecar.failures.set("system.openTerminal", { error: { code: -32602, message: `The folder does not exist: ${repoRoot}` } });
 
-    fireEvent.click(screen.getByRole("button", { name: "Open terminal" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open in Windows Terminal" }));
 
     expect((await screen.findByRole("status")).textContent).toContain("Could not open a terminal: The folder does not exist");
   });

@@ -16,7 +16,7 @@ internal sealed record AppInfo(string SidecarVersion, string? GitVersion, bool G
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.openTerminal"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal"];
 
     private readonly RepoSessions _repos;
     private readonly IProcessStarter _processes;
@@ -25,18 +25,18 @@ internal sealed class SidecarMethods : IDisposable
     /// <param name="notify">Sends a notification to the app, such as <c>repo.changed</c>. Tests may leave it out.</param>
     /// <param name="log">Where problems with no request to answer are reported.</param>
     /// <param name="processes">Starts Explorer and terminals. Tests pass a fake.</param>
-    /// <param name="findWindowsTerminal">Where wt.exe is, or null when it is not installed. Tests pass their own.</param>
+    /// <param name="machine">Where Windows keeps its programs, for finding terminals. Tests describe their own.</param>
     public SidecarMethods(
         GitRunnerOptions runnerOptions,
         DiffractConfig? config = null,
         Func<string, JsonElement, Task>? notify = null,
         TextWriter? log = null,
         IProcessStarter? processes = null,
-        Func<string?>? findWindowsTerminal = null)
+        MachineLayout? machine = null)
     {
         RunnerOptions = runnerOptions with { ReadOnly = true };
         _processes = processes ?? new ProcessStarter();
-        _terminal = new TerminalLauncher(_processes, findWindowsTerminal ?? TerminalLauncher.FindWindowsTerminal);
+        _terminal = new TerminalLauncher(_processes, machine ?? MachineLayout.Current);
         notify ??= (_, _) => Task.CompletedTask;
         _repos = new RepoSessions(
             RunnerOptions,
@@ -79,8 +79,12 @@ internal sealed class SidecarMethods : IDisposable
                     OpenFolder(Required(Params<OpenFolderParams>(parameters).Path, "path"));
                     return RpcResponse.NullResult;
 
+                case "system.listTerminals":
+                    return Result(_terminal.List());
+
                 case "system.openTerminal":
-                    _terminal.Open(ExistingFolder(Required(Params<OpenTerminalParams>(parameters).Path, "path")));
+                    var terminal = Params<OpenTerminalParams>(parameters);
+                    OpenTerminal(ExistingFolder(Required(terminal.Path, "path")), terminal.Terminal);
                     return RpcResponse.NullResult;
 
                 default:
@@ -90,6 +94,18 @@ internal sealed class SidecarMethods : IDisposable
         catch (Exception e) when (ToRpcException(e) is { } rpc)
         {
             throw rpc;
+        }
+    }
+
+    private void OpenTerminal(string folder, TerminalKind? terminal)
+    {
+        try
+        {
+            _terminal.Open(folder, terminal);
+        }
+        catch (ArgumentException e)
+        {
+            throw new RpcException(RpcErrorCodes.InvalidParams, e.Message);
         }
     }
 

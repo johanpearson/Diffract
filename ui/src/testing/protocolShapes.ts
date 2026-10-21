@@ -1,5 +1,6 @@
 import {
   changeKinds,
+  terminalKinds,
   errorKinds,
   leftoverKinds,
   verdicts,
@@ -13,6 +14,7 @@ import {
   type RepoChanged,
   type RepoState,
   type SnapshotSummary,
+  type TerminalInfo,
   type WorktreeInfo,
 } from "../protocol";
 import { arrayOf, boolean, date, nullable, nullValue, number, object, oneOf, optional, string, type Shape } from "./shapes";
@@ -83,6 +85,7 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "repo.close": nullValue,
   "app.shutdown": nullValue,
   "system.openFolder": nullValue,
+  "system.listTerminals": arrayOf(object<TerminalInfo>({ id: oneOf(terminalKinds), name: string })),
   "system.openTerminal": nullValue,
 };
 

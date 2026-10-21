@@ -28,5 +28,12 @@
     "Refs",
     "WorktreeList",
     "Everything"
+  ],
+  "terminalKind": [
+    "WindowsTerminal",
+    "WindowsPowerShell",
+    "PowerShell7",
+    "CommandPrompt",
+    "GitBash"
   ]
 }

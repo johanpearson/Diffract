@@ -4,6 +4,8 @@ export interface MenuItem {
   label: string;
   run(): void;
   disabled?: boolean;
+  /** Set on a choice among several, such as which terminal is current. Makes the item a radio item. */
+  checked?: boolean;
 }
 
 interface Props {
@@ -61,13 +63,15 @@ export function ContextMenu({ x, y, label, items, onClose }: Props) {
       {items.map((item) => (
         <li key={item.label} role="none">
           <button
-            role="menuitem"
+            role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+            aria-checked={item.checked}
             disabled={item.disabled}
             onClick={() => {
               close();
               item.run();
             }}
           >
+            {item.checked !== undefined && <span className="check" aria-hidden="true">{item.checked ? "✓" : ""}</span>}
             {item.label}
           </button>
         </li>

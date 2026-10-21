@@ -15,7 +15,8 @@ internal sealed record RepoCloseParams(string? RepoId);
 
 internal sealed record OpenFolderParams(string? Path);
 
-internal sealed record OpenTerminalParams(string? Path);
+/// <param name="Terminal">Null for the default: Windows Terminal when installed, otherwise Windows PowerShell.</param>
+internal sealed record OpenTerminalParams(string? Path, TerminalKind? Terminal);
 
 /// <summary>What the UI shows for one open repo. The result of <c>repo.open</c> and <c>repo.refresh</c>.</summary>
 /// <param name="RepoRoot">The main worktree, whatever path the repo was opened with.</param>
