@@ -38,6 +38,7 @@ public class ContractTests
         ["repo.refresh"] = () => Response(State("1")),
         ["repo.close"] = () => Response(RpcResponse.NullResult),
         ["system.openFolder"] = () => Response(RpcResponse.NullResult),
+        ["system.openTerminal"] = () => Response(RpcResponse.NullResult),
         ["app.shutdown"] = () => Response(RpcResponse.NullResult),
         ["repo.changed"] = () => Notification("repo.changed", new RepoChanged(
             [new RepoChange(ChangeKind.WorktreeFiles, AgentWorktree), new RepoChange(ChangeKind.Refs, null)],

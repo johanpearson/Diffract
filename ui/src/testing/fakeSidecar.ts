@@ -19,6 +19,7 @@ export class FakeSidecar {
   /** Repos by path, lower case. */
   readonly repos = new Map<string, RepoState>([[sampleState.repoRoot.toLowerCase(), sampleState]]);
   readonly openedFolders: string[] = [];
+  readonly openedTerminals: string[] = [];
   /** Requests with these methods get no answer until `release` is called, like a slow sidecar. */
   readonly held = new Set<keyof Methods>();
   /** Set to make the next request to that method fail. */
@@ -79,6 +80,9 @@ export class FakeSidecar {
         return this.state(p.repoId ?? "");
       case "system.openFolder":
         this.openedFolders.push(p.path ?? "");
+        return null;
+      case "system.openTerminal":
+        this.openedTerminals.push(p.path ?? "");
         return null;
       case "repo.close":
       case "app.shutdown":

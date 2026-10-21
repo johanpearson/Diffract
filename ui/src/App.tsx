@@ -167,6 +167,13 @@ export function App({ host, client, clock = systemClock }: Props) {
     [client],
   );
 
+  const openTerminal = useCallback(
+    (path: string) => {
+      client.call("system.openTerminal", { path }).catch((error: unknown) => setNotice(`Could not open a terminal: ${messageOf(error)}`));
+    },
+    [client],
+  );
+
   return (
     <div className="app">
       <header className="topbar">
@@ -192,7 +199,7 @@ export function App({ host, client, clock = systemClock }: Props) {
       )}
 
       <div className="body">
-        {screen.kind === "ready" && <Sidebar state={screen.state} />}
+        {screen.kind === "ready" && <Sidebar state={screen.state} onOpenFolder={openFolder} onOpenTerminal={openTerminal} />}
         <main className="main">
           {screen.kind === "starting" && <p className="hint">Starting…</p>}
           {screen.kind === "opening" && <p className="hint">Opening {screen.path}…</p>}
@@ -227,6 +234,7 @@ export function App({ host, client, clock = systemClock }: Props) {
               filter={filter}
               onFilter={setFilter}
               onOpenFolder={openFolder}
+              onOpenTerminal={openTerminal}
               onRefresh={() => void refresh()}
               refreshing={refreshing}
               now={now}

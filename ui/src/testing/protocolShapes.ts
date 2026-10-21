@@ -83,6 +83,7 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "repo.close": nullValue,
   "app.shutdown": nullValue,
   "system.openFolder": nullValue,
+  "system.openTerminal": nullValue,
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {

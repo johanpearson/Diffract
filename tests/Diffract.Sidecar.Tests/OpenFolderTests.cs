@@ -63,12 +63,4 @@ public sealed class OpenFolderTests : IDisposable
 
         Assert.Empty(_processes.Started);
     }
-
-    private sealed class FakeProcesses : IProcessStarter
-    {
-        public List<(string FileName, IReadOnlyList<string> Arguments, string? WorkingDirectory)> Started { get; } = [];
-
-        public void Start(string fileName, IReadOnlyList<string> arguments, string? workingDirectory = null) =>
-            Started.Add((fileName, [.. arguments], workingDirectory));
-    }
 }

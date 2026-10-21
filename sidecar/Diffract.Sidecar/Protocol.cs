@@ -15,6 +15,8 @@ internal sealed record RepoCloseParams(string? RepoId);
 
 internal sealed record OpenFolderParams(string? Path);
 
+internal sealed record OpenTerminalParams(string? Path);
+
 /// <summary>What the UI shows for one open repo. The result of <c>repo.open</c> and <c>repo.refresh</c>.</summary>
 /// <param name="RepoRoot">The main worktree, whatever path the repo was opened with.</param>
 /// <param name="TakenAt">When this snapshot was taken.</param>
