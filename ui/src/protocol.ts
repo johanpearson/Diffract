@@ -88,7 +88,8 @@ export interface Leftover {
   /** A hint from config patterns. Never used to decide anything. */
   agent: string | null;
   verdict: Verdict;
-  commitsAtRisk: number;
+  /** Null when they could not be counted, or when the item holds no commits. Shown as "-". */
+  commitsAtRisk: number | null;
   /** One plain-English sentence. */
   reason: string;
 }
@@ -127,6 +128,8 @@ export interface Methods {
   "repo.refresh": { params: { repoId: string; includeUnreachable: boolean }; result: RepoState };
   "repo.close": { params: { repoId: string }; result: null };
   "app.shutdown": { params: undefined; result: null };
+  /** Opens an existing folder in Explorer. */
+  "system.openFolder": { params: { path: string }; result: null };
 }
 
 /** Every notification the sidecar sends, with its params. */

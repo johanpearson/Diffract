@@ -63,7 +63,7 @@ internal static class Worktrees
             worktree.Path,
             Attribution.ForWorktree(config, worktree),
             verdict,
-            Branch(repo, worktree)?.CommitsAtRisk ?? worktree.AheadOfMain ?? 0,
+            Branch(repo, worktree)?.CommitsAtRisk ?? worktree.AheadOfMain,
             reason);
 }
 
@@ -76,5 +76,5 @@ internal static class Branches
         repo.Branches.Where(b => !b.IsRemote && b.Name != repo.MainBranch && !repo.Worktrees.Any(w => w.Branch == b.Name));
 
     public static Leftover Leftover(DiffractConfig config, BranchInfo branch, Verdict verdict, string reason) =>
-        new(LeftoverKind.LocalBranch, branch.Name, null, Attribution.ForBranch(config, branch.Name), verdict, branch.CommitsAtRisk ?? 0, reason);
+        new(LeftoverKind.LocalBranch, branch.Name, null, Attribution.ForBranch(config, branch.Name), verdict, branch.CommitsAtRisk, reason);
 }

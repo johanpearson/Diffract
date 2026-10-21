@@ -71,7 +71,7 @@
         "path": "C:\\src\\shop\\.claude\\worktrees\\old-task",
         "agent": "Claude Code",
         "verdict": "SafeToRemove",
-        "commitsAtRisk": 0,
+        "commitsAtRisk": null,
         "reason": "Empty folder left in a worktree container. Removing it loses nothing."
       },
       {

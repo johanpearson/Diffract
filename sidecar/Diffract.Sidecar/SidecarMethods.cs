@@ -16,19 +16,23 @@ internal sealed record AppInfo(string SidecarVersion, string? GitVersion, bool G
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder"];
 
     private readonly RepoSessions _repos;
+    private readonly IProcessStarter _processes;
 
     /// <param name="notify">Sends a notification to the app, such as <c>repo.changed</c>. Tests may leave it out.</param>
     /// <param name="log">Where problems with no request to answer are reported.</param>
+    /// <param name="processes">Starts Explorer and, later, terminals. Tests pass a fake.</param>
     public SidecarMethods(
         GitRunnerOptions runnerOptions,
         DiffractConfig? config = null,
         Func<string, JsonElement, Task>? notify = null,
-        TextWriter? log = null)
+        TextWriter? log = null,
+        IProcessStarter? processes = null)
     {
         RunnerOptions = runnerOptions with { ReadOnly = true };
+        _processes = processes ?? new ProcessStarter();
         notify ??= (_, _) => Task.CompletedTask;
         _repos = new RepoSessions(
             RunnerOptions,
@@ -67,6 +71,10 @@ internal sealed class SidecarMethods : IDisposable
                     _repos.Close(Required(Params<RepoCloseParams>(parameters).RepoId, "repoId"));
                     return RpcResponse.NullResult;
 
+                case "system.openFolder":
+                    OpenFolder(Required(Params<OpenFolderParams>(parameters).Path, "path"));
+                    return RpcResponse.NullResult;
+
                 default:
                     throw new RpcException(RpcErrorCodes.MethodNotFound, $"Unknown method '{method}'");
             }
@@ -75,6 +83,17 @@ internal sealed class SidecarMethods : IDisposable
         {
             throw rpc;
         }
+    }
+
+    /// <summary>Opens an existing folder in Explorer. Anything else is refused, so the UI cannot start other programs.</summary>
+    private void OpenFolder(string path)
+    {
+        var full = Path.IsPathFullyQualified(path) ? Path.GetFullPath(path) : null;
+        if (full is null || !Directory.Exists(full))
+            throw new RpcException(RpcErrorCodes.InvalidParams, $"The folder does not exist: {path}");
+
+        // The full path, so a program called explorer.exe elsewhere on PATH is never the one started.
+        _processes.Start(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), [full]);
     }
 
     /// <summary>Stops watching every open repo.</summary>

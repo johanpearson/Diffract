@@ -12,7 +12,7 @@ public class ScanTextTests
         @"C:\src\checkout", "main", new GitVersion(2, 47, 1), [], [], [], [], [], [], [],
         new DateTimeOffset(2026, 3, 1, 12, 0, 0, TimeSpan.Zero));
 
-    private static Leftover Item(LeftoverKind kind, string name, Verdict verdict, string? agent = null, int atRisk = 0, string reason = "Reason") =>
+    private static Leftover Item(LeftoverKind kind, string name, Verdict verdict, string? agent = null, int? atRisk = 0, string reason = "Reason") =>
         new(kind, name, null, agent, verdict, atRisk, reason);
 
     private static string[] Write(IReadOnlyList<Leftover> leftovers, IReadOnlyList<GitCallTiming>? timings = null)
@@ -50,9 +50,9 @@ public class ScanTextTests
     }
 
     [Fact]
-    public void Risk_of_a_folder_shows_a_dash_because_it_cannot_be_counted()
+    public void Risk_that_was_not_counted_shows_a_dash()
     {
-        var lines = Write([Item(LocalBranch, "feature/x", NeedsReview, atRisk: 0), Item(LeftoverFolder, "repo-claude", NeedsReview)]);
+        var lines = Write([Item(LocalBranch, "feature/x", NeedsReview, atRisk: 0), Item(LeftoverFolder, "repo-claude", NeedsReview, atRisk: null)]);
 
         Assert.Equal("Needs review  Branch  feature/x    -      0        Reason", lines[4]);
         Assert.Equal("Needs review  Folder  repo-claude  -      -        Reason", lines[5]);
