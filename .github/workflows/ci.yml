@@ -14,40 +14,70 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
+      # Two commits, so the next step can compare a PR's merge commit with main.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      # A PR that changes only docs (Markdown files anywhere, or anything under docs/) skips every step below
+      # and passes. The job itself still runs, because main requires a passing "build" check.
+      # Anything else, this file included, gets the full run. Pushes to main always run everything.
+      - name: Docs only?
+        id: scope
+        shell: pwsh
+        run: |
+          $code = 'true'
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            $files = @(git diff --name-only HEAD^1 HEAD)
+            $docs = @($files | Where-Object { $_ -like '*.md' -or $_ -like 'docs/*' })
+            if ($files.Count -gt 0 -and $docs.Count -eq $files.Count) {
+              $code = 'false'
+              "Only docs changed, so nothing was built or tested:" >> $env:GITHUB_STEP_SUMMARY
+              $files | ForEach-Object { "- $_" } >> $env:GITHUB_STEP_SUMMARY
+            }
+          }
+          "code=$code" >> $env:GITHUB_OUTPUT
 
       - name: Git version
+        if: steps.scope.outputs.code == 'true'
         run: git --version
 
       # --- .NET: libraries, sidecar and their tests ---------------------------
 
       - uses: actions/setup-dotnet@v6
+        if: steps.scope.outputs.code == 'true'
         with:
           global-json-file: global.json
 
       - name: Build
+        if: steps.scope.outputs.code == 'true'
         run: dotnet build Diffract.slnx -c Release
 
       - name: Test
+        if: steps.scope.outputs.code == 'true'
         run: dotnet test --solution Diffract.slnx -c Release --no-build
 
       - name: Publish the sidecar (Native AOT)
+        if: steps.scope.outputs.code == 'true'
         shell: pwsh
         run: ./scripts/build-sidecar.ps1
 
       # --- UI ---------------------------------------------------------------
 
       - uses: actions/setup-node@v7
+        if: steps.scope.outputs.code == 'true'
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: ui/package-lock.json
 
       - name: Install UI packages
+        if: steps.scope.outputs.code == 'true'
         working-directory: ui
         run: npm ci
 
       - name: Type-check and test the UI
+        if: steps.scope.outputs.code == 'true'
         working-directory: ui
         run: |
           npm run typecheck
@@ -55,19 +85,21 @@ jobs:
 
       # Playwright's Chromium is about 150 MB. The lockfile pins Playwright, so it only changes with it.
       - name: Cache Playwright's browser
+        if: steps.scope.outputs.code == 'true'
         uses: actions/cache@v6
         with:
           path: ~\AppData\Local\ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('ui/package-lock.json') }}
 
       - name: End-to-end tests (Playwright)
+        if: steps.scope.outputs.code == 'true'
         working-directory: ui
         run: |
           npx playwright install chromium
           npm run e2e
 
       - name: Upload the Playwright report
-        if: failure()
+        if: failure() && steps.scope.outputs.code == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
@@ -80,6 +112,7 @@ jobs:
       # So only main saves one. PRs restore it and never spend time and quota saving their own.
       # The key includes Cargo.toml, because a profile change makes every cached crate useless.
       - name: Restore the Rust build cache
+        if: steps.scope.outputs.code == 'true'
         id: cargo-cache
         uses: actions/cache/restore@v6
         with:
@@ -91,16 +124,18 @@ jobs:
           restore-keys: cargo-${{ runner.os }}-
 
       - name: Build the app and installer
+        if: steps.scope.outputs.code == 'true'
         working-directory: ui
         run: npm run tauri -- build --ci
 
       # Release profile, so it reuses what the app build just compiled.
       - name: Test the Rust core
+        if: steps.scope.outputs.code == 'true'
         working-directory: src-tauri
         run: cargo test --release --locked
 
       - name: Save the Rust build cache
-        if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        if: steps.scope.outputs.code == 'true' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: |
@@ -110,6 +145,7 @@ jobs:
           key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
       - name: Upload the installer
+        if: steps.scope.outputs.code == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: diffract-installer
