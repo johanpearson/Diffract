@@ -81,6 +81,8 @@ JSON-RPC 2.0 over the sidecar's stdin and stdout.
 
 Tests: protocol tests run the host in process over in-memory streams. Contract tests write each response and notification shape to `tests/Diffract.Sidecar.Tests/Contract/*.json`. The UI's tests read the same files, so the C# and TypeScript sides cannot drift apart unnoticed.
 
+**Done** 2026-10-21 in #19, with a CI speed-up in #18. Diffract's own errors use codes -32001 to -32005. Johan decided that a user's own `diffract.json` waits for milestone 6: until then the sidecar uses the built-in defaults.
+
 ## Phase 3: RepoWatcher and partial refresh
 
 Keep the snapshot current without rebuilding it.
@@ -95,7 +97,7 @@ Keep the snapshot current without rebuilding it.
 | Change | Refresh | Git calls |
 |---|---|---|
 | Files in one worktree | that worktree's status and last activity | 1 |
-| That worktree's `HEAD` or `index` | that worktree's status, ahead and behind | 2 |
+| That worktree's `HEAD` or `index` | that worktree's status, ahead and behind | 2, or 3 when HEAD moved to a commit no branch points at |
 | `refs/**` or `packed-refs` | refs, merged, commits at risk, all worktrees' ahead and behind | as in a full snapshot, without `fsck` |
 | `worktrees/` added or removed, or a container folder | worktree list, then as above for new worktrees | |
 | Watcher buffer overflow | full snapshot without `fsck` | |
