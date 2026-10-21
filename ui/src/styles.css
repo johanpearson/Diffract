@@ -1,0 +1,53 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f7f7f8;
+  --ink: #1d1d22;
+  --ink-2: #5d5d68;
+  --warn: #a5460a;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171b;
+    --ink: #ececf1;
+    --ink-2: #a0a0ab;
+    --warn: #f0a060;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  padding: 32px 40px;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+dt {
+  color: var(--ink-2);
+}
+
+dd {
+  margin: 0;
+}
+
+[role="alert"] {
+  color: var(--warn);
+  grid-column: 1 / -1;
+}

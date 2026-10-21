@@ -2,11 +2,13 @@
   <Folder Name="/sidecar/">
     <Project Path="sidecar/Diffract.Git/Diffract.Git.csproj" />
     <Project Path="sidecar/Diffract.Leftovers/Diffract.Leftovers.csproj" />
+    <Project Path="sidecar/Diffract.Sidecar/Diffract.Sidecar.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Diffract.Fixtures/Diffract.Fixtures.csproj" />
     <Project Path="tests/Diffract.Git.Tests/Diffract.Git.Tests.csproj" />
     <Project Path="tests/Diffract.Leftovers.Tests/Diffract.Leftovers.Tests.csproj" />
+    <Project Path="tests/Diffract.Sidecar.Tests/Diffract.Sidecar.Tests.csproj" />
     <Project Path="tests/Diffract.Spike.Tests/Diffract.Spike.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">

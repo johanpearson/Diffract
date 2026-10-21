@@ -14,6 +14,8 @@ dist/
 # Rust / Tauri
 target/
 src-tauri/gen/
+# Built by scripts/build-sidecar.ps1
+src-tauri/binaries/
 
 # Claude Code personal settings
 .claude/settings.local.json

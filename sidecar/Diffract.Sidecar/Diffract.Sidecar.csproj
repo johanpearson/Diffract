@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>diffract-sidecar</AssemblyName>
+    <RootNamespace>Diffract.Sidecar</RootNamespace>
+    <Version>0.1.0</Version>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Diffract.Sidecar.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Diffract.Git\Diffract.Git.csproj" />
+  </ItemGroup>
+
+</Project>

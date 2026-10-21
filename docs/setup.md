@@ -90,7 +90,25 @@ dotnet publish tools/Diffract.Spike -c Release -r win-x64 -o artifacts\aot
 artifacts\aot\diffract-spike.exe scan .
 ```
 
+## Run the app
+
+Once, and again after changing sidecar code: publish the sidecar to where Tauri bundles it from.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-sidecar.ps1
+```
+
+Then, from `ui\`:
+
+```powershell
+npm ci                    # once, and after package changes
+npm run tauri dev         # the app, reloading the UI as you edit it
+npm test                  # UI tests
+npm run tauri build       # the installer, in src-tauri\target\release\bundle\nsis\
+```
+
+The Rust tests run with `cargo test` in `src-tauri\`. They need a built UI in `ui\dist`, so run `npm run build` in `ui\` first.
+
 ## Later in milestone 2
 
 - **Playwright browsers.** Phase 4 adds end-to-end tests. Install the browser they use once, with `npx playwright install chromium` in `ui/`.
-- **The UI and the app.** From phase 1, `npm ci` in `ui/` and `npm run tauri dev` start the app. The phase 1 PR updates this section with the exact commands.
