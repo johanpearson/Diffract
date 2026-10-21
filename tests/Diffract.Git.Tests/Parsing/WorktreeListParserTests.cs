@@ -19,6 +19,15 @@ public class WorktreeListParserTests
     }
 
     [Fact]
+    public void An_unborn_branch_has_no_head_commit()
+    {
+        var main = Assert.Single(WorktreeListParser.Parse(Sample.Read("worktree-list-unborn.bin")));
+
+        Assert.Null(main.Head);
+        Assert.Equal("refs/heads/main", main.Branch);
+    }
+
+    [Fact]
     public void Main_worktree_comes_first_with_all_linked_worktrees_after()
     {
         var all = WorktreeListParser.Parse(Sample.Read("worktree-list-many.bin"));
