@@ -16,7 +16,7 @@ internal sealed record AppInfo(string SidecarVersion, string? GitVersion, bool G
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.openDownloadPage"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage"];
 
     private readonly RepoSessions _repos;
     private readonly IProcessStarter _processes;
@@ -29,6 +29,7 @@ internal sealed class SidecarMethods : IDisposable
     /// <param name="processes">Starts Explorer and terminals. Tests pass a fake.</param>
     /// <param name="machine">Where Windows keeps its programs, for finding terminals and winget. Tests describe their own.</param>
     /// <param name="commands">Runs winget and waits for its answer. Tests pass a fake.</param>
+    /// <param name="running">The processes on this machine, for who is using git. Tests describe their own.</param>
     public SidecarMethods(
         GitRunnerOptions runnerOptions,
         DiffractConfig? config = null,
@@ -36,21 +37,26 @@ internal sealed class SidecarMethods : IDisposable
         TextWriter? log = null,
         IProcessStarter? processes = null,
         MachineLayout? machine = null,
-        ICommandRunner? commands = null)
+        ICommandRunner? commands = null,
+        IProcessTable? running = null)
     {
         RunnerOptions = runnerOptions with { ReadOnly = true };
-        _processes = processes ?? new ProcessStarter();
-        _terminal = new TerminalLauncher(_processes, machine ?? MachineLayout.Current);
-        commands ??= new CommandRunner(RunnerOptions.TimeProvider);
-        _updates = new GitUpdateChecker(commands, machine ?? MachineLayout.Current);
-        _updater = new GitUpdater(_updates, commands);
         notify ??= (_, _) => Task.CompletedTask;
+        machine ??= MachineLayout.Current;
+        _processes = processes ?? new ProcessStarter();
+        _terminal = new TerminalLauncher(_processes, machine);
+        commands ??= new CommandRunner(RunnerOptions.TimeProvider);
+        _updates = new GitUpdateChecker(commands, machine);
+        _updater = new GitUpdater(
+            _updates, commands, running ?? new ProcessTable(), machine, RunnerOptions.TimeProvider,
+            progress => notify("git.updateProgress", Result(progress)));
         _repos = new RepoSessions(
             RunnerOptions,
             config ?? DiffractConfig.Default,
             RunnerOptions.TimeProvider,
             changed => notify("repo.changed", Result(changed)),
-            log ?? TextWriter.Null);
+            log ?? TextWriter.Null,
+            paused: () => _updater.IsRunning);
     }
 
     /// <summary>The options every git call uses. Read-only, whatever was passed in.</summary>
@@ -100,6 +106,9 @@ internal sealed class SidecarMethods : IDisposable
                 case "git.update":
                     var version = Required(Params<GitUpdateParams>(parameters).Version, "version");
                     return Result(await _updater.UpdateAsync(await InstalledGitAsync(ct).ConfigureAwait(false), version, ct).ConfigureAwait(false));
+
+                case "git.inUse":
+                    return Result(_updater.InUse());
 
                 case "git.openDownloadPage":
                     // A fixed address, so the UI cannot make Explorer open anything else. Explorer hands it to the browser.

@@ -10,15 +10,43 @@ internal enum GitUpdateOutcome { Updated, RestartNeeded, Failed }
 
 /// <summary>The result of <c>git.update</c>.</summary>
 /// <param name="Message">What happened, in plain English.</param>
-internal sealed record GitUpdateResult(GitUpdateOutcome Outcome, string Message);
+/// <param name="InUse">When git was in use and that stopped the update: the programs using it. Empty otherwise.</param>
+internal sealed record GitUpdateResult(GitUpdateOutcome Outcome, string Message, IReadOnlyList<GitInUse> InUse);
+
+/// <summary>Downloading lasts until Git for Windows' installer starts. Installing is the installer running.</summary>
+internal enum GitUpdateStage { Downloading, Installing }
+
+/// <summary>The params of the <c>git.updateProgress</c> notification, sent when the stage changes.</summary>
+internal sealed record GitUpdateProgress(GitUpdateStage Stage);
 
 /// <summary>
 /// Updates Git for Windows through winget, to exactly the version the user confirmed. Plan, then apply: winget is
 /// asked again first, and nothing is installed unless it still offers that version over the git Diffract uses.
 /// </summary>
-internal sealed class GitUpdater(GitUpdateChecker checker, ICommandRunner commands)
+/// <param name="progress">Sends <c>git.updateProgress</c> to the app.</param>
+/// <param name="selfId">The sidecar's process id, so its own git calls never count as git in use.</param>
+/// <param name="wingetDownloads">Where winget puts installers. A program running from there is the installer.</param>
+internal sealed class GitUpdater(
+    GitUpdateChecker checker,
+    ICommandRunner commands,
+    IProcessTable processes,
+    MachineLayout machine,
+    TimeProvider time,
+    Func<GitUpdateProgress, Task> progress,
+    int? selfId = null,
+    string? wingetDownloads = null)
 {
+    /// <summary>
+    /// winget prints no progress when its output is redirected, so the stage comes from the process list instead.
+    /// See docs/findings/winget.md.
+    /// </summary>
+    public static TimeSpan PollInterval { get; } = TimeSpan.FromSeconds(1);
+
+    private readonly string _downloads = Path.TrimEndingDirectorySeparator(wingetDownloads ?? Path.Combine(Path.GetTempPath(), "WinGet")) + Path.DirectorySeparatorChar;
     private int _running;
+
+    /// <summary>While true, Diffract starts no git of its own: the installer refuses to replace git while it runs.</summary>
+    public bool IsRunning => Volatile.Read(ref _running) == 1;
 
     /// <summary>
     /// The installer runs to the end once started, so Diffract never stops it: killing an installer halfway could
@@ -30,6 +58,10 @@ internal sealed class GitUpdater(GitUpdateChecker checker, ICommandRunner comman
         // winget cannot ask, so the licence is accepted here. The confirm dialog says so.
         "--disable-interactivity", "--accept-package-agreements",
     ];
+
+    /// <summary>The programs using Git for Windows right now, apart from Diffract. Only reads the process list.</summary>
+    public IReadOnlyList<GitInUse> InUse() =>
+        GitForWindows.FindFolder(machine) is { } folder ? GitForWindows.Users(processes, folder, selfId ?? Environment.ProcessId) : [];
 
     /// <param name="installed">The git Diffract uses, or null when it could not be run.</param>
     /// <param name="ct">Cancels only the check before the update. Once winget upgrade starts, it runs to the end.</param>
@@ -48,14 +80,13 @@ internal sealed class GitUpdater(GitUpdateChecker checker, ICommandRunner comman
             CommandResult result;
             try
             {
-                result = await commands.RunAsync(checker.FindWinget()!, UpgradeArguments(version), System.Threading.Timeout.InfiniteTimeSpan, CancellationToken.None)
-                    .ConfigureAwait(false);
+                result = await UpgradeAsync(checker.FindWinget()!, version).ConfigureAwait(false);
             }
             catch (Win32Exception e)
             {
                 return Failed($"winget could not be started: {e.Message}");
             }
-            return Outcome(result.ExitCode, version);
+            return Outcome(result.ExitCode, version, InUse);
         }
         finally
         {
@@ -63,18 +94,51 @@ internal sealed class GitUpdater(GitUpdateChecker checker, ICommandRunner comman
         }
     }
 
-    /// <summary>What winget's exit code means for the user. The codes are listed in docs/findings/winget.md.</summary>
-    internal static GitUpdateResult Outcome(int exitCode, string version) => (uint)exitCode switch
+    /// <summary>Runs winget upgrade, and says when the installer starts.</summary>
+    private async Task<CommandResult> UpgradeAsync(string winget, string version)
     {
-        0 => new(GitUpdateOutcome.Updated, $"Git for Windows {version} is installed."),
-        0x8A150109 or 0x8A15010A or 0x8A15010B => new(GitUpdateOutcome.RestartNeeded, $"Git for Windows {version} is installed. Restart Windows to finish the update."),
-        0x8A150101 or 0x8A150103 or 0x8A150111 =>
-            Failed("Git is in use, for example by an agent, Git Bash or an editor. Close those programs and try again."),
+        var upgrade = commands.RunAsync(winget, UpgradeArguments(version), Timeout.InfiniteTimeSpan, CancellationToken.None);
+        await progress(new GitUpdateProgress(GitUpdateStage.Downloading)).ConfigureAwait(false);
+
+        using var done = new CancellationTokenSource();
+        var installing = false;
+        while (!upgrade.IsCompleted)
+        {
+            var tick = Task.Delay(PollInterval, time, done.Token);
+            await Task.WhenAny(upgrade, tick).ConfigureAwait(false);
+            if (!upgrade.IsCompleted && !installing && InstallerRunning())
+            {
+                installing = true;
+                await progress(new GitUpdateProgress(GitUpdateStage.Installing)).ConfigureAwait(false);
+            }
+        }
+        await done.CancelAsync().ConfigureAwait(false);
+        return await upgrade.ConfigureAwait(false);
+    }
+
+    private bool InstallerRunning() =>
+        processes.Snapshot().Any(p => p.Path?.StartsWith(_downloads, StringComparison.OrdinalIgnoreCase) == true);
+
+    /// <summary>What winget's exit code means for the user. The codes are listed in docs/findings/winget.md.</summary>
+    /// <param name="inUse">Asked only when the installer stopped, to name the programs that were using git.</param>
+    internal static GitUpdateResult Outcome(int exitCode, string version, Func<IReadOnlyList<GitInUse>> inUse) => (uint)exitCode switch
+    {
+        0 => new(GitUpdateOutcome.Updated, $"Git for Windows {version} is installed.", []),
+        0x8A150109 or 0x8A15010A or 0x8A15010B => new(GitUpdateOutcome.RestartNeeded, $"Git for Windows {version} is installed. Restart Windows to finish the update.", []),
+        // 0x8A150006: the installer itself ended with an error. Git for Windows' installer does that when programs use
+        // git, because winget runs it silently and it cannot ask for them to be closed.
+        0x8A150006 or 0x8A150101 or 0x8A150103 or 0x8A150111 => InstallerStopped(exitCode, inUse()),
         0x8A15010C => Failed("The update was cancelled."),
         0x8A15002B => Failed("winget found no update to install."),
         0x8A150008 or 0x8A150107 or 0x8A15002E or 0x8A150086 => Failed("Downloading the update failed. Check the network connection and try again."),
-        _ => Failed($"The update failed: winget ended with exit code 0x{exitCode:X8}. If Windows asked for permission and was refused, that is the reason."),
+        _ => Failed($"The update failed: winget ended with exit code 0x{exitCode:X8}."),
     };
 
-    private static GitUpdateResult Failed(string message) => new(GitUpdateOutcome.Failed, message);
+    private static GitUpdateResult InstallerStopped(int exitCode, IReadOnlyList<GitInUse> inUse) => inUse.Count > 0
+        ? new(GitUpdateOutcome.Failed, "Git for Windows was not updated, because these programs are using git. Close them, then try again.", inUse)
+        : exitCode == unchecked((int)0x8A150006)
+            ? Failed("The Git for Windows installer stopped before it finished. If a program was using git, close it and try again.")
+            : Failed("Git was in use while the installer ran. Close the programs that use git, then try again.");
+
+    private static GitUpdateResult Failed(string message) => new(GitUpdateOutcome.Failed, message, []);
 }

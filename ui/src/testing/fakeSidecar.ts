@@ -1,5 +1,5 @@
 import openSample from "../../../tests/Diffract.Sidecar.Tests/Contract/repo.open.json";
-import type { AppInfo, GitUpdateCheck, GitUpdateResult, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
+import type { AppInfo, GitInUse, GitUpdateCheck, GitUpdateResult, GitUpdateStage, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
 import { FakeTransport } from "./fakeTransport";
 
 /** The repo in the repo.open contract sample, which the sidecar's own tests write. */
@@ -34,7 +34,9 @@ export class FakeSidecar {
     downloadPage: "https://gitforwindows.org/",
   };
   /** How the next git.update ends. */
-  gitUpdateResult: GitUpdateResult = { outcome: "Updated", message: "Git for Windows 2.55.0.5 is installed." };
+  gitUpdateResult: GitUpdateResult = { outcome: "Updated", message: "Git for Windows 2.55.0.5 is installed.", inUse: [] };
+  /** What git.inUse answers. */
+  gitInUse: GitInUse[] = [];
   /** Every version git.update was asked to install. */
   readonly gitUpdates: string[] = [];
   downloadPageOpened = 0;
@@ -61,6 +63,11 @@ export class FakeSidecar {
     const state = update(this.state(repoId));
     this.repos.set(state.repoRoot.toLowerCase(), state);
     this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "repo.changed", params: { changes, state } }));
+  }
+
+  /** Sends git.updateProgress, as the sidecar does while git.update runs. */
+  updateProgress(stage: GitUpdateStage): void {
+    this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "git.updateProgress", params: { stage } }));
   }
 
   release(): void {
@@ -109,6 +116,8 @@ export class FakeSidecar {
       case "git.update":
         this.gitUpdates.push(p.version ?? "");
         return this.gitUpdateResult;
+      case "git.inUse":
+        return this.gitInUse;
       case "git.openDownloadPage":
         this.downloadPageOpened++;
         return null;

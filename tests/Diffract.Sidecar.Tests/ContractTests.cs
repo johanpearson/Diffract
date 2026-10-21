@@ -42,7 +42,9 @@ public class ContractTests
             [new(TerminalKind.WindowsTerminal, "Windows Terminal"), new(TerminalKind.WindowsPowerShell, "Windows PowerShell"), new(TerminalKind.GitBash, "Git Bash")]),
         ["system.openTerminal"] = () => Response(RpcResponse.NullResult),
         ["git.checkUpdate"] = () => Response(new GitUpdateCheck(GitUpdateStatus.UpdateAvailable, "2.47.1", "2.55.0.5", null, GitUpdateChecker.DownloadPage)),
-        ["git.update"] = () => Response(GitUpdater.Outcome(0, "2.55.0.5")),
+        ["git.update"] = () => Response(GitUpdater.Outcome(unchecked((int)0x8A150006), "2.55.0.5", () => InUse)),
+        ["git.inUse"] = () => Response(InUse),
+        ["git.updateProgress"] = () => Notification("git.updateProgress", new GitUpdateProgress(GitUpdateStage.Installing)),
         ["git.openDownloadPage"] = () => Response(RpcResponse.NullResult),
         ["app.shutdown"] = () => Response(RpcResponse.NullResult),
         ["repo.changed"] = () => Notification("repo.changed", new RepoChanged(
@@ -57,6 +59,9 @@ public class ContractTests
         ["error.invalid-params"] = () => Line(RpcResponse.Failure(Id, RpcErrorCodes.InvalidParams, "'path' is required")),
         ["enums"] = Enums,
     };
+
+    private static IReadOnlyList<GitInUse> InUse =>
+        [new("CodeScene cs-ide tool for windows", "Visual Studio Code", 2), new("Git Bash", null, 3)];
 
     private const string MainWorktree = @"C:\src\shop";
     private const string AgentWorktree = @"C:\src\shop\.claude\worktrees\räksmörgås fix";
@@ -170,6 +175,7 @@ public class ContractTests
         ["terminalKind"] = Values<TerminalKind>(),
         ["gitUpdateStatus"] = Values<GitUpdateStatus>(),
         ["gitUpdateOutcome"] = Values<GitUpdateOutcome>(),
+        ["gitUpdateStage"] = Values<GitUpdateStage>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

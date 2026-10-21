@@ -45,5 +45,9 @@
     "Updated",
     "RestartNeeded",
     "Failed"
+  ],
+  "gitUpdateStage": [
+    "Downloading",
+    "Installing"
   ]
 }

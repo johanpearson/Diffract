@@ -58,11 +58,32 @@ export interface GitUpdateCheck {
 export const gitUpdateOutcomes = ["Updated", "RestartNeeded", "Failed"] as const;
 export type GitUpdateOutcome = (typeof gitUpdateOutcomes)[number];
 
+/** A program using Git for Windows, from `git.inUse`. Its installer will not replace git while it runs. */
+export interface GitInUse {
+  /** Such as "Visual Studio Code" or "Git Bash". */
+  program: string;
+  /** The program that started it, when that tells more. */
+  startedBy: string | null;
+  /** How many of Git for Windows' processes it runs. */
+  processes: number;
+}
+
 /** Result of `git.update`. */
 export interface GitUpdateResult {
   outcome: GitUpdateOutcome;
   /** What happened, in plain English. */
   message: string;
+  /** When programs using git stopped the update: who they are. Empty otherwise. */
+  inUse: GitInUse[];
+}
+
+/** Downloading lasts until Git for Windows' installer starts. Installing is the installer running. */
+export const gitUpdateStages = ["Downloading", "Installing"] as const;
+export type GitUpdateStage = (typeof gitUpdateStages)[number];
+
+/** Params of the `git.updateProgress` notification, sent while `git.update` runs, when the stage changes. */
+export interface GitUpdateProgress {
+  stage: GitUpdateStage;
 }
 
 /** Result of `app.info`. */
@@ -180,6 +201,8 @@ export interface Methods {
    * nothing if winget now offers something else. Takes minutes, and Windows asks for permission.
    */
   "git.update": { params: { version: string }; result: GitUpdateResult };
+  /** The programs using Git for Windows right now, apart from Diffract. Only reads the process list. */
+  "git.inUse": { params: undefined; result: GitInUse[] };
   /** Opens gitforwindows.org in the browser. */
   "git.openDownloadPage": { params: undefined; result: null };
 }
@@ -187,4 +210,5 @@ export interface Methods {
 /** Every notification the sidecar sends, with its params. */
 export interface Notifications {
   "repo.changed": RepoChanged;
+  "git.updateProgress": GitUpdateProgress;
 }

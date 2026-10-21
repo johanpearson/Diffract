@@ -30,3 +30,29 @@ internal sealed class FakeCommands(Func<string, IReadOnlyList<string>, CommandRe
         return _answer(fileName, arguments);
     }
 }
+
+/// <summary>A process list the test writes. Programs are described by their file name without the extension, unless told otherwise.</summary>
+internal sealed class FakeProcessTable : IProcessTable
+{
+    private readonly List<ProcessInfo> _processes = [];
+    private readonly Lock _lock = new();
+
+    /// <summary>Descriptions by file name, such as "Code.exe" = "Visual Studio Code".</summary>
+    public Dictionary<string, string> Descriptions { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public FakeProcessTable Add(params ProcessInfo[] processes)
+    {
+        lock (_lock)
+            _processes.AddRange(processes);
+        return this;
+    }
+
+    public IReadOnlyList<ProcessInfo> Snapshot()
+    {
+        lock (_lock)
+            return [.. _processes];
+    }
+
+    public string Describe(string path) =>
+        Descriptions.TryGetValue(Path.GetFileName(path), out var description) ? description : Path.GetFileNameWithoutExtension(path);
+}

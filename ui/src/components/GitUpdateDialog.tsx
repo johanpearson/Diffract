@@ -1,88 +1,81 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
-import type { GitUpdateResult } from "../protocol";
-
-/** Where the update is: waiting for the user's yes, running, or finished. `version` is the one offered and confirmed. */
-export type GitUpdateStage =
-  | { kind: "confirm"; version: string }
-  | { kind: "running"; version: string }
-  | { kind: "done"; version: string; result: GitUpdateResult };
+import type { GitInUse } from "../protocol";
 
 interface Props {
-  stage: GitUpdateStage;
   /** The git Diffract uses now. */
   installed: string | null;
+  /** The version offered, and the only one the sidecar will install. */
+  version: string;
+  /** The programs using git right now. Null while Diffract is still looking. */
+  inUse: GitInUse[] | null;
+  onCheckAgain(): void;
   onConfirm(): void;
-  onClose(): void;
-  onDownloadPage(): void;
+  onCancel(): void;
 }
 
-const titles = {
-  Updated: "Git for Windows is updated",
-  RestartNeeded: "Restart Windows to finish",
-  Failed: "The update did not finish",
-} as const;
-
 /**
- * Confirms a Git for Windows update, then shows its progress and result. Nothing is installed until "Update" is
- * pressed, and the version named here is the only one the sidecar will install.
+ * Asks before Git for Windows is updated. Nothing is installed until "Update" is pressed. The update itself then
+ * runs in the background and shows in the update bar, so the dialog never locks the app while the installer runs.
  */
-export function GitUpdateDialog({ stage, installed, onConfirm, onClose, onDownloadPage }: Props) {
-  const first = useRef<HTMLButtonElement>(null);
-  useEffect(() => first.current?.focus(), [stage.kind]);
+export function GitUpdateDialog({ installed, version, inUse, onCheckAgain, onConfirm, onCancel }: Props) {
+  const cancel = useRef<HTMLButtonElement>(null);
+  useEffect(() => cancel.current?.focus(), []);
 
-  // Escape closes the dialog, except while the update runs: it cannot be stopped halfway.
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape" && stage.kind !== "running") onClose();
+    if (event.key === "Escape") onCancel();
   };
 
   return (
     <div className="overlay">
-      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="git-update-title" aria-busy={stage.kind === "running"} onKeyDown={onKeyDown}>
-        {stage.kind === "confirm" && (
-          <>
-            <h1 id="git-update-title">Update Git for Windows?</h1>
-            <p className="versions-change">
-              From <strong>{installed ?? "the installed version"}</strong> to <strong>{stage.version}</strong>.
-            </p>
-            <ul>
-              <li>winget downloads the installer and runs it. Windows asks for permission, because Git for Windows is installed for all users.</li>
-              <li>Updating accepts the Git for Windows license (GPL-2.0).</li>
-              <li>Close Git Bash, and stop agents that use git, before you start. Git cannot be updated while it is in use.</li>
-            </ul>
-            <div className="panel-actions">
-              {/* Cancel first, so Enter on a dialog that just opened never starts an install. */}
-              <button ref={first} className="abtn" onClick={onClose}>
-                Cancel
-              </button>
-              <button className="abtn primary" onClick={onConfirm}>
-                Update
-              </button>
-            </div>
-          </>
-        )}
-        {stage.kind === "running" && (
-          <>
-            <h1 id="git-update-title">Updating Git for Windows to {stage.version}…</h1>
-            <p role="status">This can take a few minutes. Diffract checks git again when it is done.</p>
-          </>
-        )}
-        {stage.kind === "done" && (
-          <>
-            <h1 id="git-update-title">{titles[stage.result.outcome]}</h1>
-            <p role="status">{stage.result.message}</p>
-            <div className="panel-actions">
-              {stage.result.outcome === "Failed" && (
-                <button className="abtn" onClick={onDownloadPage}>
-                  Open download page
-                </button>
-              )}
-              <button ref={first} className="abtn primary" onClick={onClose}>
-                Close
-              </button>
-            </div>
-          </>
-        )}
+      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="git-update-title" onKeyDown={onKeyDown}>
+        <h1 id="git-update-title">Update Git for Windows?</h1>
+        <p className="versions-change">
+          From <strong>{installed ?? "the installed version"}</strong> to <strong>{version}</strong>.
+        </p>
+        <ul>
+          <li>winget downloads the installer and runs it. Windows asks for permission, because Git for Windows is installed for all users.</li>
+          <li>Updating accepts the Git for Windows license (GPL-2.0).</li>
+          <li>You can keep using Diffract meanwhile. It pauses its own git calls until the update is done.</li>
+        </ul>
+        <InUse inUse={inUse} onCheckAgain={onCheckAgain} />
+        <div className="panel-actions">
+          {/* Cancel first, so Enter on a dialog that just opened never starts an install. */}
+          <button ref={cancel} className="abtn" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="abtn primary" onClick={onConfirm}>
+            Update
+          </button>
+        </div>
       </div>
     </div>
+  );
+}
+
+function InUse({ inUse, onCheckAgain }: { inUse: GitInUse[] | null; onCheckAgain(): void }) {
+  if (inUse === null) return <p className="in-use">Checking which programs use git…</p>;
+  if (inUse.length === 0) return <p className="in-use">No other program is using git right now.</p>;
+  return (
+    <div className="in-use warn" role="alert">
+      <p>The update will stop unless you close these programs first, because they are using git:</p>
+      <GitUsers inUse={inUse} />
+      <button className="abtn small" onClick={onCheckAgain}>
+        Check again
+      </button>
+    </div>
+  );
+}
+
+/** The programs using git, as a list. */
+export function GitUsers({ inUse }: { inUse: GitInUse[] }) {
+  return (
+    <ul aria-label="Programs using git">
+      {inUse.map((u) => (
+        <li key={`${u.program}|${u.startedBy ?? ""}`}>
+          {u.program}
+          {u.startedBy && <span className="started-by"> in {u.startedBy}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }

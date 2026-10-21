@@ -3,11 +3,14 @@ import {
   terminalKinds,
   errorKinds,
   gitUpdateOutcomes,
+  gitUpdateStages,
   gitUpdateStatuses,
   leftoverKinds,
   verdicts,
   type AppInfo,
+  type GitInUse,
   type GitUpdateCheck,
+  type GitUpdateProgress,
   type GitUpdateResult,
   type Leftover,
   type LeftoverFolderInfo,
@@ -79,6 +82,8 @@ const repoState = object<RepoState>({
   leftovers: arrayOf(leftover),
 });
 
+const gitInUse = object<GitInUse>({ program: string, startedBy: nullable(string), processes: number });
+
 const repoChange = object<RepoChange>({ kind: oneOf(changeKinds), path: nullable(string) });
 
 /** The result of every method. Adding a method to `Methods` without a shape here fails the type check. */
@@ -98,12 +103,14 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
     problem: nullable(string),
     downloadPage: string,
   }),
-  "git.update": object<GitUpdateResult>({ outcome: oneOf(gitUpdateOutcomes), message: string }),
+  "git.update": object<GitUpdateResult>({ outcome: oneOf(gitUpdateOutcomes), message: string, inUse: arrayOf(gitInUse) }),
+  "git.inUse": arrayOf(gitInUse),
   "git.openDownloadPage": nullValue,
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {
   "repo.changed": object<RepoChanged>({ changes: arrayOf(repoChange), state: repoState }),
+  "git.updateProgress": object<GitUpdateProgress>({ stage: oneOf(gitUpdateStages) }),
 };
 
 export const responseShape = (result: Shape) => object<{ jsonrpc: string; id: number; result: unknown }>({ jsonrpc: string, id: number, result });

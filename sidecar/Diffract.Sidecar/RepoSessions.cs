@@ -15,7 +15,9 @@ namespace Diffract.Sidecar;
 /// </summary>
 /// <param name="notify">Sends a <c>repo.changed</c> notification.</param>
 /// <param name="log">Where failed live refreshes are reported. They have no request to answer.</param>
-internal sealed class RepoSessions(GitRunnerOptions runnerOptions, DiffractConfig config, TimeProvider time, Func<RepoChanged, Task> notify, TextWriter log)
+/// <param name="paused">While true, live refreshes are skipped, so Diffract starts no git. Opening the repo again catches up.</param>
+internal sealed class RepoSessions(
+    GitRunnerOptions runnerOptions, DiffractConfig config, TimeProvider time, Func<RepoChanged, Task> notify, TextWriter log, Func<bool>? paused = null)
     : IDisposable
 {
     private readonly ConcurrentDictionary<string, RepoSession> _byId = new();
@@ -101,6 +103,12 @@ internal sealed class RepoSessions(GitRunnerOptions runnerOptions, DiffractConfi
 
     private async Task LiveRefreshAsync(RepoSession session, ChangeSet changes)
     {
+        if (paused?.Invoke() == true)
+        {
+            await log.WriteLineAsync($"Live refresh of {session.RepoRoot} ({changes}) skipped while git is being updated.").ConfigureAwait(false);
+            return;
+        }
+
         var ct = session.Closing;
         try
         {

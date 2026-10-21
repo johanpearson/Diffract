@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { App, LastRepoKey, TerminalKey } from "./App";
 import type { AppHost, SidecarEvent } from "./host";
 import { RpcClient } from "./rpc";
+import { GitUpdateCheckKey, OneDayMs } from "./model/useGitUpdate";
 import { FakeSidecar, sampleState } from "./testing/fakeSidecar";
 
 afterEach(cleanup);
@@ -11,8 +12,15 @@ const repoRoot = sampleState.repoRoot;
 
 /** Renders the app against a fake sidecar. `last` is the repo remembered from the previous run. */
 /** `terminal` is the one remembered from the previous run. */
-function setup({ last = null as string | null, sidecar = new FakeSidecar(), folder = repoRoot as string | null, terminal = null as string | null } = {}) {
-  const stored = new Map<string, string>(last ? [[LastRepoKey, last]] : []);
+/** `remembered` is anything else stored from earlier runs. */
+function setup({
+  last = null as string | null,
+  sidecar = new FakeSidecar(),
+  folder = repoRoot as string | null,
+  terminal = null as string | null,
+  remembered = {} as Record<string, string>,
+} = {}) {
+  const stored = new Map<string, string>([...(last ? [[LastRepoKey, last] as const] : []), ...Object.entries(remembered)]);
   if (terminal) stored.set(TerminalKey, terminal);
   const handlers = new Set<(event: SidecarEvent) => void>();
   const host: AppHost = {
@@ -348,33 +356,124 @@ describe("App", () => {
 
 describe("Git for Windows update", () => {
   const newer = { status: "UpdateAvailable", installedVersion: "2.47.1", availableVersion: "2.55.0.5", problem: null, downloadPage: "https://gitforwindows.org/" } as const;
+  const now = new Date("2026-10-21T09:30:00+02:00").getTime();
+  const codeScene = { program: "CodeScene cs-ide tool for windows", startedBy: "Visual Studio Code", processes: 2 };
 
   function withUpdate(sidecar = new FakeSidecar()) {
     sidecar.gitUpdate = { ...newer };
     return sidecar;
   }
 
+  const remembered = (check: object, checkedAt = now - 60_000) => ({ [GitUpdateCheckKey]: JSON.stringify({ checkedAt, check }) });
   const dialog = () => screen.getByRole("dialog");
+  const offer = () => screen.queryByText(/is available/);
 
-  it("checks for an update on start, and says nothing when git is current", async () => {
-    const { sidecar } = setup();
+  async function confirmUpdate() {
+    fireEvent.click(await screen.findByRole("button", { name: "Update…" }));
+    await within(dialog()).findByText("No other program is using git right now.");
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Update" }));
+  }
+
+  // --- when winget is asked -----------------------------------------------------
+
+  it("asks winget only once the last repo is open, so opening it is not slowed down", async () => {
+    const sidecar = withUpdate();
+    sidecar.held.add("repo.open");
+    setup({ last: repoRoot, sidecar });
+
+    await waitFor(() => expect(sent(sidecar, "repo.open")).toHaveLength(1));
+    expect(sent(sidecar, "git.checkUpdate")).toHaveLength(0);
+    act(() => sidecar.release());
+
+    await screen.findByRole("list", { name: "Leftovers" });
+    await waitFor(() => expect(sent(sidecar, "git.checkUpdate")).toHaveLength(1));
+    expect(await screen.findByText(/Git for Windows 2\.55\.0\.5 is available/)).toBeTruthy();
+  });
+
+  it("asks on a first start with no repo, says nothing when git is current, and remembers the answer", async () => {
+    const { sidecar, stored } = setup();
     await screen.findByRole("heading", { name: "Open a repo" });
 
     await waitFor(() => expect(sent(sidecar, "git.checkUpdate")).toHaveLength(1));
-    expect(screen.queryByText(/is available/)).toBeNull();
+    expect(offer()).toBeNull();
+    expect(JSON.parse(stored.get(GitUpdateCheckKey)!)).toEqual({ checkedAt: now, check: sidecar.gitUpdate });
   });
 
-  it("offers a newer version quietly, and installs nothing until the dialog is confirmed", async () => {
-    const { sidecar } = setup({ sidecar: withUpdate() });
+  it("uses an answer from the last day instead of asking winget again", async () => {
+    const { sidecar } = setup({ last: repoRoot, remembered: remembered(newer) });
 
-    expect((await screen.findByText(/Git for Windows 2\.55\.0\.5 is available/)).textContent).toContain("You have 2.47.1");
-    fireEvent.click(screen.getByRole("button", { name: "Update…" }));
+    expect(await screen.findByText(/Git for Windows 2\.55\.0\.5 is available/)).toBeTruthy();
+    expect(sent(sidecar, "git.checkUpdate")).toHaveLength(0);
+  });
+
+  it.each([
+    ["more than a day old", remembered(newer, now - OneDayMs - 1)],
+    ["about another git", remembered({ ...newer, installedVersion: "2.43.0" })],
+    ["unreadable", { [GitUpdateCheckKey]: "{not json" }],
+  ])("asks winget again when the remembered answer is %s", async (_, stored) => {
+    const { sidecar } = setup({ remembered: stored });
+
+    await waitFor(() => expect(sent(sidecar, "git.checkUpdate")).toHaveLength(1));
+  });
+
+  it("does not remember an answer that was unknown", async () => {
+    const sidecar = new FakeSidecar();
+    sidecar.gitUpdate = { status: "Unknown", installedVersion: "2.47.1", availableVersion: null, problem: "winget did not answer within 60 seconds.", downloadPage: "https://gitforwindows.org/" };
+    const { stored } = setup({ sidecar });
+
+    await waitFor(() => expect(sent(sidecar, "git.checkUpdate")).toHaveLength(1));
+    expect(stored.has(GitUpdateCheckKey)).toBe(false);
+  });
+
+  it("'Check for git updates' asks winget now and says when git is current", async () => {
+    const { sidecar } = setup({ remembered: remembered({ ...newer, status: "UpToDate", availableVersion: null }) });
+    await screen.findByRole("heading", { name: "Open a repo" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Check for git updates" }));
+
+    await waitFor(() => expect(sent(sidecar, "git.checkUpdate")).toHaveLength(1));
+    expect((await screen.findByText(/is up to date/)).textContent).toBe("Git for Windows 2.47.1 is up to date.");
+  });
+
+  it("'Not now' hides the offer until it is asked for again", async () => {
+    const { sidecar } = setup({ sidecar: withUpdate() });
+    fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
+    expect(offer()).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Check for git updates" }));
+
+    await waitFor(() => expect(sent(sidecar, "git.checkUpdate")).toHaveLength(2));
+    expect(await screen.findByText(/Git for Windows 2\.55\.0\.5 is available/)).toBeTruthy();
+  });
+
+  // --- confirming -----------------------------------------------------------------
+
+  it("asks first, names both versions and the license, and installs nothing until confirmed", async () => {
+    const { sidecar } = setup({ sidecar: withUpdate() });
+    fireEvent.click(await screen.findByRole("button", { name: "Update…" }));
 
     expect(within(dialog()).getByRole("heading", { name: "Update Git for Windows?" })).toBeTruthy();
     expect(dialog().textContent).toContain("From 2.47.1 to 2.55.0.5.");
     expect(dialog().textContent).toContain("accepts the Git for Windows license (GPL-2.0)");
     expect(document.activeElement).toBe(within(dialog()).getByRole("button", { name: "Cancel" }));
     expect(sent(sidecar, "git.update")).toHaveLength(0);
+  });
+
+  it("names the programs using git before it starts, and can look again", async () => {
+    const sidecar = withUpdate();
+    sidecar.gitInUse = [codeScene, { program: "Git Bash", startedBy: null, processes: 3 }];
+    setup({ sidecar });
+    fireEvent.click(await screen.findByRole("button", { name: "Update…" }));
+
+    const users = await within(dialog()).findByRole("list", { name: "Programs using git" });
+    expect(within(users).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["CodeScene cs-ide tool for windows in Visual Studio Code", "Git Bash"]);
+    expect(within(dialog()).getByRole("alert").textContent).toContain("The update will stop unless you close these programs first");
+
+    sidecar.gitInUse = [];
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Check again" }));
+
+    expect(await within(dialog()).findByText("No other program is using git right now.")).toBeTruthy();
+    expect(sent(sidecar, "git.inUse")).toHaveLength(2);
   });
 
   it("cancelling, or Escape, closes the dialog and installs nothing", async () => {
@@ -390,89 +489,93 @@ describe("Git for Windows update", () => {
     expect(sent(sidecar, "git.update")).toHaveLength(0);
   });
 
-  it("updates to the confirmed version, shows progress and the result, then checks git again", async () => {
+  // --- running ----------------------------------------------------------------------
+
+  it("updates in the background, shows each stage, and keeps git calls away until it is done", async () => {
     const sidecar = withUpdate();
     sidecar.held.add("git.update");
-    setup({ sidecar });
-    fireEvent.click(await screen.findByRole("button", { name: "Update…" }));
+    setup({ last: repoRoot, sidecar });
+    await screen.findByRole("list", { name: "Leftovers" });
 
-    fireEvent.click(within(dialog()).getByRole("button", { name: "Update" }));
+    await confirmUpdate();
 
-    expect(within(dialog()).getByRole("heading", { name: "Updating Git for Windows to 2.55.0.5…" })).toBeTruthy();
-    expect(dialog().getAttribute("aria-busy")).toBe("true");
-    fireEvent.keyDown(dialog(), { key: "Escape" });
-    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(sent(sidecar, "git.update")[0]?.params).toEqual({ version: "2.55.0.5" });
+    const bar = () => screen.getByText(/Git for Windows 2\.55\.0\.5…/);
+    expect(bar().textContent).toContain("Downloading Git for Windows 2.55.0.5… 0:00");
+    expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
+    expect(screen.getAllByRole("button", { name: "Open repo…" })[0]).toHaveProperty("disabled", true);
+
+    act(() => sidecar.updateProgress("Installing"));
+    expect(bar().textContent).toContain("Installing Git for Windows 2.55.0.5…");
+    expect(bar().textContent).toContain("Windows may ask for permission.");
 
     sidecar.gitUpdate = { ...newer, status: "UpToDate", installedVersion: "2.55.0", availableVersion: null };
     sidecar.info = { ...sidecar.info, gitVersion: "2.55.0" };
     act(() => sidecar.release());
 
-    expect(await within(dialog()).findByRole("heading", { name: "Git for Windows is updated" })).toBeTruthy();
-    expect(dialog().textContent).toContain("Git for Windows 2.55.0.5 is installed.");
-    await waitFor(() => expect(sent(sidecar, "app.info")).toHaveLength(2));
+    expect(await screen.findByText("Git for Windows 2.55.0.5 is installed.")).toBeTruthy();
     expect(await screen.findByText("git 2.55.0 · sidecar 0.1.0")).toBeTruthy();
-    fireEvent.click(within(dialog()).getByRole("button", { name: "Close" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.queryByText(/is available/)).toBeNull();
+    await waitFor(() => expect(sent(sidecar, "repo.refresh").at(-1)?.params).toEqual({ repoId: "1", includeUnreachable: false }));
+    await waitFor(() => expect(sent(sidecar, "git.checkUpdate")).toHaveLength(2));
+    expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", false);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(/is installed/)).toBeNull();
+    expect(offer()).toBeNull();
   });
 
   it("says when Windows must restart to finish", async () => {
     const sidecar = withUpdate();
-    sidecar.gitUpdateResult = { outcome: "RestartNeeded", message: "Git for Windows 2.55.0.5 is installed. Restart Windows to finish the update." };
+    sidecar.gitUpdateResult = { outcome: "RestartNeeded", message: "Git for Windows 2.55.0.5 is installed. Restart Windows to finish the update.", inUse: [] };
     setup({ sidecar });
-    fireEvent.click(await screen.findByRole("button", { name: "Update…" }));
 
-    fireEvent.click(within(dialog()).getByRole("button", { name: "Update" }));
+    await confirmUpdate();
 
-    expect(await within(dialog()).findByRole("heading", { name: "Restart Windows to finish" })).toBeTruthy();
+    expect(await screen.findByText(/Restart Windows to finish the update/)).toBeTruthy();
   });
 
-  it("explains a failed update and offers the download page", async () => {
+  it("names the programs that stopped the installer, and offers to try again or download", async () => {
     const sidecar = withUpdate();
-    sidecar.gitUpdateResult = { outcome: "Failed", message: "Git is in use, for example by an agent, Git Bash or an editor. Close those programs and try again." };
+    sidecar.gitUpdateResult = { outcome: "Failed", message: "Git for Windows was not updated, because these programs are using git. Close them, then try again.", inUse: [codeScene] };
     setup({ sidecar });
-    fireEvent.click(await screen.findByRole("button", { name: "Update…" }));
-    fireEvent.click(within(dialog()).getByRole("button", { name: "Update" }));
 
-    expect(await within(dialog()).findByRole("heading", { name: "The update did not finish" })).toBeTruthy();
-    expect(dialog().textContent).toContain("Git is in use");
-    fireEvent.click(within(dialog()).getByRole("button", { name: "Open download page" }));
+    await confirmUpdate();
 
+    expect(await screen.findByText(/was not updated, because these programs are using git/)).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Programs using git" }).textContent).toBe("CodeScene cs-ide tool for windows in Visual Studio Code");
+    fireEvent.click(screen.getByRole("button", { name: "Open download page" }));
     await waitFor(() => expect(sidecar.downloadPageOpened).toBe(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again…" }));
+    expect(within(dialog()).getByRole("heading", { name: "Update Git for Windows?" })).toBeTruthy();
   });
 
-  it("'Not now' hides the offer until a newer version comes along", async () => {
-    const { sidecar, sidecarEvent } = setup({ sidecar: withUpdate() });
-    fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
-    expect(screen.queryByText(/is available/)).toBeNull();
+  // --- git that is too old ------------------------------------------------------------
 
-    // A restarted sidecar makes the app start over, which checks again. The same version stays hidden.
-    sidecarEvent({ kind: "restarted" });
-    await waitFor(() => expect(sent(sidecar, "git.checkUpdate")).toHaveLength(2));
-    expect(screen.queryByText(/is available/)).toBeNull();
+  const tooOld = { gitVersion: "2.39.5", gitSupported: false, gitProblem: "Diffract needs git 2.40.0 or newer, but found 2.39.5." };
 
-    sidecar.gitUpdate = { ...newer, availableVersion: "2.56.0.1" };
-    sidecarEvent({ kind: "restarted" });
-    expect(await screen.findByText(/Git for Windows 2\.56\.0\.1 is available/)).toBeTruthy();
-  });
-
-  it("offers the update where it says git is too old", async () => {
+  it("offers the update where it says git is too old, even with a fresh answer remembered, and starts over once it works", async () => {
     const sidecar = withUpdate();
-    sidecar.info = { ...sidecar.info, gitVersion: "2.39.5", gitSupported: false, gitProblem: "Diffract needs git 2.40.0 or newer, but found 2.39.5." };
+    sidecar.info = { ...sidecar.info, ...tooOld };
     sidecar.gitUpdate = { ...newer, installedVersion: "2.39.5" };
-    setup({ sidecar });
+    setup({ last: repoRoot, sidecar, remembered: remembered({ ...newer, status: "UpToDate", installedVersion: "2.39.5", availableVersion: null }) });
 
     const alert = await screen.findByRole("alert");
     fireEvent.click(await within(alert).findByRole("button", { name: "Update to 2.55.0.5…" }));
-
     expect(dialog().textContent).toContain("From 2.39.5 to 2.55.0.5.");
-    expect(screen.queryByText(/is available/)).toBeNull();
+    expect(offer()).toBeNull();
+
+    sidecar.info = { ...sidecar.info, gitVersion: "2.55.0", gitSupported: true, gitProblem: null };
+    await within(dialog()).findByText("No other program is using git right now.");
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Update" }));
+
+    expect(await screen.findByRole("list", { name: "Leftovers" })).toBeTruthy();
+    expect(sent(sidecar, "repo.open")).toHaveLength(1);
   });
 
   it("offers the download page, and says why, when winget cannot update git that is too old", async () => {
     const sidecar = new FakeSidecar();
-    sidecar.info = { ...sidecar.info, gitVersion: "2.39.5", gitSupported: false, gitProblem: "Diffract needs git 2.40.0 or newer, but found 2.39.5." };
+    sidecar.info = { ...sidecar.info, ...tooOld };
     sidecar.gitUpdate = { status: "Unknown", installedVersion: "2.39.5", availableVersion: null, problem: "winget is not installed, so Diffract cannot check for a newer Git for Windows.", downloadPage: "https://gitforwindows.org/" };
     setup({ sidecar });
 

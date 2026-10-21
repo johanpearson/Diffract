@@ -3,6 +3,7 @@ using System.Text.Json;
 using Diffract.Fixtures;
 using Diffract.Git;
 using Diffract.Sidecar.Rpc;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Diffract.Sidecar.Tests;
 
@@ -29,7 +30,11 @@ public sealed class GitUpdaterTests : IDisposable
     private static FakeCommands Answering(int upgradeExitCode = 0, string list = "winget-list-git-update-available.txt") =>
         new((_, args) => args[0] == "list" ? new CommandResult(0, Sample(list)) : new CommandResult(upgradeExitCode, ""));
 
-    private static GitUpdater Updater(FakeCommands commands) => new(new GitUpdateChecker(commands, Machine), commands);
+    private const string Downloads = @"C:\Users\johan\AppData\Local\Temp\WinGet";
+
+    private static GitUpdater Updater(FakeCommands commands, FakeProcessTable? table = null, List<GitUpdateStage>? stages = null, TimeProvider? time = null) =>
+        new(new GitUpdateChecker(commands, Machine), commands, table ?? new FakeProcessTable(), Machine, time ?? TimeProvider.System,
+            p => { stages?.Add(p.Stage); return Task.CompletedTask; }, selfId: 1, wingetDownloads: Downloads);
 
     private static IEnumerable<string> Subcommands(FakeCommands commands) => commands.Ran.Select(r => r.Arguments[0]);
 
@@ -40,7 +45,8 @@ public sealed class GitUpdaterTests : IDisposable
 
         var result = await Updater(commands).UpdateAsync(Git2471, "2.55.0.5", TestContext.Current.CancellationToken);
 
-        Assert.Equal(new GitUpdateResult(GitUpdateOutcome.Updated, "Git for Windows 2.55.0.5 is installed."), result);
+        Assert.Equal((GitUpdateOutcome.Updated, "Git for Windows 2.55.0.5 is installed."), (result.Outcome, result.Message));
+        Assert.Empty(result.InUse);
         Assert.Equal(["list", "upgrade"], Subcommands(commands));
         var (fileName, arguments, _) = commands.Ran[1];
         Assert.Equal(Winget, fileName);
@@ -107,7 +113,7 @@ public sealed class GitUpdaterTests : IDisposable
         var second = await updater.UpdateAsync(Git2471, "2.55.0.5", TestContext.Current.CancellationToken);
         upgrade.SetResult(new CommandResult(0, ""));
 
-        Assert.Equal(new GitUpdateResult(GitUpdateOutcome.Failed, "An update of Git for Windows is already running."), second);
+        Assert.Equal((GitUpdateOutcome.Failed, "An update of Git for Windows is already running."), (second.Outcome, second.Message));
         Assert.Equal(GitUpdateOutcome.Updated, (await first).Outcome);
         Assert.Equal(1, Subcommands(commands).Count(s => s == "upgrade"));
         Assert.Equal(GitUpdateOutcome.Updated, (await updater.UpdateAsync(Git2471, "2.55.0.5", TestContext.Current.CancellationToken)).Outcome);
@@ -117,20 +123,111 @@ public sealed class GitUpdaterTests : IDisposable
     [InlineData(0, "Updated", "Git for Windows 2.55.0.5 is installed.")]
     [InlineData(unchecked((int)0x8A150109), "RestartNeeded", "Restart Windows")]
     [InlineData(unchecked((int)0x8A15010B), "RestartNeeded", "Restart Windows")]
-    [InlineData(unchecked((int)0x8A150101), "Failed", "Git is in use")]
-    [InlineData(unchecked((int)0x8A150103), "Failed", "Git is in use")]
-    [InlineData(unchecked((int)0x8A150111), "Failed", "Git is in use")]
+    [InlineData(unchecked((int)0x8A150101), "Failed", "Git was in use while the installer ran")]
+    [InlineData(unchecked((int)0x8A150103), "Failed", "Git was in use while the installer ran")]
+    [InlineData(unchecked((int)0x8A150111), "Failed", "Git was in use while the installer ran")]
     [InlineData(unchecked((int)0x8A15010C), "Failed", "cancelled")]
     [InlineData(unchecked((int)0x8A15002B), "Failed", "no update to install")]
     [InlineData(unchecked((int)0x8A150008), "Failed", "network")]
     [InlineData(unchecked((int)0x8A150107), "Failed", "network")]
-    [InlineData(1, "Failed", "exit code 0x00000001")]
+    [InlineData(unchecked((int)0x8A150006), "Failed", "installer stopped before it finished")]
+    [InlineData(1, "Failed", "exit code 0x00000001.")]
     public void Each_exit_code_is_explained(int exitCode, string outcome, string expected)
     {
-        var result = GitUpdater.Outcome(exitCode, "2.55.0.5");
+        var result = GitUpdater.Outcome(exitCode, "2.55.0.5", () => []);
 
         Assert.Equal(outcome, result.Outcome.ToString());
         Assert.Contains(expected, result.Message);
+    }
+
+    [Fact]
+    public void A_failure_never_guesses_at_the_permission_prompt()
+    {
+        Assert.DoesNotContain("permission", GitUpdater.Outcome(1, "2.55.0.5", () => []).Message);
+    }
+
+    [Theory]
+    [InlineData(unchecked((int)0x8A150006))]
+    [InlineData(unchecked((int)0x8A150101))]
+    [InlineData(unchecked((int)0x8A150111))]
+    public void When_the_installer_stops_it_names_the_programs_using_git(int exitCode)
+    {
+        IReadOnlyList<GitInUse> users = [new("CodeScene cs-ide tool for windows", "Visual Studio Code", 2)];
+
+        var result = GitUpdater.Outcome(exitCode, "2.55.0.5", () => users);
+
+        Assert.Equal(GitUpdateOutcome.Failed, result.Outcome);
+        Assert.Equal("Git for Windows was not updated, because these programs are using git. Close them, then try again.", result.Message);
+        Assert.Equal(users, result.InUse);
+    }
+
+    [Fact]
+    public void Only_a_stopped_installer_looks_for_programs_using_git()
+    {
+        var asked = 0;
+
+        GitUpdater.Outcome(0, "2.55.0.5", () => { asked++; return []; });
+        GitUpdater.Outcome(unchecked((int)0x8A150008), "2.55.0.5", () => { asked++; return []; });
+
+        Assert.Equal(0, asked);
+    }
+
+    [Fact]
+    public async Task Says_downloading_first_and_installing_once_the_installer_runs()
+    {
+        var time = new FakeTimeProvider();
+        var table = new FakeProcessTable();
+        var upgrade = new TaskCompletionSource<CommandResult>();
+        var commands = FakeCommands.Async((_, args) => args[0] == "list"
+            ? Task.FromResult(new CommandResult(0, Sample("winget-list-git-update-available.txt")))
+            : upgrade.Task);
+        var stages = new List<GitUpdateStage>();
+        var updater = Updater(commands, table, stages, time);
+
+        var update = updater.UpdateAsync(Git2471, "2.55.0.5", TestContext.Current.CancellationToken);
+        Assert.True(updater.IsRunning);
+        Assert.Equal([GitUpdateStage.Downloading], stages);
+
+        // Polls with no installer running yet change nothing.
+        for (var i = 0; i < 3; i++)
+        {
+            time.Advance(GitUpdater.PollInterval);
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
+        Assert.Equal([GitUpdateStage.Downloading], stages);
+
+        table.Add(new ProcessInfo(40, 30, Downloads + @"\Git.Git.2.55.0.5\Git-2.55.0.5-64-bit.exe"));
+        await AdvanceUntil(time, () => stages.Count == 2);
+        time.Advance(GitUpdater.PollInterval);
+        await Task.Delay(20, TestContext.Current.CancellationToken);
+        Assert.Equal([GitUpdateStage.Downloading, GitUpdateStage.Installing], stages);
+
+        upgrade.SetResult(new CommandResult(0, ""));
+        Assert.Equal(GitUpdateOutcome.Updated, (await update).Outcome);
+        Assert.False(updater.IsRunning);
+    }
+
+    [Fact]
+    public async Task Nothing_is_sent_and_nothing_pauses_when_nothing_is_installed()
+    {
+        var stages = new List<GitUpdateStage>();
+        var updater = Updater(Answering(), stages: stages);
+
+        await updater.UpdateAsync(Git2471, "2.54.0.1", TestContext.Current.CancellationToken);
+
+        Assert.Empty(stages);
+        Assert.False(updater.IsRunning);
+    }
+
+    /// <summary>Moves the fake clock a poll at a time until the updater has seen what the test waits for.</summary>
+    private static async Task AdvanceUntil(FakeTimeProvider time, Func<bool> done)
+    {
+        for (var i = 0; i < 100 && !done(); i++)
+        {
+            time.Advance(GitUpdater.PollInterval);
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
+        Assert.True(done());
     }
 
     // --- through the protocol -----------------------------------------------------
@@ -155,7 +252,7 @@ public sealed class GitUpdaterTests : IDisposable
         var result = await methods.Dispatch("git.update", JsonSerializer.SerializeToElement(new { version = "2.55.0.5" }), TestContext.Current.CancellationToken);
 
         Assert.Equal(
-            """{"outcome":"RestartNeeded","message":"Git for Windows 2.55.0.5 is installed. Restart Windows to finish the update."}""",
+            """{"outcome":"RestartNeeded","message":"Git for Windows 2.55.0.5 is installed. Restart Windows to finish the update.","inUse":[]}""",
             JsonSerializer.Serialize(result));
     }
 

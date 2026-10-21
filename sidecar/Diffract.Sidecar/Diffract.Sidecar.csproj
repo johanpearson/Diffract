@@ -6,6 +6,8 @@
     <RootNamespace>Diffract.Sidecar</RootNamespace>
     <Version>0.1.0</Version>
     <PublishAot>true</PublishAot>
+    <!-- Only for the code LibraryImport generates, the Native AOT way to call Windows (ProcessTable.cs). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

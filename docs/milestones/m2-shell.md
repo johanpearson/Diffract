@@ -75,9 +75,10 @@ JSON-RPC 2.0 over the sidecar's stdin and stdout.
 | `git.checkUpdate` | none | installed and available Git for Windows versions (phase 6) |
 | `git.update` | `version`, the one the user confirmed | how the winget update ended (phase 6) |
 | `git.openDownloadPage` | none | none. Opens gitforwindows.org in the browser (phase 6) |
+| `git.inUse` | none | the programs using Git for Windows right now, apart from Diffract (phase 6) |
 | `app.shutdown` | none | none, then the sidecar exits |
 
-- **Notifications from the sidecar:** `repo.changed` with `repoId`, what changed, the new snapshot summary and the new leftovers. The UI replaces its state with what it receives and animates the difference.
+- **Notifications from the sidecar:** `repo.changed` with `repoId`, what changed, the new snapshot summary and the new leftovers. The UI replaces its state with what it receives and animates the difference. `git.updateProgress` gives the stage of a running Git for Windows update (phase 6).
 - **Errors:** standard JSON-RPC error objects. Diffract's own errors get codes and a `data.kind` that matches the exception: not a repo, git too old, git failed, timed out, config invalid. The message is the plain-English one the spike already prints.
 - **Requests run concurrently**, and each has its own cancellation. `$/cancelRequest` with the request id cancels it, as in LSP.
 - The sidecar only ever builds read-only `GitRunner`s. A test proves no code path in `Diffract.Sidecar` creates a writable one.

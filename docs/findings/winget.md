@@ -39,16 +39,33 @@ Diffract runs the git on PATH. If its version is a different release from the on
 
 ## How the update runs
 
-Johan reviewed the check on 2026-10-21 and chose this approach over the PowerShell module. `git.update` runs only after the user confirms in a dialog that names both versions.
+Johan reviewed the check on 2026-10-21 and chose this approach over the PowerShell module. `git.update` runs only after the user confirms in a dialog that names both versions and lists the programs using git right now (`git.inUse`).
 
-1. **Check again.** The sidecar runs the same `winget list` first. If winget no longer offers exactly the version the user confirmed, or the git Diffract uses is not the one winget manages, nothing is installed and the dialog says why. The dialog and the update can never disagree.
+1. **Check again.** The sidecar runs the same `winget list` first. If winget no longer offers exactly the version the user confirmed, or the git Diffract uses is not the one winget manages, nothing is installed and Diffract says why. The dialog and the update can never disagree.
 2. **Upgrade to that version only:**
 
    ```
    winget upgrade --id Git.Git --exact --version <confirmed> --source winget --disable-interactivity --accept-package-agreements
    ```
 
-3. **Start over.** When it is done, the UI runs `app.info` and the update check again and opens the repo again, with whichever git is there now.
+3. **Catch up.** When it is done, the UI asks `app.info` and winget again, and refreshes the repo without `fsck`. A git that was too old and now works starts the app over.
+
+The update runs in the background. The dialog closes when the user confirms, and the bar under the top bar shows the stage, how long it has run, and then the result. Refresh and Open repo wait until it is done.
+
+### What the first real update taught us
+
+Johan's first update from the installed app, on 2026-10-21, failed with `0x8A150006`. The winget and installer logs in `%LOCALAPPDATA%\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\DiagOutputDir` showed why:
+
+- The download took 4 seconds. The installer then waited about 3.5 minutes and gave up: two long-running `git check-ignore --stdin` processes, started by the CodeScene extension in VS Code, were using Git for Windows.
+- winget runs the installer with `/SILENT /SUPPRESSMSGBOXES`, so it cannot ask the user to close them. It answers its own "close these programs" question with Cancel and ends with exit code 1, which winget reports as `0x8A150006`.
+- Diffract's message then guessed that the admin prompt had been refused. It had not. Messages no longer guess.
+
+What changed because of it:
+
+- **Who uses git is shown before the update**, and again when the installer stops. The sidecar reads the process list (the Tool Help functions, no git calls), finds every process running from Git for Windows' folder, and names the program that started it, such as "CodeScene cs-ide tool for windows in Visual Studio Code" or "Git Bash". Diffract's own git calls are left out.
+- **Live refresh pauses during the update**, so Diffract's own git calls cannot stop the installer. This replaces the first plan, which let them fail and retry.
+- **Progress comes from the process list.** winget prints no progress at all when its output is redirected: a captured `winget download` shows only a few lines of text and no progress bar. So the stage is "Downloading" until a program from winget's download folder (`%TEMP%\WinGet`) runs, and "Installing" while it does. That works in any display language.
+- **winget is asked less often.** Running it while a repo opens slows the opening on Johan's laptop. The check now runs only after the repo is open, and an answer is reused for a day unless git itself changed. "Check for git updates" in the top bar asks at once. A git that is too old is checked at once, since nothing else can happen until it is updated.
 
 Notes:
 
@@ -56,8 +73,7 @@ Notes:
 - Git for Windows installs for all users, so Windows shows its own admin prompt. If the user says no there, winget is expected to end with an error code, which Diffract shows. This has not been tried for real yet.
 - Diffract never stops the installer once it has started, so there is no time limit and no cancel. Killing an installer halfway could leave git broken. If Diffract closes meanwhile, winget should carry on by itself, since the Rust core only stops the sidecar process. This has not been tried for real yet.
 - Only one update runs at a time.
-- Exit codes with their own message: `0x8A150109`, `0x8A15010A` and `0x8A15010B` (restart needed), `0x8A150101`, `0x8A150103` and `0x8A150111` (git is in use, for example by an agent or a Git Bash window), `0x8A15010C` (cancelled), `0x8A15002B` (nothing to update), and `0x8A150008`, `0x8A150107`, `0x8A15002E` and `0x8A150086` (download or network). Any other code is shown as is.
-- Live refresh is not paused during the update, as first proposed. A live refresh that fails is already logged and tried again on the next change, and the fresh start after the update replaces everything anyway.
+- Exit codes with their own message: `0x8A150109`, `0x8A15010A` and `0x8A15010B` (restart needed); `0x8A150006`, `0x8A150101`, `0x8A150103` and `0x8A150111` (the installer stopped, usually because git is in use, and Diffract names who uses it); `0x8A15010C` (cancelled); `0x8A15002B` (nothing to update); and `0x8A150008`, `0x8A150107`, `0x8A15002E` and `0x8A150086` (download or network). Any other code is shown as is.
 - When winget cannot update git, the UI offers the download page instead. The sidecar opens the fixed address <https://gitforwindows.org/> through Explorer, so the UI can never make it open anything else.
 
 ## Samples

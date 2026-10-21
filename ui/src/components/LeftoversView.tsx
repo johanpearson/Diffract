@@ -18,11 +18,13 @@ interface Props {
   terminalName: string | null;
   onRefresh(): void;
   refreshing: boolean;
+  /** Why Refresh cannot be used right now, or null when it can. */
+  refreshBlocked?: string | null;
   now: Date;
 }
 
 /** The read-only "Worktrees and agents" view: counts, filter chips and one row per leftover. */
-export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onOpenTerminal, terminalName, onRefresh, refreshing, now }: Props) {
+export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onOpenTerminal, terminalName, onRefresh, refreshing, refreshBlocked = null, now }: Props) {
   const counts: Record<Verdict, number> = {
     SafeToRemove: state.summary.safeToRemove,
     NeedsReview: state.summary.needsReview,
@@ -35,7 +37,12 @@ export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onO
       <div className="bar">
         <h1 id="view-title">Worktrees and agents</h1>
         <span className="grow" />
-        <button className="abtn" onClick={onRefresh} disabled={refreshing} title="Also counts unreachable commits, which takes a few seconds">
+        <button
+          className="abtn"
+          onClick={onRefresh}
+          disabled={refreshing || refreshBlocked !== null}
+          title={refreshBlocked ?? "Also counts unreachable commits, which takes a few seconds"}
+        >
           {refreshing ? "Refreshing…" : "Refresh"}
         </button>
       </div>

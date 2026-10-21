@@ -2,7 +2,19 @@
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "outcome": "Updated",
-    "message": "Git for Windows 2.55.0.5 is installed."
+    "outcome": "Failed",
+    "message": "Git for Windows was not updated, because these programs are using git. Close them, then try again.",
+    "inUse": [
+      {
+        "program": "CodeScene cs-ide tool for windows",
+        "startedBy": "Visual Studio Code",
+        "processes": 2
+      },
+      {
+        "program": "Git Bash",
+        "startedBy": null,
+        "processes": 3
+      }
+    ]
   }
 }
