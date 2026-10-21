@@ -14,13 +14,15 @@ interface Props {
   onFilter(filter: Filter): void;
   onOpenFolder(path: string): void;
   onOpenTerminal(path: string): void;
+  /** The terminal "Open" uses, for the button's label. Null when unknown. */
+  terminalName: string | null;
   onRefresh(): void;
   refreshing: boolean;
   now: Date;
 }
 
 /** The read-only "Worktrees and agents" view: counts, filter chips and one row per leftover. */
-export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onOpenTerminal, onRefresh, refreshing, now }: Props) {
+export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onOpenTerminal, terminalName, onRefresh, refreshing, now }: Props) {
   const counts: Record<Verdict, number> = {
     SafeToRemove: state.summary.safeToRemove,
     NeedsReview: state.summary.needsReview,
@@ -60,7 +62,7 @@ export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onO
       ) : (
         <ul className="items" aria-label="Leftovers">
           {shown.map((row) => (
-            <LeftoverRow key={row.key} row={row} onOpenFolder={onOpenFolder} onOpenTerminal={onOpenTerminal} />
+            <LeftoverRow key={row.key} row={row} onOpenFolder={onOpenFolder} onOpenTerminal={onOpenTerminal} terminalName={terminalName} />
           ))}
         </ul>
       )}
@@ -70,7 +72,14 @@ export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onO
   );
 }
 
-function LeftoverRow({ row, onOpenFolder, onOpenTerminal }: { row: Row; onOpenFolder(path: string): void; onOpenTerminal(path: string): void }) {
+interface RowProps {
+  row: Row;
+  onOpenFolder(path: string): void;
+  onOpenTerminal(path: string): void;
+  terminalName: string | null;
+}
+
+function LeftoverRow({ row, onOpenFolder, onOpenTerminal, terminalName }: RowProps) {
   const l = row.leftover;
   return (
     <li className={`item${row.flash ? ` flash-${row.flash}` : ""}`} data-flash={row.flash ?? undefined} aria-label={l.name}>
@@ -88,7 +97,7 @@ function LeftoverRow({ row, onOpenFolder, onOpenTerminal }: { row: Row; onOpenFo
             </button>
             {l.kind === "Worktree" && (
               <button className="abtn" onClick={() => onOpenTerminal(l.path!)} aria-label={`Open terminal in ${l.path}`}>
-                Open terminal here
+                {terminalName ? `Open in ${terminalName}` : "Open terminal here"}
               </button>
             )}
           </div>

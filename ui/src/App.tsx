@@ -5,11 +5,14 @@ import { Sidebar } from "./components/Sidebar";
 import type { AppHost } from "./host";
 import { folderName } from "./model/format";
 import { FlashMs, initialRows, settleRows, updateRows, type Row } from "./model/rows";
-import type { AppInfo, RepoState } from "./protocol";
+import { terminalKinds, type AppInfo, type RepoState, type TerminalInfo, type TerminalKind } from "./protocol";
 import { ErrorCodes, RpcError, type RpcClient } from "./rpc";
 
 /** The storage key for the last repo that opened, which opens again on start. */
 export const LastRepoKey = "diffract.lastRepo";
+
+/** The storage key for the terminal chosen last, which "Open" uses until another is chosen. */
+export const TerminalKey = "diffract.terminal";
 
 type Screen =
   | { kind: "starting" }
@@ -37,6 +40,13 @@ export function App({ host, client, clock = systemClock }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [starts, setStarts] = useState(0);
+  const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
+  const [terminalId, setTerminalId] = useState<TerminalKind | null>(() => {
+    const stored = host.storage.get(TerminalKey);
+    return terminalKinds.find((k) => k === stored) ?? null;
+  });
+  // The chosen terminal if it is still installed, otherwise the sidecar's default, which it lists first.
+  const terminal = terminals.find((t) => t.id === terminalId) ?? terminals[0] ?? null;
   const now = useNow(clock);
 
   // The repo on screen. Refs, because notifications and sidecar events arrive outside React's render cycle.
@@ -80,6 +90,8 @@ export function App({ host, client, clock = systemClock }: Props) {
       .then((appInfo) => {
         if (!current) return;
         setInfo(appInfo);
+        // Not knowing the terminals only means "Open terminal" uses the default one.
+        client.call("system.listTerminals", undefined).then((list) => current && setTerminals(list), () => {});
         if (!appInfo.gitSupported) return setScreen({ kind: "gitProblem", problem: appInfo.gitProblem ?? "This git cannot be used." });
         const last = host.storage.get(LastRepoKey);
         if (last) void open(last);
@@ -168,10 +180,17 @@ export function App({ host, client, clock = systemClock }: Props) {
   );
 
   const openTerminal = useCallback(
-    (path: string) => {
-      client.call("system.openTerminal", { path }).catch((error: unknown) => setNotice(`Could not open a terminal: ${messageOf(error)}`));
+    (path: string, kind?: TerminalKind) => {
+      if (kind) {
+        setTerminalId(kind);
+        host.storage.set(TerminalKey, kind);
+      }
+      const chosen = kind ?? terminal?.id;
+      client
+        .call("system.openTerminal", chosen ? { path, terminal: chosen } : { path })
+        .catch((error: unknown) => setNotice(`Could not open a terminal: ${messageOf(error)}`));
     },
-    [client],
+    [client, host, terminal],
   );
 
   return (
@@ -199,7 +218,7 @@ export function App({ host, client, clock = systemClock }: Props) {
       )}
 
       <div className="body">
-        {screen.kind === "ready" && <Sidebar state={screen.state} onOpenFolder={openFolder} onOpenTerminal={openTerminal} />}
+        {screen.kind === "ready" && <Sidebar state={screen.state} terminals={terminals} terminal={terminal} onOpenFolder={openFolder} onOpenTerminal={openTerminal} />}
         <main className="main">
           {screen.kind === "starting" && <p className="hint">Starting…</p>}
           {screen.kind === "opening" && <p className="hint">Opening {screen.path}…</p>}
@@ -235,6 +254,7 @@ export function App({ host, client, clock = systemClock }: Props) {
               onFilter={setFilter}
               onOpenFolder={openFolder}
               onOpenTerminal={openTerminal}
+              terminalName={terminal?.name ?? null}
               onRefresh={() => void refresh()}
               refreshing={refreshing}
               now={now}

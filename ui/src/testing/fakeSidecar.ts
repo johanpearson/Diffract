@@ -1,5 +1,5 @@
 import openSample from "../../../tests/Diffract.Sidecar.Tests/Contract/repo.open.json";
-import type { AppInfo, Methods, RepoChange, RepoState } from "../protocol";
+import type { AppInfo, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
 import { FakeTransport } from "./fakeTransport";
 
 /** The repo in the repo.open contract sample, which the sidecar's own tests write. */
@@ -19,7 +19,13 @@ export class FakeSidecar {
   /** Repos by path, lower case. */
   readonly repos = new Map<string, RepoState>([[sampleState.repoRoot.toLowerCase(), sampleState]]);
   readonly openedFolders: string[] = [];
+  /** Every terminal opened, as "path" for the default one or "path in Kind" for a chosen one. */
   readonly openedTerminals: string[] = [];
+  terminals: TerminalInfo[] = [
+    { id: "WindowsTerminal", name: "Windows Terminal" },
+    { id: "WindowsPowerShell", name: "Windows PowerShell" },
+    { id: "GitBash", name: "Git Bash" },
+  ];
   /** Requests with these methods get no answer until `release` is called, like a slow sidecar. */
   readonly held = new Set<keyof Methods>();
   /** Set to make the next request to that method fail. */
@@ -67,7 +73,7 @@ export class FakeSidecar {
   }
 
   private respond(method: keyof Methods, params: unknown): unknown {
-    const p = (params ?? {}) as { path?: string; repoId?: string };
+    const p = (params ?? {}) as { path?: string; repoId?: string; terminal?: TerminalKind };
     switch (method) {
       case "app.info":
         return this.info;
@@ -81,8 +87,10 @@ export class FakeSidecar {
       case "system.openFolder":
         this.openedFolders.push(p.path ?? "");
         return null;
+      case "system.listTerminals":
+        return this.terminals;
       case "system.openTerminal":
-        this.openedTerminals.push(p.path ?? "");
+        this.openedTerminals.push(p.terminal ? `${p.path} in ${p.terminal}` : (p.path ?? ""));
         return null;
       case "repo.close":
       case "app.shutdown":

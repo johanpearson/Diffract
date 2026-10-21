@@ -1,17 +1,25 @@
 import { useState, type MouseEvent } from "react";
-import type { RepoState, WorktreeInfo } from "../protocol";
+import type { RepoState, TerminalInfo, TerminalKind, WorktreeInfo } from "../protocol";
 import { folderName } from "../model/format";
 import { ContextMenu } from "./ContextMenu";
 
 interface Props {
   state: RepoState;
+  /** The installed terminals. Empty when the sidecar could not list them; then the default opens. */
+  terminals: TerminalInfo[];
+  /** The one a plain "Open" uses: the last one chosen, or the default. */
+  terminal: TerminalInfo | null;
   onOpenFolder(path: string): void;
-  onOpenTerminal(path: string): void;
+  /** Without `kind`, the current terminal. With it, that one, which becomes the current one. */
+  onOpenTerminal(path: string, kind?: TerminalKind): void;
 }
 
 /** The repo's worktrees with their state, and the Leftovers entry with the count of everything not in use. */
-export function Sidebar({ state, onOpenFolder, onOpenTerminal }: Props) {
+export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTerminal }: Props) {
   const [menu, setMenu] = useState<{ worktree: WorktreeInfo; x: number; y: number } | null>(null);
+  const [chooser, setChooser] = useState<{ x: number; y: number } | null>(null);
+  // The current terminal first, so the menu's first item does what the button does.
+  const ordered = terminal ? [terminal, ...terminals.filter((t) => t.id !== terminal.id)] : terminals;
   const inUse = new Set(state.leftovers.filter((l) => l.verdict === "InUse" && l.path).map((l) => l.path!.toLowerCase()));
   const notInUse = state.summary.total - state.summary.inUse;
 
@@ -30,9 +38,25 @@ export function Sidebar({ state, onOpenFolder, onOpenTerminal }: Props) {
         <div className="repo-path" title={state.repoRoot}>
           {state.repoRoot}
         </div>
-        <button className="abtn small" onClick={() => onOpenTerminal(state.repoRoot)}>
-          Open terminal
-        </button>
+        <div className="split">
+          <button className="abtn small" onClick={() => onOpenTerminal(state.repoRoot)}>
+            {terminal ? `Open in ${terminal.name}` : "Open terminal"}
+          </button>
+          {terminals.length > 1 && (
+            <button
+              className="abtn small"
+              aria-label="Choose terminal"
+              aria-haspopup="menu"
+              aria-expanded={chooser !== null}
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                setChooser({ x: rect.left, y: rect.bottom + 2 });
+              }}
+            >
+              ▾
+            </button>
+          )}
+        </div>
       </div>
       <h2 id="worktrees-title">Worktrees</h2>
       <ul className="worktrees" aria-labelledby="worktrees-title">
@@ -73,9 +97,21 @@ export function Sidebar({ state, onOpenFolder, onOpenTerminal }: Props) {
           onClose={() => setMenu(null)}
           items={[
             // A prunable worktree's folder is gone, so there is nothing to open.
-            { label: "Open terminal here", run: () => onOpenTerminal(menu.worktree.path), disabled: menu.worktree.isPrunable },
+            ...(ordered.length === 0
+              ? [{ label: "Open terminal here", run: () => onOpenTerminal(menu.worktree.path), disabled: menu.worktree.isPrunable }]
+              : ordered.map((t) => ({ label: `Open in ${t.name}`, run: () => onOpenTerminal(menu.worktree.path, t.id), disabled: menu.worktree.isPrunable }))),
             { label: "Open folder", run: () => onOpenFolder(menu.worktree.path), disabled: menu.worktree.isPrunable },
           ]}
+        />
+      )}
+
+      {chooser && (
+        <ContextMenu
+          x={chooser.x}
+          y={chooser.y}
+          label="Choose terminal"
+          onClose={() => setChooser(null)}
+          items={terminals.map((t) => ({ label: t.name, checked: t.id === terminal?.id, run: () => onOpenTerminal(state.repoRoot, t.id) }))}
         />
       )}
     </nav>

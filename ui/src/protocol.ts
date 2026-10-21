@@ -26,6 +26,16 @@ export type ErrorKind = (typeof errorKinds)[number];
 export const changeKinds = ["WorktreeFiles", "WorktreeHead", "Refs", "WorktreeList", "Everything"] as const;
 export type ChangeKind = (typeof changeKinds)[number];
 
+/** The terminals Diffract can open, in the order the sidecar lists them. */
+export const terminalKinds = ["WindowsTerminal", "WindowsPowerShell", "PowerShell7", "CommandPrompt", "GitBash"] as const;
+export type TerminalKind = (typeof terminalKinds)[number];
+
+/** An installed terminal, from `system.listTerminals`. */
+export interface TerminalInfo {
+  id: TerminalKind;
+  name: string;
+}
+
 /** Result of `app.info`. */
 export interface AppInfo {
   sidecarVersion: string;
@@ -130,8 +140,10 @@ export interface Methods {
   "app.shutdown": { params: undefined; result: null };
   /** Opens an existing folder in Explorer. */
   "system.openFolder": { params: { path: string }; result: null };
-  /** Opens Windows Terminal in an existing folder, or PowerShell when Windows Terminal is not installed. */
-  "system.openTerminal": { params: { path: string }; result: null };
+  /** The installed terminals, the default first. */
+  "system.listTerminals": { params: undefined; result: TerminalInfo[] };
+  /** Opens a terminal in an existing folder. Without `terminal`, Windows Terminal, or PowerShell when it is not installed. */
+  "system.openTerminal": { params: { path: string; terminal?: TerminalKind }; result: null };
 }
 
 /** Every notification the sidecar sends, with its params. */
