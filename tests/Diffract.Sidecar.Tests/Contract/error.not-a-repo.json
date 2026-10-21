@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32001,
+    "message": "Not a git repository: C:\\Users\\johan\\Downloads",
+    "data": {
+      "kind": "NotARepo"
+    }
+  }
+}

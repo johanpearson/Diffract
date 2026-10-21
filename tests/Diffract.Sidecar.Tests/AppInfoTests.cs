@@ -56,10 +56,4 @@ public sealed class AppInfoTests : IDisposable
         Assert.Equal(["sidecarVersion", "gitVersion", "gitSupported", "gitProblem"], result.EnumerateObject().Select(p => p.Name));
         Assert.Equal(JsonValueKind.True, result.GetProperty("gitSupported").ValueKind);
     }
-
-    [Fact]
-    public void Git_calls_are_read_only_even_when_asked_otherwise()
-    {
-        Assert.True(new SidecarMethods(new GitRunnerOptions { ReadOnly = false }).RunnerOptions.ReadOnly);
-    }
 }

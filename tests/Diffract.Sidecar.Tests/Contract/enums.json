@@ -1,0 +1,32 @@
+{
+  "verdict": [
+    "SafeToRemove",
+    "NeedsReview",
+    "InUse"
+  ],
+  "leftoverKind": [
+    "Worktree",
+    "PrunableWorktree",
+    "LocalBranch",
+    "RemoteBranch",
+    "Stash",
+    "CheckpointSession",
+    "OrphanedCommit",
+    "BackupTag",
+    "LeftoverFolder"
+  ],
+  "errorKind": [
+    "NotARepo",
+    "GitTooOld",
+    "GitFailed",
+    "TimedOut",
+    "ConfigInvalid"
+  ],
+  "changeKind": [
+    "WorktreeFiles",
+    "WorktreeHead",
+    "Refs",
+    "WorktreeList",
+    "Everything"
+  ]
+}

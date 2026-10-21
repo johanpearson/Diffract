@@ -90,6 +90,14 @@ dotnet publish tools/Diffract.Spike -c Release -r win-x64 -o artifacts\aot
 artifacts\aot\diffract-spike.exe scan .
 ```
 
+If the publish fails with `'vswhere.exe' is not recognized`, the .NET tools cannot find Visual Studio. `vswhere.exe` lives in the Visual Studio Installer folder, and on some machines that folder is not on the PATH. Add it for the current PowerShell session, then publish again:
+
+```powershell
+$env:Path = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer;$env:Path"
+```
+
+To fix it for good, add `C:\Program Files (x86)\Microsoft Visual Studio\Installer` to your user PATH and open a new terminal.
+
 ## Run the app
 
 Once, and again after changing sidecar code: publish the sidecar to where Tauri bundles it from.

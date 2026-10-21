@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32004,
+    "message": "git fsck --unreachable --no-reflogs did not finish within 30 seconds",
+    "data": {
+      "kind": "TimedOut"
+    }
+  }
+}

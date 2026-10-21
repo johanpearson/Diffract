@@ -5,7 +5,7 @@ import type { Transport } from "../rpc";
  * and a thrown { code, message } becomes a JSON-RPC error. Return undefined to leave a request unanswered.
  */
 export class FakeTransport implements Transport {
-  readonly sent: { id: number; method: string; params?: unknown }[] = [];
+  readonly sent: { id?: number; method: string; params?: unknown }[] = [];
   private readonly handlers = new Set<(message: string) => void>();
   private readonly answer: (method: string, params: unknown) => unknown;
 
@@ -14,8 +14,9 @@ export class FakeTransport implements Transport {
   }
 
   async send(message: string): Promise<void> {
-    const request = JSON.parse(message) as { id: number; method: string; params?: unknown };
+    const request = JSON.parse(message) as { id?: number; method: string; params?: unknown };
     this.sent.push(request);
+    if (request.id === undefined) return; // a notification, such as $/cancelRequest
     let reply: object | undefined;
     try {
       const result = this.answer(request.method, request.params);
