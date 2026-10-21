@@ -1,6 +1,6 @@
 # Milestone 3: history graph
 
-**Status:** draft, waiting for Johan's decisions in phase 0
+**Status:** in progress. Johan made the phase 0 decisions on 2026-10-21; the spike is still to do.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** opening Johan's busiest repo shows its history within a second or two, scrolling stays smooth on a repo with 50,000 commits, and the graph keeps up while agents add commits.
 
@@ -21,7 +21,8 @@ From the visual plan:
 
 - **History is the start view.** "Worktrees and agents" becomes a second tab, with the leftovers count on it.
 - **The graph:** one row per commit, lanes drawn with Canvas 2D (a locked decision), virtualized so only the visible rows are drawn. Each row shows the graph, branch, tag and worktree markers, the subject, the author and the age. The current branch and each worktree's HEAD are marked.
-- **Commit details** on the right: subject and body, author and committer with dates, parents (clickable), the refs that point to it, and the list of changed files.
+- **Commit details** on the right: subject and body, author and committer with dates, parents (clickable), the refs that point to it, and the list of changed files. Selecting a file shows its diff in a read-only Monaco diff editor, both sides next to each other.
+- **Find:** a box for hash, subject and author, over the commits loaded so far. Enter jumps to the next match.
 - **Toggles:** "Fade merged branches" and "Agent work only", using the attribution hints from milestone 1.
 - **Keyboard:** up and down move the selection, Page Up and Page Down, Home and End, Enter shows details.
 - **Live:** when refs change, new commits appear at the top without losing the scroll position or the selection.
@@ -32,20 +33,23 @@ From the visual plan:
 2. Build a fixture repo with 50,000 commits and many branches and merges with `git fast-import`, in a temp folder, for the performance tests.
 3. Settle the decisions below.
 
-**Checkpoint:** Johan decides the open questions below.
+**Checkpoint:** Johan decides the open questions below. Decided on 2026-10-21; steps 1 and 2 are still to do.
 
-### Decisions for Johan
+### Decisions
 
-1. **Which refs the graph shows by default.** Proposal: local branches, remote-tracking branches, tags, and every worktree's HEAD. Hidden: agent checkpoint refs (`refs/copilot/checkpoints/**` and the like) and the stash, each behind a toggle. Git Extensions shows all branches by default, so this matches it.
-2. **Commit order.** Proposal: `--topo-order`, so a branch's commits stay together and the lanes are easy to follow. The alternative is `--date-order`, which interleaves branches by commit date.
-3. **Seeing a commit's diff.** The brief puts Monaco diffs in milestone 4, with changes and commit. But looking at what a commit changed is a big part of daily use. Proposal: bring the read-only diff of a selected commit's file into this milestone. That needs `monaco-editor`, which is not on the pre-approved list yet; Monaco itself is a locked decision in the brief. The alternative is a file list only, with diffs coming in milestone 4.
-4. **Finding a commit.** Proposal: a simple find box for hash, subject and author, over the commits already loaded. Searching the whole history with `git log --grep` comes later.
+Johan decided these on 2026-10-21, in #30.
+
+1. **Refs shown by default:** local branches, remote-tracking branches, tags, and every worktree's HEAD. Agent checkpoint refs (`refs/copilot/checkpoints/**` and the like) and the stash are hidden, each behind a toggle.
+2. **Commit order:** `--topo-order`, so a branch's commits stay together and the lanes are easy to follow.
+3. **A commit's diff comes in this milestone.** Selecting a file in the commit details shows its diff in a read-only Monaco diff editor. `monaco-editor` is added to the pre-approved npm packages in `AGENTS.md`. Staging and editing stay in milestone 4.
+4. **A simple find box** for hash, subject and author, over the commits already loaded. Searching the whole history comes later.
 
 ## Phase 1: reading history in the sidecar
 
 - One streamed `git log` call per page, with `-z` and a `--format` that has explicit separators: hash, parents, author, committer, dates, subject. Refs come from the snapshot milestone 1 already builds, not from `--decorate`.
 - The first page (proposal: 500 commits) comes back as fast as git can produce it. Later pages are requested as the user scrolls, so a 50,000-commit repo never sends everything at once.
 - Commit details with one call: body, committer and changed files (`git show` or `git diff-tree` with `-z`).
+- A file's two sides for the diff, one call each (`git show <commit>^:<path>` and `git show <commit>:<path>`), with added, deleted, renamed and binary files handled. Large files are refused with a plain message instead of being sent whole.
 - Tests: parsers against captured real output in `Samples/`, including merges, octopus merges, root commits, non-ASCII names and subjects, and empty subjects. Call budget tests per page and per details request.
 
 ## Phase 2: lane layout
@@ -59,19 +63,25 @@ From the visual plan:
 - Selection, keyboard and the details panel.
 - Tests: Vitest for the details panel and selection. Playwright for scrolling, selecting and the keyboard, against a fake sidecar with a large generated history.
 
-## Phase 4: history as the start view
+## Phase 4: the diff and the find box
+
+- The read-only Monaco diff editor, both sides next to each other, following the Windows theme. Monaco is loaded only when a diff is first opened, so it never slows the start.
+- The find box from decision 4.
+- Tests: Vitest for find. Playwright for selecting a commit, then a file, and seeing its diff. Monaco's own rendering is not tested.
+
+## Phase 5: history as the start view
 
 - `repo.open` answers with what history needs as soon as it has it. The leftover scan, `fsck` included, keeps running and its result arrives later as `repo.changed`. This changes milestone 2's protocol, and the contract samples change with it.
 - The tabs: History first, Worktrees and agents second.
 - Tests: opening a repo shows history before the leftover scan has finished. A call budget for what opening waits for.
 
-## Phase 5: live history and the toggles
+## Phase 6: live history and the toggles
 
 - When refs change, only the new commits are read (`git log <new tips> --not <old tips>`) and added at the top. The scroll position and the selection stay.
-- "Fade merged branches" and "Agent work only".
+- "Fade merged branches", "Agent work only", and the toggles for checkpoint refs and the stash.
 - Tests: fixture repos where a branch gets a commit, a branch is added, and a branch is force-moved. Each updates the graph, with a call budget.
 
-## Phase 6: real-world check
+## Phase 7: real-world check
 
 1. Johan installs the CI build and opens his busiest repos.
 2. History shows within a second or two, scrolls smoothly, and follows an agent's commits as they happen.
@@ -87,8 +97,15 @@ From the visual plan:
 - [ ] Scrolling a 50,000-commit history in the built UI keeps up, measured in Playwright.
 - [ ] Opening a repo never waits for `git fsck`.
 - [ ] New commits appear without losing the scroll position or the selection.
+- [ ] Selecting a file in a commit shows its diff, and Monaco is not loaded until then.
 - [ ] Johan has used it on his busiest repos and signs off.
+
+## Dependencies
+
+| Package | Why |
+|---|---|
+| `monaco-editor` | the read-only diff of a commit's file. Monaco for diffs is a locked decision in the brief. Approved by Johan on 2026-10-21. |
 
 ## Out of scope for milestone 3
 
-Staging, committing, pull and push (milestone 4), cleanup (milestone 5), searching the whole history, blame, and file history.
+Staging, committing, pull and push (milestone 4), diffs of the working tree (milestone 4), cleanup (milestone 5), searching the whole history, blame, and file history.

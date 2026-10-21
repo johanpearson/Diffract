@@ -37,7 +37,7 @@ Decisions in the brief are locked. If you think one is wrong, say so in the PR d
 - Use `TimeProvider` for anything time-based so tests can control the clock.
 - No new NuGet, npm or cargo packages without a line in the PR description saying why. Pre-approved:
   - NuGet: `xunit.v3`, `Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio`, `Microsoft.Extensions.TimeProvider.Testing`.
-  - npm: `react`, `react-dom`, `@types/react`, `@types/react-dom`, `vite`, `@vitejs/plugin-react`, `typescript`, `@tauri-apps/api`, `@tauri-apps/cli`, `@tauri-apps/plugin-dialog`, `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/dom`, `@playwright/test`.
+  - npm: `react`, `react-dom`, `@types/react`, `@types/react-dom`, `vite`, `@vitejs/plugin-react`, `typescript`, `@tauri-apps/api`, `@tauri-apps/cli`, `@tauri-apps/plugin-dialog`, `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/dom`, `@playwright/test`, `monaco-editor`.
   - cargo: `tauri`, `tauri-build`, `tauri-plugin-dialog`, `tauri-plugin-shell`, `serde`, `serde_json`.
 - Commit lockfiles (`package-lock.json`, `Cargo.lock`) and install with `npm ci` in CI.
 - Line endings are LF in the repo (`.gitattributes`). Do not fight it.

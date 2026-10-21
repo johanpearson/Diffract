@@ -6,7 +6,7 @@ Personal project. Windows only.
 
 ## Status
 
-Milestone 2, [the Tauri shell, sidecar and live worktree view](docs/milestones/m2-shell.md), is done. Current milestone: [docs/milestones/m3-history.md](docs/milestones/m3-history.md), the history graph, still a draft waiting for Johan's decisions. Safe cleanup moved to milestone 5 and is planned in [docs/milestones/m5-cleanup.md](docs/milestones/m5-cleanup.md). Milestone 1, [the spike for the repo snapshot and agent leftover rules](docs/milestones/m1-spike.md), is done.
+Milestone 2, [the Tauri shell, sidecar and live worktree view](docs/milestones/m2-shell.md), is done. Current milestone: [docs/milestones/m3-history.md](docs/milestones/m3-history.md), the history graph. Safe cleanup moved to milestone 5 and is planned in [docs/milestones/m5-cleanup.md](docs/milestones/m5-cleanup.md). Milestone 1, [the spike for the repo snapshot and agent leftover rules](docs/milestones/m1-spike.md), is done.
 
 ## Docs
 
