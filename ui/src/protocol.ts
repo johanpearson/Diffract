@@ -130,6 +130,8 @@ export interface Methods {
   "app.shutdown": { params: undefined; result: null };
   /** Opens an existing folder in Explorer. */
   "system.openFolder": { params: { path: string }; result: null };
+  /** Opens Windows Terminal in an existing folder, or PowerShell when Windows Terminal is not installed. */
+  "system.openTerminal": { params: { path: string }; result: null };
 }
 
 /** Every notification the sidecar sends, with its params. */

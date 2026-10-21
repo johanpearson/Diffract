@@ -108,3 +108,22 @@ for (const colorScheme of ["light", "dark"] as const) {
     expect(colorScheme === "dark" ? lightness < 60 : lightness > 200).toBe(true);
   });
 }
+
+test("opens a terminal from the sidebar's menu with the keyboard", async ({ page }) => {
+  await openRepo(page);
+  await expect(leftovers(page).getByRole("listitem")).toHaveCount(3);
+
+  const entry = page.getByRole("listitem", { name: "claude/räksmörgås-fix" });
+  for (let i = 0; i < 20 && !(await entry.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+  await expect(entry).toBeFocused();
+  await page.keyboard.press("Shift+F10");
+
+  const menu = page.getByRole("menu", { name: "Actions for claude/räksmörgås-fix" });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Open terminal here" })).toBeFocused();
+  await page.keyboard.press("Enter");
+
+  await expect(menu).toBeHidden();
+  await expect(entry).toBeFocused();
+  expect(await page.evaluate(() => window.diffractTest.sidecar.openedTerminals)).toEqual([String.raw`C:\src\shop\.claude\worktrees\räksmörgås fix`]);
+});

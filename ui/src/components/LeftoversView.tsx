@@ -13,13 +13,14 @@ interface Props {
   filter: Filter;
   onFilter(filter: Filter): void;
   onOpenFolder(path: string): void;
+  onOpenTerminal(path: string): void;
   onRefresh(): void;
   refreshing: boolean;
   now: Date;
 }
 
 /** The read-only "Worktrees and agents" view: counts, filter chips and one row per leftover. */
-export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onRefresh, refreshing, now }: Props) {
+export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onOpenTerminal, onRefresh, refreshing, now }: Props) {
   const counts: Record<Verdict, number> = {
     SafeToRemove: state.summary.safeToRemove,
     NeedsReview: state.summary.needsReview,
@@ -59,7 +60,7 @@ export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onR
       ) : (
         <ul className="items" aria-label="Leftovers">
           {shown.map((row) => (
-            <LeftoverRow key={row.key} row={row} onOpenFolder={onOpenFolder} />
+            <LeftoverRow key={row.key} row={row} onOpenFolder={onOpenFolder} onOpenTerminal={onOpenTerminal} />
           ))}
         </ul>
       )}
@@ -69,7 +70,7 @@ export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onR
   );
 }
 
-function LeftoverRow({ row, onOpenFolder }: { row: Row; onOpenFolder(path: string): void }) {
+function LeftoverRow({ row, onOpenFolder, onOpenTerminal }: { row: Row; onOpenFolder(path: string): void; onOpenTerminal(path: string): void }) {
   const l = row.leftover;
   return (
     <li className={`item${row.flash ? ` flash-${row.flash}` : ""}`} data-flash={row.flash ?? undefined} aria-label={l.name}>
@@ -85,6 +86,11 @@ function LeftoverRow({ row, onOpenFolder }: { row: Row; onOpenFolder(path: strin
             <button className="abtn" onClick={() => onOpenFolder(l.path!)} aria-label={`Open folder ${l.path}`}>
               Open folder
             </button>
+            {l.kind === "Worktree" && (
+              <button className="abtn" onClick={() => onOpenTerminal(l.path!)} aria-label={`Open terminal in ${l.path}`}>
+                Open terminal here
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -144,6 +144,79 @@ describe("App", () => {
     await waitFor(() => expect(sidecar.openedFolders).toEqual(["C:\\src\\shop\\.claude\\worktrees\\old-task"]));
   });
 
+  it("opens a terminal in the repo, in a worktree row, and from the sidebar's menu", async () => {
+    const { sidecar } = setup({ last: repoRoot });
+    await screen.findByRole("list", { name: "Leftovers" });
+    const worktree = sampleState.snapshot.worktrees[1]!.path;
+
+    fireEvent.click(screen.getByRole("button", { name: "Open terminal" }));
+    fireEvent.click(within(row("räksmörgås fix")).getByRole("button", { name: /Open terminal in/ }));
+    fireEvent.contextMenu(screen.getByRole("listitem", { name: "claude/räksmörgås-fix" }), { clientX: 40, clientY: 80 });
+    fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Open terminal here" }));
+
+    await waitFor(() => expect(sidecar.openedTerminals).toEqual([repoRoot, worktree, worktree]));
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("offers a terminal only on worktree rows, not on folders or branches", async () => {
+    setup({ last: repoRoot });
+    await screen.findByRole("list", { name: "Leftovers" });
+
+    expect(within(row("old-task")).queryByRole("button", { name: /Open terminal/ })).toBeNull();
+    expect(within(row("copilot/fix-login")).queryByRole("button", { name: /Open terminal/ })).toBeNull();
+  });
+
+  it("works the sidebar menu from the keyboard and gives focus back when it closes", async () => {
+    setup({ last: repoRoot });
+    await screen.findByRole("list", { name: "Leftovers" });
+    const entry = screen.getByRole("listitem", { name: "main" });
+    entry.focus();
+
+    fireEvent.contextMenu(entry);
+    const menu = screen.getByRole("menu", { name: "Actions for main" });
+    expect(document.activeElement?.textContent).toBe("Open terminal here");
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement?.textContent).toBe("Open folder");
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement?.textContent).toBe("Open terminal here");
+    fireEvent.keyDown(menu, { key: "Escape" });
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(entry);
+  });
+
+  it("closes the sidebar menu on a click elsewhere", async () => {
+    setup({ last: repoRoot });
+    await screen.findByRole("list", { name: "Leftovers" });
+
+    fireEvent.contextMenu(screen.getByRole("listitem", { name: "main" }), { clientX: 40, clientY: 80 });
+    fireEvent.mouseDown(document.body);
+
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("disables the menu's actions for a worktree whose folder is gone", async () => {
+    const sidecar = new FakeSidecar();
+    const gone = { ...sampleState.snapshot.worktrees[1]!, isPrunable: true, prunableReason: "gitdir file points to non-existent location" };
+    sidecar.repos.set(repoRoot.toLowerCase(), { ...sampleState, snapshot: { ...sampleState.snapshot, worktrees: [sampleState.snapshot.worktrees[0]!, gone] } });
+    setup({ sidecar, last: repoRoot });
+    await screen.findByRole("list", { name: "Leftovers" });
+
+    fireEvent.contextMenu(screen.getByRole("listitem", { name: "claude/räksmörgås-fix" }), { clientX: 40, clientY: 80 });
+
+    for (const item of within(screen.getByRole("menu")).getAllByRole("menuitem")) expect((item as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("says so when a terminal cannot be opened", async () => {
+    const { sidecar } = setup({ last: repoRoot });
+    await screen.findByRole("list", { name: "Leftovers" });
+    sidecar.failures.set("system.openTerminal", { error: { code: -32602, message: `The folder does not exist: ${repoRoot}` } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open terminal" }));
+
+    expect((await screen.findByRole("status")).textContent).toContain("Could not open a terminal: The folder does not exist");
+  });
+
   it("refreshes with a new count of unreachable commits", async () => {
     const { sidecar } = setup({ last: repoRoot });
     await screen.findByRole("list", { name: "Leftovers" });

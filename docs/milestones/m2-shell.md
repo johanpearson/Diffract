@@ -127,6 +127,8 @@ Rust core: restarts the sidecar if it exits unexpectedly, at most 3 times a minu
 
 Tests: Vitest and Testing Library for components, against the contract samples. Playwright runs the built UI in a browser against a fake sidecar transport and checks: open a repo, see the rows, filter, receive a `repo.changed` and see the row update. Rust unit tests cover the line framing and the restart policy.
 
+**Done** 2026-10-21 in #21. Johan installed the CI build and tried it. "Commits at risk" can now be unknown, shown as "-", and "Open folder" is the sidecar method `system.openFolder`. Opening a busy repo takes a few seconds, mostly `git fsck`. Johan decided that this is fixed in milestone 4, when History becomes the start view (see the brief).
+
 ## Phase 5: Open terminal here
 
 - A button on the repo and on each worktree row, and in the sidebar's context menu.
