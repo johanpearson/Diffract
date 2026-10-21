@@ -6,12 +6,12 @@ Personal project. Windows only.
 
 ## Status
 
-Current milestone: [docs/milestones/m2-shell.md](docs/milestones/m2-shell.md), the Tauri shell, sidecar and live worktree view. Milestone 1, [the spike for the repo snapshot and agent leftover rules](docs/milestones/m1-spike.md), is done.
+Milestone 2, [the Tauri shell, sidecar and live worktree view](docs/milestones/m2-shell.md), is done. The next one, milestone 3 (safe cleanup with backup tags and undo, see the brief), has no milestone doc yet. Milestone 1, [the spike for the repo snapshot and agent leftover rules](docs/milestones/m1-spike.md), is done.
 
 ## Docs
 
 - [docs/brief.md](docs/brief.md): what Diffract is, locked decisions, architecture
-- [docs/milestones/m2-shell.md](docs/milestones/m2-shell.md): current milestone, scope and acceptance criteria
+- [docs/milestones/m2-shell.md](docs/milestones/m2-shell.md): milestone 2 (done), scope and acceptance criteria
 - [docs/milestones/m1-spike.md](docs/milestones/m1-spike.md): milestone 1 (done), scope and acceptance criteria
 - [docs/findings/agent-leftovers.md](docs/findings/agent-leftovers.md): what Claude Code and Copilot really leave behind in a repo
 - [docs/findings/winget.md](docs/findings/winget.md): how Diffract asks winget about Git for Windows

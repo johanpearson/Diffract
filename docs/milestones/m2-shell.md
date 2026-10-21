@@ -1,6 +1,6 @@
 # Milestone 2: Tauri shell, sidecar and live worktree view
 
-**Status:** in progress
+**Status:** done (2026-10-21)
 **Estimate:** 2 to 3 weeks of evenings.
 **Done when:** an installed build runs on Johan's machine, shows the worktrees and leftovers of a repo he opens, and updates live while an agent works in it.
 
@@ -163,6 +163,8 @@ Tests: Vitest and Testing Library for components, against the contract samples. 
 
 **Checkpoint:** Johan uses the installed build for a few days and signs off.
 
+**Done** 2026-10-21, signed off by Johan without the few days of use. He had installed each phase's build and tried it, and the app does too little yet to fill days of use: the real test is dogfooding, after milestone 5. Not checked on his laptop, and waived: a file change timed in the view (the sidecar alone measured 0.6 seconds in phase 3), and killing the sidecar of the installed app (tested with a simulated stop).
+
 ## Dependencies
 
 Approved in phase 0, and added to the pre-approved lists in `AGENTS.md`. Versions are the current major versions on 2026-10-20. The lockfiles (`package-lock.json`, `Cargo.lock`) pin the exact versions.
@@ -187,16 +189,16 @@ No UI component library and no state library. The view is small enough without t
 
 ## Acceptance criteria
 
-- [ ] `dotnet test`, the UI tests, the Playwright tests and `cargo test` pass locally and in CI on `windows-latest`.
-- [ ] CI builds an NSIS installer as an artifact on every run.
-- [ ] Every JSON-RPC method and notification has a contract sample that both the C# and the TypeScript tests use.
-- [ ] A test proves the sidecar never creates a writable `GitRunner`.
-- [ ] Each kind of change in the phase 3 table refreshes only its part, and a test checks its git call budget.
-- [ ] A refresh never triggers another refresh.
-- [ ] On Johan's laptop, a file change in a worktree shows in the view within 2 seconds of the last write.
-- [ ] Killing the sidecar process shows a message and the app recovers by itself.
-- [ ] Git for Windows is only ever updated after the user confirms.
-- [ ] Johan has used the installed build for a few days and signs off.
+- [x] `dotnet test`, the UI tests, the Playwright tests and `cargo test` pass locally and in CI on `windows-latest`.
+- [x] CI builds an NSIS installer as an artifact on every run.
+- [x] Every JSON-RPC method and notification has a contract sample that both the C# and the TypeScript tests use.
+- [x] A test proves the sidecar never creates a writable `GitRunner`.
+- [x] Each kind of change in the phase 3 table refreshes only its part, and a test checks its git call budget.
+- [x] A refresh never triggers another refresh.
+- [x] On Johan's laptop, a file change in a worktree shows in the view within 2 seconds of the last write. Waived: measured in the sidecar only, 0.6 seconds.
+- [x] Killing the sidecar process shows a message and the app recovers by itself. Waived: tested with a simulated stop only.
+- [x] Git for Windows is only ever updated after the user confirms.
+- [x] Johan has used the installed build for a few days and signs off. Waived: signed off on 2026-10-21 after trying each phase's build.
 
 ## Out of scope for milestone 2
 
