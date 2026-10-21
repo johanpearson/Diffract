@@ -67,7 +67,23 @@ internal sealed record LeftoverSummary(int Total, int SafeToRemove, int NeedsRev
 internal sealed record RepoChanged(IReadOnlyList<RepoChange> Changes, RepoState State);
 
 /// <param name="Path">The worktree, for changes that belong to one. Null otherwise.</param>
-internal sealed record RepoChange(ChangeKind Kind, string? Path);
+internal sealed record RepoChange(ChangeKind Kind, string? Path)
+{
+    public static IReadOnlyList<RepoChange> From(ChangeSet changes)
+    {
+        if (changes.Everything)
+            return [new RepoChange(ChangeKind.Everything, null)];
+
+        List<RepoChange> list = [];
+        if (changes.WorktreeList)
+            list.Add(new RepoChange(ChangeKind.WorktreeList, null));
+        if (changes.Refs)
+            list.Add(new RepoChange(ChangeKind.Refs, null));
+        list.AddRange(changes.WorktreeHeads.Order(StringComparer.OrdinalIgnoreCase).Select(p => new RepoChange(ChangeKind.WorktreeHead, p)));
+        list.AddRange(changes.WorktreeFiles.Order(StringComparer.OrdinalIgnoreCase).Select(p => new RepoChange(ChangeKind.WorktreeFiles, p)));
+        return list;
+    }
+}
 
 /// <summary>What a change refreshed. One per row of the table in the milestone 2 doc, phase 3.</summary>
 internal enum ChangeKind

@@ -8,7 +8,7 @@ namespace Diffract.Git.Snapshot;
 /// Builds a <see cref="RepoSnapshot"/> using only read-only git commands and file timestamps.
 /// Independent git calls run in parallel.
 /// </summary>
-public sealed class RepoSnapshotBuilder
+public sealed partial class RepoSnapshotBuilder
 {
     private const string Heads = "refs/heads/";
     private const string Remotes = "refs/remotes/";
@@ -116,6 +116,12 @@ public sealed class RepoSnapshotBuilder
         CallContext call, string repoPath, Task<IReadOnlyList<WorktreeEntry>> worktreesTask, CancellationToken ct)
     {
         var worktrees = await worktreesTask.ConfigureAwait(false);
+        return await ListStashesAsync(call, repoPath, worktrees.Select(w => (w.Path, w.IsBare, w.IsPrunable)), ct).ConfigureAwait(false);
+    }
+
+    private static async Task<IReadOnlyList<StashEntry>> ListStashesAsync(
+        CallContext call, string repoPath, IEnumerable<(string Path, bool IsBare, bool IsPrunable)> worktrees, CancellationToken ct)
+    {
         var bare = worktrees.Where(w => w.IsBare).Select(w => NormalizePath(w.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var workingDirectory = !bare.Contains(repoPath)
             ? repoPath
@@ -362,18 +368,7 @@ public sealed class RepoSnapshotBuilder
             records is not null && GitDirectory.ReadGitFileLink(folder) is { } link
             && string.Equals(Path.GetDirectoryName(link), records, StringComparison.OrdinalIgnoreCase);
 
-        var patterns = _options.WorktreeContainerPatterns;
-        var containers = patterns.Count == 0 ? [] : worktrees.Skip(1)
-            .Select(w => Path.GetDirectoryName(w.Path))
-            .OfType<string>()
-            .Concat(patterns
-                .Select(p => p.StartsWith("**/", StringComparison.Ordinal) ? p[3..] : null)
-                .Where(p => p is not null && p.IndexOfAny(['*', '?']) < 0)
-                .Select(p => NormalizePath(Path.Combine(repoRoot, p!))))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(c => Directory.Exists(c) && GlobMatcher.IsMatchAny(patterns, c, ignoreCase: true));
-
-        var inContainers = containers
+        var inContainers = WorktreeContainers(worktrees, _options.WorktreeContainerPatterns)
             .SelectMany(SubfoldersOf)
             .Where(d => !registered.Contains(d) && (!GitDirectory.HasGitEntry(d) || WasWorktree(d)));
         var nextToRepo = (Path.GetDirectoryName(repoRoot) is { } parent ? SubfoldersOf(parent) : [])
@@ -384,6 +379,27 @@ public sealed class RepoSnapshotBuilder
             .Order(StringComparer.OrdinalIgnoreCase)
             .Select(d => new LeftoverFolderInfo(d, HoldsNoFiles(d), WasWorktree(d)))
             .ToList();
+    }
+
+    /// <summary>
+    /// Folders that hold worktrees: the parent folders of linked worktrees, plus pattern paths with no wildcards
+    /// below the repo root (such as .claude/worktrees). Only existing folders that match a pattern count.
+    /// </summary>
+    public static IReadOnlyList<string> WorktreeContainers(IReadOnlyList<WorktreeInfo> worktrees, IReadOnlyList<string> patterns)
+    {
+        if (patterns.Count == 0)
+            return [];
+
+        var repoRoot = worktrees[0].Path;
+        return [.. worktrees.Skip(1)
+            .Select(w => Path.GetDirectoryName(w.Path))
+            .OfType<string>()
+            .Concat(patterns
+                .Select(p => p.StartsWith("**/", StringComparison.Ordinal) ? p[3..] : null)
+                .Where(p => p is not null && p.IndexOfAny(['*', '?']) < 0)
+                .Select(p => NormalizePath(Path.Combine(repoRoot, p!))))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(c => Directory.Exists(c) && GlobMatcher.IsMatchAny(patterns, c, ignoreCase: true))];
     }
 
     // <git dir>/worktrees, where git keeps one record folder per linked worktree.

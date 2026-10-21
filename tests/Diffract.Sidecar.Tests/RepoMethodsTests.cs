@@ -13,17 +13,29 @@ public sealed class RepoMethodsTests : IDisposable
 {
     private readonly TempDirectory _temp = new();
     private readonly FakeTimeProvider _time = new(FixtureRepoBuilder.DefaultNow);
+    private readonly List<SidecarMethods> _created = [];
 
-    public void Dispose() => _temp.Dispose();
+    public void Dispose()
+    {
+        // Open repos are watched; stop that before their folders are deleted.
+        foreach (var methods in _created)
+            methods.Dispose();
+        _temp.Dispose();
+    }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private SidecarMethods Methods(string gitExecutable = "git") => new(new GitRunnerOptions
+    private SidecarMethods Methods(string gitExecutable = "git")
     {
-        Environment = IsolatedGit.Environment(_temp),
-        GitExecutable = gitExecutable,
-        TimeProvider = _time,
-    });
+        var methods = new SidecarMethods(new GitRunnerOptions
+        {
+            Environment = IsolatedGit.Environment(_temp),
+            GitExecutable = gitExecutable,
+            TimeProvider = _time,
+        });
+        _created.Add(methods);
+        return methods;
+    }
 
     private Task<string> ScenarioAsync(string name) =>
         new FixtureRepoBuilder(_temp).BuildAsync(name).ContinueWith(t => t.Result.RepoPath, TaskScheduler.Default);
