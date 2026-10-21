@@ -41,7 +41,7 @@ The full visual plan, with a clickable prototype of every main view, is in `visu
 | Conflict labels | "On main" and "Your commit", never ours and theirs |
 | Repo settings in v1 | Line endings, default branch, identity, commit signing, pull strategy, prune on fetch, .gitignore templates |
 | Code signing | Unsigned for now |
-| Start dogfooding | After milestone 5 |
+| Start dogfooding | After changes and commit (milestone 4 since the reorder on 2026-10-21) |
 
 ## Architecture
 
@@ -80,7 +80,7 @@ diffract/
 ├─ sidecar/
 │  ├─ Diffract.Sidecar/           JSON-RPC host (milestone 2)
 │  ├─ Diffract.Git/               GitRunner, parsers, snapshot builder (milestone 1)
-│  ├─ Diffract.Leftovers/         rules and config (milestone 1), cleanup (milestone 3)
+│  ├─ Diffract.Leftovers/         rules and config (milestone 1), cleanup (milestone 5)
 │  └─ Diffract.Operations/        merge and rebase sessions (milestones 7 and 8)
 ├─ tools/
 │  └─ Diffract.Spike/             console app for milestone 1
@@ -96,12 +96,14 @@ diffract/
 
 1. **Spike: snapshot and rules.** Console app that classifies leftovers in any repo. (Done)
 2. Tauri shell, sidecar and live worktree view. Includes "Open terminal here" for the repo and each worktree (Windows Terminal, falling back to PowerShell), and a git version check at startup that offers to update Git for Windows through winget when git is older than 2.40 or a newer release exists. The update only runs after the user confirms. (Done)
-3. Safe cleanup with backup tags and undo.
-4. History graph. History becomes the view a repo opens on, because using a repo comes first and cleanup second. Opening a repo shows history and status first; the leftover scan, `git fsck` included, runs in the background and never makes the user wait.
-5. Changes and commit. *Checkpoint: start dogfooding.*
+3. History graph. History becomes the view a repo opens on, because using a repo comes first and cleanup second. Opening a repo shows history and status first; the leftover scan, `git fsck` included, runs in the background and never makes the user wait.
+4. Changes and commit. *Checkpoint: start dogfooding.*
+5. Safe cleanup with backup tags and undo.
 6. Repo setup and settings.
 7. Merge and conflict resolution.
 8. Interactive rebase. *v1.*
 9. Visual experiments. Includes trying a terminal embedded in the app.
+
+On 2026-10-21 Johan moved history and changes ahead of cleanup, which was milestone 3: Diffract becomes something he uses every day once it can replace Git Extensions for daily work, and that comes before cleaning up.
 
 Each milestone may revisit how earlier views feel and perform, as new views change what matters most. Changes like that are proposed in the milestone's PR, as any other change to the plan.
