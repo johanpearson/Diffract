@@ -55,14 +55,18 @@ jobs:
 
       # --- Tauri app and installer -------------------------------------------
 
-      - name: Cache Rust build
-        uses: actions/cache@v4
+      # GitHub scopes caches by branch: a PR can read main's cache, but not another PR's.
+      # So only main saves one. PRs restore it and never spend time and quota saving their own.
+      # The key includes Cargo.toml, because a profile change makes every cached crate useless.
+      - name: Restore the Rust build cache
+        id: cargo-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             src-tauri/target
-          key: cargo-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
           restore-keys: cargo-${{ runner.os }}-
 
       - name: Build the app and installer
@@ -73,6 +77,16 @@ jobs:
       - name: Test the Rust core
         working-directory: src-tauri
         run: cargo test --release --locked
+
+      - name: Save the Rust build cache
+        if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
       - name: Upload the installer
         uses: actions/upload-artifact@v4
