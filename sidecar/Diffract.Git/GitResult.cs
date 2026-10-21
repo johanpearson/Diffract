@@ -2,13 +2,18 @@ using System.Text;
 
 namespace Diffract.Git;
 
-public sealed record GitResult(
-    IReadOnlyList<string> Arguments,
-    int ExitCode,
-    byte[] StandardOutputBytes,
-    string StandardError,
-    TimeSpan Duration)
+/// <summary>A git call that ran to the end, with all of its output.</summary>
+/// <param name="Run">How the process ended. A buffered call is never stopped early, so it always has an exit code.</param>
+public sealed record GitResult(GitStreamResult Run, byte[] StandardOutputBytes)
 {
+    public IReadOnlyList<string> Arguments => Run.Arguments;
+
+    public int ExitCode => Run.ExitCode ?? throw new InvalidOperationException("A buffered git call always runs to the end.");
+
+    public string StandardError => Run.StandardError;
+
+    public TimeSpan Duration => Run.Duration;
+
     public string StandardOutput { get; } = Encoding.UTF8.GetString(StandardOutputBytes);
 }
 

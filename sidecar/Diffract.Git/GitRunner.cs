@@ -29,7 +29,7 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
             await output.CopyToAsync(buffer, token).ConfigureAwait(false);
             return true;
         }, allowedExitCodes, ct).ConfigureAwait(false);
-        return new GitResult(args, result.ExitCode!.Value, buffer.ToArray(), result.StandardError, result.Duration);
+        return new GitResult(result, buffer.ToArray());
     }
 
     /// <summary>

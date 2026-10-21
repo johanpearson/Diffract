@@ -34,34 +34,42 @@ public static class ReadOnlyPolicy
         return reason.Length == 0;
     }
 
-    private static string? Check(IReadOnlyList<string> args)
-    {
-        if (args.Count == 0)
-            return "no subcommand";
+    private static string? Check(IReadOnlyList<string> args) =>
+        args.Count == 0 ? "no subcommand" : CheckAnySubcommand(args) ?? CheckSubcommand(args);
 
-        var subcommand = args[0];
-        if (subcommand.StartsWith('-'))
+    /// <summary>Writes that are possible whatever the subcommand.</summary>
+    private static string? CheckAnySubcommand(IReadOnlyList<string> args)
+    {
+        if (args[0].StartsWith('-'))
             return "options before the subcommand are not allowed";
 
         // `log --output=<file>` writes a file.
-        if (args.Any(a => a == "--output" || a.StartsWith("--output=", StringComparison.Ordinal)))
+        if (args.Any(IsOutputOption))
             return "--output writes a file";
 
-        if (subcommand == "fsck" && args.Contains("--lost-found"))
-            return "fsck --lost-found writes to .git/lost-found";
+        return args[0] == "fsck" && args.Contains("--lost-found") ? "fsck --lost-found writes to .git/lost-found" : null;
+    }
 
+    private static bool IsOutputOption(string arg) => arg == "--output" || arg.StartsWith("--output=", StringComparison.Ordinal);
+
+    private static string? CheckSubcommand(IReadOnlyList<string> args)
+    {
+        var subcommand = args[0];
         if (AnyArguments.Contains(subcommand))
             return null;
 
         return subcommand switch
         {
-            "worktree" or "stash" => args.Count > 1 && args[1] == "list" ? null : $"only '{subcommand} list' is allowed",
+            "worktree" or "stash" => CheckList(args),
             "reflog" => CheckReflog(args),
             "config" => CheckConfig(args),
             "symbolic-ref" => CheckSymbolicRef(args),
             _ => $"'{subcommand}' is not on the read-only allowlist",
         };
     }
+
+    private static string? CheckList(IReadOnlyList<string> args) =>
+        args.Count > 1 && args[1] == "list" ? null : $"only '{args[0]} list' is allowed";
 
     // `git reflog` with no subcommand, or followed by an option, means `reflog show`.
     private static string? CheckReflog(IReadOnlyList<string> args) =>
