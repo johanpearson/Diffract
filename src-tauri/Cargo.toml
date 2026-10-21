@@ -11,6 +11,7 @@ tauri-build = { version = "2.7", features = [] }
 [dependencies]
 tauri = { version = "2.12", features = [] }
 tauri-plugin-shell = "2.5"
+tauri-plugin-dialog = "2"
 
 # No link-time optimization: with it, every build re-optimizes all of Tauri at the final link,
 # which took 2.5 minutes in CI even with a warm cache. The installer is a little bigger without it.
