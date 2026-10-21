@@ -26,6 +26,8 @@ public class ReadOnlyPolicyTests
     [InlineData("symbolic-ref -q --short refs/remotes/origin/HEAD")]
     [InlineData("cat-file -t HEAD")]
     [InlineData("show-ref --verify refs/heads/main")]
+    [InlineData("diff-tree -r -z --always --root --raw --numstat HEAD")]
+    [InlineData("cat-file blob 0123456789abcdef0123456789abcdef01234567")]
     public void Allows_reads(string commandLine)
     {
         Assert.True(ReadOnlyPolicy.IsAllowed(commandLine.Split(' '), out var reason), reason);
@@ -64,6 +66,7 @@ public class ReadOnlyPolicyTests
     [InlineData("symbolic-ref -m reason HEAD")]
     [InlineData("log --output=out.txt")]
     [InlineData("log --output out.txt")]
+    [InlineData("diff-tree --output=out.txt HEAD")]
     [InlineData("fsck --lost-found")]
     [InlineData("-c core.editor=x status")]
     [InlineData("--git-dir=. status")]
