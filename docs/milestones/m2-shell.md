@@ -6,7 +6,7 @@
 
 This is the first milestone with a UI. It wraps the milestone 1 libraries in a sidecar process, puts a Tauri app in front of it, and keeps the view current while files and refs change.
 
-Everything in this milestone is still **read-only against real repos**. Cleanup actions come in milestone 3. The only things Diffract starts that are not read-only git calls are a terminal (when you ask for one) and a Git for Windows update through winget (only after you confirm it). See the safety rules in `AGENTS.md`.
+Everything in this milestone is still **read-only against real repos**. Cleanup actions come in a later milestone (5, after the reorder on 2026-10-21). The only things Diffract starts that are not read-only git calls are a terminal (when you ask for one) and a Git for Windows update through winget (only after you confirm it). See the safety rules in `AGENTS.md`.
 
 ## What milestone 1 taught us
 
@@ -123,7 +123,7 @@ The read-only version of the "Worktrees and agents" view in `docs/visual-plan.ht
 - **Open a repo** with a folder dialog. The last opened repo opens again on start. One repo per window in this milestone.
 - **Sidebar:** the repo's worktrees with branch, and dirty or active state. A "Leftovers" entry with the count of everything that is not "In use".
 - **Main view:** three summary counts (safe, needs review, in use), filter chips, and one row per leftover. Each row shows name, kind, agent hint, reason, path when there is one, commits at risk ("-" when it cannot be counted), and the verdict.
-- **Row actions:** "Open folder" for worktrees and folders that exist. "Open terminal here" arrives in phase 5. There are no cleanup buttons or checkboxes yet. Milestone 3 adds them.
+- **Row actions:** "Open folder" for worktrees and folders that exist. "Open terminal here" arrives in phase 5. There are no cleanup buttons or checkboxes yet. The cleanup milestone adds them.
 - **Live:** rows that appear, change verdict or disappear are briefly highlighted. A small status line shows when the snapshot was taken, and when unreachable commits were last counted.
 - **Errors** are shown in the view in plain English, with a retry button. Examples: the sidecar crashed and was restarted, the folder is not a repo, git is too old.
 - Dark and light theme following Windows. Keyboard reachable.
@@ -132,7 +132,7 @@ Rust core: restarts the sidecar if it exits unexpectedly, at most 3 times a minu
 
 Tests: Vitest and Testing Library for components, against the contract samples. Playwright runs the built UI in a browser against a fake sidecar transport and checks: open a repo, see the rows, filter, receive a `repo.changed` and see the row update. Rust unit tests cover the line framing and the restart policy.
 
-**Done** 2026-10-21 in #21. Johan installed the CI build and tried it. "Commits at risk" can now be unknown, shown as "-", and "Open folder" is the sidecar method `system.openFolder`. Opening a busy repo takes a few seconds, mostly `git fsck`. Johan decided that this is fixed in milestone 4, when History becomes the start view (see the brief).
+**Done** 2026-10-21 in #21. Johan installed the CI build and tried it. "Commits at risk" can now be unknown, shown as "-", and "Open folder" is the sidecar method `system.openFolder`. Opening a busy repo takes a few seconds, mostly `git fsck`. Johan decided that this is fixed when History becomes the start view, now milestone 3 (see the brief).
 
 ## Phase 5: Open terminal here
 
@@ -163,7 +163,7 @@ Tests: Vitest and Testing Library for components, against the contract samples. 
 
 **Checkpoint:** Johan uses the installed build for a few days and signs off.
 
-**Done** 2026-10-21, signed off by Johan without the few days of use. He had installed each phase's build and tried it, and the app does too little yet to fill days of use: the real test is dogfooding, after milestone 5. Not checked on his laptop, and waived: a file change timed in the view (the sidecar alone measured 0.6 seconds in phase 3), and killing the sidecar of the installed app (tested with a simulated stop).
+**Done** 2026-10-21, signed off by Johan without the few days of use. He had installed each phase's build and tried it, and the app does too little yet to fill days of use: the real test is dogfooding, after changes and commit. Not checked on his laptop, and waived: a file change timed in the view (the sidecar alone measured 0.6 seconds in phase 3), and killing the sidecar of the installed app (tested with a simulated stop).
 
 ## Dependencies
 

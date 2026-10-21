@@ -6,7 +6,7 @@ Personal project. Windows only.
 
 ## Status
 
-Milestone 2, [the Tauri shell, sidecar and live worktree view](docs/milestones/m2-shell.md), is done. The next one, milestone 3 (safe cleanup with backup tags and undo, see the brief), has no milestone doc yet. Milestone 1, [the spike for the repo snapshot and agent leftover rules](docs/milestones/m1-spike.md), is done.
+Milestone 2, [the Tauri shell, sidecar and live worktree view](docs/milestones/m2-shell.md), is done. The next one, milestone 3 (the history graph, see the brief), has no milestone doc yet. Safe cleanup moved to milestone 5 and is planned in [docs/milestones/m5-cleanup.md](docs/milestones/m5-cleanup.md). Milestone 1, [the spike for the repo snapshot and agent leftover rules](docs/milestones/m1-spike.md), is done.
 
 ## Docs
 
