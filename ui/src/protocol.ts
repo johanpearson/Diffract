@@ -77,14 +77,6 @@ export interface GitUpdateResult {
   inUse: GitInUse[];
 }
 
-/** Downloading lasts until Git for Windows' installer starts. Installing is the installer running. */
-export const gitUpdateStages = ["Downloading", "Installing"] as const;
-export type GitUpdateStage = (typeof gitUpdateStages)[number];
-
-/** Params of the `git.updateProgress` notification, sent while `git.update` runs, when the stage changes. */
-export interface GitUpdateProgress {
-  stage: GitUpdateStage;
-}
 
 /** Result of `app.info`. */
 export interface AppInfo {
@@ -210,5 +202,4 @@ export interface Methods {
 /** Every notification the sidecar sends, with its params. */
 export interface Notifications {
   "repo.changed": RepoChanged;
-  "git.updateProgress": GitUpdateProgress;
 }

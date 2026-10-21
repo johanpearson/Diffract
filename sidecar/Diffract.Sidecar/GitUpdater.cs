@@ -13,36 +13,13 @@ internal enum GitUpdateOutcome { Updated, RestartNeeded, Failed }
 /// <param name="InUse">When git was in use and that stopped the update: the programs using it. Empty otherwise.</param>
 internal sealed record GitUpdateResult(GitUpdateOutcome Outcome, string Message, IReadOnlyList<GitInUse> InUse);
 
-/// <summary>Downloading lasts until Git for Windows' installer starts. Installing is the installer running.</summary>
-internal enum GitUpdateStage { Downloading, Installing }
-
-/// <summary>The params of the <c>git.updateProgress</c> notification, sent when the stage changes.</summary>
-internal sealed record GitUpdateProgress(GitUpdateStage Stage);
-
 /// <summary>
 /// Updates Git for Windows through winget, to exactly the version the user confirmed. Plan, then apply: winget is
 /// asked again first, and nothing is installed unless it still offers that version over the git Diffract uses.
 /// </summary>
-/// <param name="progress">Sends <c>git.updateProgress</c> to the app.</param>
 /// <param name="selfId">The sidecar's process id, so its own git calls never count as git in use.</param>
-/// <param name="wingetDownloads">Where winget puts installers. A program running from there is the installer.</param>
-internal sealed class GitUpdater(
-    GitUpdateChecker checker,
-    ICommandRunner commands,
-    IProcessTable processes,
-    MachineLayout machine,
-    TimeProvider time,
-    Func<GitUpdateProgress, Task> progress,
-    int? selfId = null,
-    string? wingetDownloads = null)
+internal sealed class GitUpdater(GitUpdateChecker checker, ICommandRunner commands, IProcessTable processes, MachineLayout machine, int? selfId = null)
 {
-    /// <summary>
-    /// winget prints no progress when its output is redirected, so the stage comes from the process list instead.
-    /// See docs/findings/winget.md.
-    /// </summary>
-    public static TimeSpan PollInterval { get; } = TimeSpan.FromSeconds(1);
-
-    private readonly string _downloads = Path.TrimEndingDirectorySeparator(wingetDownloads ?? Path.Combine(Path.GetTempPath(), "WinGet")) + Path.DirectorySeparatorChar;
     private int _running;
 
     /// <summary>While true, Diffract starts no git of its own: the installer refuses to replace git while it runs.</summary>
@@ -80,7 +57,10 @@ internal sealed class GitUpdater(
             CommandResult result;
             try
             {
-                result = await UpgradeAsync(checker.FindWinget()!, version).ConfigureAwait(false);
+                // No progress to show: winget prints none when its output is redirected, and the installer shows
+                // its own window. See docs/findings/winget.md.
+                result = await commands.RunAsync(checker.FindWinget()!, UpgradeArguments(version), Timeout.InfiniteTimeSpan, CancellationToken.None)
+                    .ConfigureAwait(false);
             }
             catch (Win32Exception e)
             {
@@ -93,31 +73,6 @@ internal sealed class GitUpdater(
             Volatile.Write(ref _running, 0);
         }
     }
-
-    /// <summary>Runs winget upgrade, and says when the installer starts.</summary>
-    private async Task<CommandResult> UpgradeAsync(string winget, string version)
-    {
-        var upgrade = commands.RunAsync(winget, UpgradeArguments(version), Timeout.InfiniteTimeSpan, CancellationToken.None);
-        await progress(new GitUpdateProgress(GitUpdateStage.Downloading)).ConfigureAwait(false);
-
-        using var done = new CancellationTokenSource();
-        var installing = false;
-        while (!upgrade.IsCompleted)
-        {
-            var tick = Task.Delay(PollInterval, time, done.Token);
-            await Task.WhenAny(upgrade, tick).ConfigureAwait(false);
-            if (!upgrade.IsCompleted && !installing && InstallerRunning())
-            {
-                installing = true;
-                await progress(new GitUpdateProgress(GitUpdateStage.Installing)).ConfigureAwait(false);
-            }
-        }
-        await done.CancelAsync().ConfigureAwait(false);
-        return await upgrade.ConfigureAwait(false);
-    }
-
-    private bool InstallerRunning() =>
-        processes.Snapshot().Any(p => p.Path?.StartsWith(_downloads, StringComparison.OrdinalIgnoreCase) == true);
 
     /// <summary>What winget's exit code means for the user. The codes are listed in docs/findings/winget.md.</summary>
     /// <param name="inUse">Asked only when the installer stopped, to name the programs that were using git.</param>

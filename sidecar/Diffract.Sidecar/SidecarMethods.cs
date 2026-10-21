@@ -47,9 +47,7 @@ internal sealed class SidecarMethods : IDisposable
         _terminal = new TerminalLauncher(_processes, machine);
         commands ??= new CommandRunner(RunnerOptions.TimeProvider);
         _updates = new GitUpdateChecker(commands, machine);
-        _updater = new GitUpdater(
-            _updates, commands, running ?? new ProcessTable(), machine, RunnerOptions.TimeProvider,
-            progress => notify("git.updateProgress", Result(progress)));
+        _updater = new GitUpdater(_updates, commands, running ?? new ProcessTable(), machine);
         _repos = new RepoSessions(
             RunnerOptions,
             config ?? DiffractConfig.Default,

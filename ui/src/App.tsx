@@ -208,13 +208,6 @@ export function App({ host, client, clock = systemClock }: Props) {
     }
   }, [client, info, checkForUpdate, refresh]);
 
-  const checkNow = useCallback(async () => {
-    const answer = await checkForUpdate(info?.gitVersion ?? null, true);
-    if (!answer) setNotice("Could not check for a newer Git for Windows.");
-    else if (answer.status === "UpToDate") setNotice(`Git for Windows ${answer.installedVersion ?? ""} is up to date.`);
-    else if (answer.status === "Unknown") setNotice(answer.problem ?? "Could not check for a newer Git for Windows.");
-    else setDeclined(null);
-  }, [checkForUpdate, info]);
 
   const openDownloadPage = useCallback(() => {
     client.call("git.openDownloadPage", undefined).catch((error: unknown) => setNotice(messageOf(error)));
@@ -254,11 +247,6 @@ export function App({ host, client, clock = systemClock }: Props) {
             git {info.gitVersion ?? "not found"} · sidecar {info.sidecarVersion}
           </span>
         )}
-        {info && (
-          <button className="abtn small" onClick={() => void checkNow()} disabled={git.checking || git.running}>
-            {git.checking ? "Checking…" : "Check for git updates"}
-          </button>
-        )}
         <button
           className="abtn"
           onClick={() => void pickAndOpen()}
@@ -269,17 +257,16 @@ export function App({ host, client, clock = systemClock }: Props) {
         </button>
       </header>
 
-      {git.run && (
+      {git.result && (
         <GitUpdateBar
-          run={git.run}
-          clock={clock}
-          onTryAgain={() => git.askToUpdate(git.run!.version)}
+          result={git.result}
+          onTryAgain={offered ? () => git.askToUpdate(offered) : null}
           onDownloadPage={openDownloadPage}
-          onDismiss={git.dismissRun}
+          onDismiss={git.dismissResult}
         />
       )}
 
-      {offered && info?.gitSupported && declined !== offered && !git.run && (
+      {offered && info?.gitSupported && declined !== offered && !git.result && !git.running && (
         <div className="notice quiet" role="status">
           <span>
             Git for Windows {offered} is available. You have {git.check?.installedVersion}.

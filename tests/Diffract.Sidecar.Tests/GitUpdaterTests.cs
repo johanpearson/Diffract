@@ -3,7 +3,6 @@ using System.Text.Json;
 using Diffract.Fixtures;
 using Diffract.Git;
 using Diffract.Sidecar.Rpc;
-using Microsoft.Extensions.Time.Testing;
 
 namespace Diffract.Sidecar.Tests;
 
@@ -30,11 +29,8 @@ public sealed class GitUpdaterTests : IDisposable
     private static FakeCommands Answering(int upgradeExitCode = 0, string list = "winget-list-git-update-available.txt") =>
         new((_, args) => args[0] == "list" ? new CommandResult(0, Sample(list)) : new CommandResult(upgradeExitCode, ""));
 
-    private const string Downloads = @"C:\Users\johan\AppData\Local\Temp\WinGet";
-
-    private static GitUpdater Updater(FakeCommands commands, FakeProcessTable? table = null, List<GitUpdateStage>? stages = null, TimeProvider? time = null) =>
-        new(new GitUpdateChecker(commands, Machine), commands, table ?? new FakeProcessTable(), Machine, time ?? TimeProvider.System,
-            p => { stages?.Add(p.Stage); return Task.CompletedTask; }, selfId: 1, wingetDownloads: Downloads);
+    private static GitUpdater Updater(FakeCommands commands) =>
+        new(new GitUpdateChecker(commands, Machine), commands, new FakeProcessTable(), Machine, selfId: 1);
 
     private static IEnumerable<string> Subcommands(FakeCommands commands) => commands.Ran.Select(r => r.Arguments[0]);
 
@@ -173,34 +169,16 @@ public sealed class GitUpdaterTests : IDisposable
     }
 
     [Fact]
-    public async Task Says_downloading_first_and_installing_once_the_installer_runs()
+    public async Task Diffracts_own_git_waits_while_winget_runs_the_installer()
     {
-        var time = new FakeTimeProvider();
-        var table = new FakeProcessTable();
         var upgrade = new TaskCompletionSource<CommandResult>();
         var commands = FakeCommands.Async((_, args) => args[0] == "list"
             ? Task.FromResult(new CommandResult(0, Sample("winget-list-git-update-available.txt")))
             : upgrade.Task);
-        var stages = new List<GitUpdateStage>();
-        var updater = Updater(commands, table, stages, time);
+        var updater = Updater(commands);
 
         var update = updater.UpdateAsync(Git2471, "2.55.0.5", TestContext.Current.CancellationToken);
         Assert.True(updater.IsRunning);
-        Assert.Equal([GitUpdateStage.Downloading], stages);
-
-        // Polls with no installer running yet change nothing.
-        for (var i = 0; i < 3; i++)
-        {
-            time.Advance(GitUpdater.PollInterval);
-            await Task.Delay(20, TestContext.Current.CancellationToken);
-        }
-        Assert.Equal([GitUpdateStage.Downloading], stages);
-
-        table.Add(new ProcessInfo(40, 30, Downloads + @"\Git.Git.2.55.0.5\Git-2.55.0.5-64-bit.exe"));
-        await AdvanceUntil(time, () => stages.Count == 2);
-        time.Advance(GitUpdater.PollInterval);
-        await Task.Delay(20, TestContext.Current.CancellationToken);
-        Assert.Equal([GitUpdateStage.Downloading, GitUpdateStage.Installing], stages);
 
         upgrade.SetResult(new CommandResult(0, ""));
         Assert.Equal(GitUpdateOutcome.Updated, (await update).Outcome);
@@ -208,26 +186,13 @@ public sealed class GitUpdaterTests : IDisposable
     }
 
     [Fact]
-    public async Task Nothing_is_sent_and_nothing_pauses_when_nothing_is_installed()
+    public async Task Nothing_pauses_when_nothing_is_installed()
     {
-        var stages = new List<GitUpdateStage>();
-        var updater = Updater(Answering(), stages: stages);
+        var updater = Updater(Answering());
 
         await updater.UpdateAsync(Git2471, "2.54.0.1", TestContext.Current.CancellationToken);
 
-        Assert.Empty(stages);
         Assert.False(updater.IsRunning);
-    }
-
-    /// <summary>Moves the fake clock a poll at a time until the updater has seen what the test waits for.</summary>
-    private static async Task AdvanceUntil(FakeTimeProvider time, Func<bool> done)
-    {
-        for (var i = 0; i < 100 && !done(); i++)
-        {
-            time.Advance(GitUpdater.PollInterval);
-            await Task.Delay(20, TestContext.Current.CancellationToken);
-        }
-        Assert.True(done());
     }
 
     // --- through the protocol -----------------------------------------------------

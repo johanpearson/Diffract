@@ -3,14 +3,12 @@ import {
   terminalKinds,
   errorKinds,
   gitUpdateOutcomes,
-  gitUpdateStages,
   gitUpdateStatuses,
   leftoverKinds,
   verdicts,
   type AppInfo,
   type GitInUse,
   type GitUpdateCheck,
-  type GitUpdateProgress,
   type GitUpdateResult,
   type Leftover,
   type LeftoverFolderInfo,
@@ -110,7 +108,6 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {
   "repo.changed": object<RepoChanged>({ changes: arrayOf(repoChange), state: repoState }),
-  "git.updateProgress": object<GitUpdateProgress>({ stage: oneOf(gitUpdateStages) }),
 };
 
 export const responseShape = (result: Shape) => object<{ jsonrpc: string; id: number; result: unknown }>({ jsonrpc: string, id: number, result });

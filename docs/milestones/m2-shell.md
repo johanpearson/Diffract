@@ -78,7 +78,7 @@ JSON-RPC 2.0 over the sidecar's stdin and stdout.
 | `git.inUse` | none | the programs using Git for Windows right now, apart from Diffract (phase 6) |
 | `app.shutdown` | none | none, then the sidecar exits |
 
-- **Notifications from the sidecar:** `repo.changed` with `repoId`, what changed, the new snapshot summary and the new leftovers. The UI replaces its state with what it receives and animates the difference. `git.updateProgress` gives the stage of a running Git for Windows update (phase 6).
+- **Notifications from the sidecar:** `repo.changed` with `repoId`, what changed, the new snapshot summary and the new leftovers. The UI replaces its state with what it receives and animates the difference.
 - **Errors:** standard JSON-RPC error objects. Diffract's own errors get codes and a `data.kind` that matches the exception: not a repo, git too old, git failed, timed out, config invalid. The message is the plain-English one the spike already prints.
 - **Requests run concurrently**, and each has its own cancellation. `$/cancelRequest` with the request id cancels it, as in LSP.
 - The sidecar only ever builds read-only `GitRunner`s. A test proves no code path in `Diffract.Sidecar` creates a writable one.
@@ -153,7 +153,7 @@ Tests: Vitest and Testing Library for components, against the contract samples. 
 
 **Checkpoint:** Johan reviews how the update check works before it is wired into the UI.
 
-The spike's result, and how the update runs, are in `docs/findings/winget.md`. At the checkpoint on 2026-10-21 (#25), Johan chose to read `winget list` with its exit code over installing the `Microsoft.WinGet.Client` module. He agreed that the update accepts the Git for Windows license with `--accept-package-agreements`, which the confirm dialog says, and that Diffract offers the download page instead of an update when the git it uses is not the one winget manages.
+**Done** 2026-10-21 in #25 and #26. Johan updated Git for Windows from 2.47.1 to 2.55.0.5 from the installed app. The spike's result, and how the update runs, are in `docs/findings/winget.md`. His first try failed because CodeScene in VS Code kept git busy, so the confirm dialog now lists the programs using git, and Diffract pauses its own git calls during the update. At his request there is no progress bar, no "check for updates" button and no "up to date" message: the installer shows its own window, and the new version shows in the top bar. At the checkpoint on 2026-10-21 (#25), Johan chose to read `winget list` with its exit code over installing the `Microsoft.WinGet.Client` module. He agreed that the update accepts the Git for Windows license with `--accept-package-agreements`, which the confirm dialog says, and that Diffract offers the download page instead of an update when the git it uses is not the one winget manages.
 
 ## Phase 7: real-world check
 

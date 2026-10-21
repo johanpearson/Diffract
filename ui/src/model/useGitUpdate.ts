@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
-import type { GitUpdateRun } from "../components/GitUpdateBar";
+import { useCallback, useState } from "react";
 import type { AppHost } from "../host";
 import type { GitInUse, GitUpdateCheck, GitUpdateResult } from "../protocol";
 import type { RpcClient } from "../rpc";
@@ -21,9 +20,11 @@ export interface GitUpdateConfirm {
  */
 export function useGitUpdate(client: RpcClient, host: AppHost, clock: () => Date) {
   const [check, setCheck] = useState<GitUpdateCheck | null>(null);
-  const [checking, setChecking] = useState(false);
   const [confirm, setConfirm] = useState<GitUpdateConfirm | null>(null);
-  const [run, setRun] = useState<GitUpdateRun | null>(null);
+  const [running, setRunning] = useState(false);
+  // Kept only when the user has something to do: the update failed, or Windows must restart. A good update shows
+  // in the git version in the top bar, and the installer shows its own window meanwhile.
+  const [result, setResult] = useState<GitUpdateResult | null>(null);
 
   /** `force` asks winget even when a recent answer is remembered. Null when winget could not be asked. */
   const checkForUpdate = useCallback(
@@ -33,7 +34,6 @@ export function useGitUpdate(client: RpcClient, host: AppHost, clock: () => Date
         setCheck(remembered);
         return remembered;
       }
-      setChecking(true);
       try {
         const answer = await client.call("git.checkUpdate", undefined);
         setCheck(answer);
@@ -42,8 +42,6 @@ export function useGitUpdate(client: RpcClient, host: AppHost, clock: () => Date
         return answer;
       } catch {
         return null;
-      } finally {
-        setChecking(false);
       }
     },
     [client, host, clock],
@@ -70,36 +68,32 @@ export function useGitUpdate(client: RpcClient, host: AppHost, clock: () => Date
   const update = useCallback(
     async (version: string, then: () => void) => {
       setConfirm(null);
-      setRun({ kind: "running", version, stage: "Downloading", startedAt: clock().getTime() });
-      let result: GitUpdateResult;
+      setResult(null);
+      setRunning(true);
+      let answer: GitUpdateResult;
       try {
-        result = await client.call("git.update", { version });
+        answer = await client.call("git.update", { version });
       } catch (error) {
-        result = { outcome: "Failed", message: error instanceof Error ? error.message : String(error), inUse: [] };
+        answer = { outcome: "Failed", message: error instanceof Error ? error.message : String(error), inUse: [] };
       }
-      setRun({ kind: "done", version, result });
+      setRunning(false);
+      if (answer.outcome !== "Updated") setResult(answer);
       then();
     },
-    [client, clock],
-  );
-
-  useEffect(
-    () => client.onNotification("git.updateProgress", ({ stage }) => setRun((r) => (r?.kind === "running" ? { ...r, stage } : r))),
     [client],
   );
 
   return {
     check,
-    checking,
     confirm,
-    run,
-    running: run?.kind === "running",
+    result,
+    running,
     checkForUpdate,
     askToUpdate,
     findUsers,
     cancelConfirm: () => setConfirm(null),
     update,
-    dismissRun: () => setRun(null),
+    dismissResult: () => setResult(null),
   };
 }
 

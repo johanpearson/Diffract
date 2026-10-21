@@ -44,7 +44,6 @@ public class ContractTests
         ["git.checkUpdate"] = () => Response(new GitUpdateCheck(GitUpdateStatus.UpdateAvailable, "2.47.1", "2.55.0.5", null, GitUpdateChecker.DownloadPage)),
         ["git.update"] = () => Response(GitUpdater.Outcome(unchecked((int)0x8A150006), "2.55.0.5", () => InUse)),
         ["git.inUse"] = () => Response(InUse),
-        ["git.updateProgress"] = () => Notification("git.updateProgress", new GitUpdateProgress(GitUpdateStage.Installing)),
         ["git.openDownloadPage"] = () => Response(RpcResponse.NullResult),
         ["app.shutdown"] = () => Response(RpcResponse.NullResult),
         ["repo.changed"] = () => Notification("repo.changed", new RepoChanged(
@@ -175,7 +174,6 @@ public class ContractTests
         ["terminalKind"] = Values<TerminalKind>(),
         ["gitUpdateStatus"] = Values<GitUpdateStatus>(),
         ["gitUpdateOutcome"] = Values<GitUpdateOutcome>(),
-        ["gitUpdateStage"] = Values<GitUpdateStage>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

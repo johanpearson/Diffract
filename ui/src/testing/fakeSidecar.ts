@@ -1,5 +1,5 @@
 import openSample from "../../../tests/Diffract.Sidecar.Tests/Contract/repo.open.json";
-import type { AppInfo, GitInUse, GitUpdateCheck, GitUpdateResult, GitUpdateStage, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
+import type { AppInfo, GitInUse, GitUpdateCheck, GitUpdateResult, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
 import { FakeTransport } from "./fakeTransport";
 
 /** The repo in the repo.open contract sample, which the sidecar's own tests write. */
@@ -63,11 +63,6 @@ export class FakeSidecar {
     const state = update(this.state(repoId));
     this.repos.set(state.repoRoot.toLowerCase(), state);
     this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "repo.changed", params: { changes, state } }));
-  }
-
-  /** Sends git.updateProgress, as the sidecar does while git.update runs. */
-  updateProgress(stage: GitUpdateStage): void {
-    this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "git.updateProgress", params: { stage } }));
   }
 
   release(): void {

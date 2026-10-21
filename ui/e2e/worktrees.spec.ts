@@ -146,6 +146,7 @@ test("offers a newer Git for Windows and installs it only after the user confirm
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Open a repo" })).toBeVisible();
 
+  // Forget the answer from the first start, then start over: with no repo open, a restart does that.
   await page.evaluate(() => {
     window.diffractTest.sidecar.gitUpdate = {
       status: "UpdateAvailable",
@@ -154,8 +155,9 @@ test("offers a newer Git for Windows and installs it only after the user confirm
       problem: null,
       downloadPage: "https://gitforwindows.org/",
     };
+    window.diffractTest.storage.clear();
+    window.diffractTest.sidecarEvent({ kind: "restarted" });
   });
-  await page.getByRole("button", { name: "Check for git updates" }).click();
   await page.getByRole("button", { name: "Update…" }).click();
 
   const dialog = page.getByRole("dialog");
@@ -164,11 +166,13 @@ test("offers a newer Git for Windows and installs it only after the user confirm
   await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
   expect(await page.evaluate(() => window.diffractTest.sidecar.gitUpdates)).toEqual([]);
 
+  // Afterwards winget has nothing newer to offer, as on a real machine.
+  await page.evaluate(() => {
+    window.diffractTest.sidecar.gitUpdate = { ...window.diffractTest.sidecar.gitUpdate, status: "UpToDate", availableVersion: null };
+  });
   await dialog.getByRole("button", { name: "Update" }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByText("Git for Windows 2.55.0.5 is installed.")).toBeVisible();
-  expect(await page.evaluate(() => window.diffractTest.sidecar.gitUpdates)).toEqual(["2.55.0.5"]);
-  await page.getByRole("button", { name: "Dismiss" }).click();
-  await expect(page.getByText("Git for Windows 2.55.0.5 is installed.")).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.diffractTest.sidecar.gitUpdates)).toEqual(["2.55.0.5"]);
+  await expect(page.getByText(/is available|is installed/)).toHaveCount(0);
 });

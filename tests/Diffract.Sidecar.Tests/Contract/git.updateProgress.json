@@ -1,7 +1,0 @@
-{
-  "jsonrpc": "2.0",
-  "method": "git.updateProgress",
-  "params": {
-    "stage": "Installing"
-  }
-}

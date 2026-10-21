@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeKinds, errorKinds, gitUpdateOutcomes, gitUpdateStages, gitUpdateStatuses, leftoverKinds, terminalKinds, verdicts, type Methods, type Notifications, type RepoChanged } from "./protocol";
+import { changeKinds, errorKinds, gitUpdateOutcomes, gitUpdateStatuses, leftoverKinds, terminalKinds, verdicts, type Methods, type Notifications, type RepoChanged } from "./protocol";
 import { RpcClient, RpcError } from "./rpc";
 import { FakeTransport } from "./testing/fakeTransport";
 import { check } from "./testing/shapes";
@@ -50,7 +50,6 @@ describe("contract samples from the sidecar", () => {
       terminalKind: [...terminalKinds],
       gitUpdateStatus: [...gitUpdateStatuses],
       gitUpdateOutcome: [...gitUpdateOutcomes],
-      gitUpdateStage: [...gitUpdateStages],
     });
   });
 

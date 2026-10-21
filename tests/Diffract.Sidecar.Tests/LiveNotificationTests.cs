@@ -99,8 +99,8 @@ public sealed class LiveNotificationTests : IAsyncDisposable
         var (_, worktree) = await OpenAsync(commands, machine);
 
         _host.Send("""{"jsonrpc":"2.0","id":2,"method":"git.update","params":{"version":"99.0.0.1"}}""");
-        var progress = await _host.NextJsonAsync();
-        Assert.Equal("git.updateProgress", progress.GetProperty("method").GetString());
+        for (var i = 0; i < 200 && !commands.Ran.Any(r => r.Arguments[0] == "upgrade"); i++)
+            await Task.Delay(25, Ct);
         Assert.Contains(commands.Ran, r => r.Arguments[0] == "upgrade");
 
         await File.WriteAllTextAsync(Path.Combine(worktree, "notes.txt"), "todo", Ct);

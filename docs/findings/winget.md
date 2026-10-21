@@ -50,7 +50,7 @@ Johan reviewed the check on 2026-10-21 and chose this approach over the PowerShe
 
 3. **Catch up.** When it is done, the UI asks `app.info` and winget again, and refreshes the repo without `fsck`. A git that was too old and now works starts the app over.
 
-The update runs in the background. The dialog closes when the user confirms, and the bar under the top bar shows the stage, how long it has run, and then the result. Refresh and Open repo wait until it is done.
+The update runs in the background, and Diffract shows nothing while it runs: the installer shows its own window. Refresh and Open repo wait until it is done. Afterwards a good update shows only as the new git version in the top bar. A bar appears only when the user has something to do: the update failed, or Windows must restart.
 
 ### What the first real update taught us
 
@@ -64,8 +64,10 @@ What changed because of it:
 
 - **Who uses git is shown before the update**, and again when the installer stops. The sidecar reads the process list (the Tool Help functions, no git calls), finds every process running from Git for Windows' folder, and names the program that started it, such as "CodeScene cs-ide tool for windows in Visual Studio Code" or "Git Bash". Diffract's own git calls are left out.
 - **Live refresh pauses during the update**, so Diffract's own git calls cannot stop the installer. This replaces the first plan, which let them fail and retry.
-- **Progress comes from the process list.** winget prints no progress at all when its output is redirected: a captured `winget download` shows only a few lines of text and no progress bar. So the stage is "Downloading" until a program from winget's download folder (`%TEMP%\WinGet`) runs, and "Installing" while it does. That works in any display language.
-- **winget is asked less often.** Running it while a repo opens slows the opening on Johan's laptop. The check now runs only after the repo is open, and an answer is reused for a day unless git itself changed. "Check for git updates" in the top bar asks at once. A git that is too old is checked at once, since nothing else can happen until it is updated.
+- **No progress from Diffract.** winget prints no progress at all when its output is redirected: a captured `winget download` shows only a few lines of text and no progress bar. A first version showed a stage read from the process list, but Johan found it noise next to the installer's own window, so it was removed.
+- **winget is asked less often.** Running it while a repo opens slows the opening on Johan's laptop. The check now runs only after the repo is open, and an answer is reused for a day unless git itself changed. A git that is too old is checked at once, since nothing else can happen until it is updated. A "Check for git updates" button was tried and removed, to keep the screen clean.
+
+Johan's second update, with the programs using git closed, installed Git for Windows 2.55.0.5.
 
 Notes:
 
