@@ -26,12 +26,16 @@ public sealed class HistoryReader
     private const int BinaryCheckBytes = 8000;
 
     private readonly GitRunnerOptions _runnerOptions;
+    private readonly int _pageSize;
 
-    public HistoryReader(GitRunnerOptions runnerOptions)
+    /// <param name="pageSize">Commits per page that <see cref="ReadAsync"/> hands on. Tests use small pages.</param>
+    public HistoryReader(GitRunnerOptions runnerOptions, int pageSize = PageSize)
     {
         if (!runnerOptions.ReadOnly)
             throw new ArgumentException("The history reader only runs with a read-only git runner.", nameof(runnerOptions));
+        ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
         _runnerOptions = runnerOptions;
+        _pageSize = pageSize;
     }
 
     /// <summary>The worktree HEADs history starts from, besides branches and tags. Unborn branches have none.</summary>
@@ -40,13 +44,12 @@ public sealed class HistoryReader
 
     /// <summary>Reads the whole history in topological order with one git call, handing it on page by page as it streams.</summary>
     /// <returns>How many commits were read.</returns>
-    public async Task<int> ReadAsync(
-        string repoRoot, IEnumerable<string> heads, int pageSize, Func<IReadOnlyList<CommitEntry>, Task> onPage, CancellationToken ct)
+    public async Task<int> ReadAsync(string repoRoot, IEnumerable<string> heads, Func<IReadOnlyList<CommitEntry>, Task> onPage, CancellationToken ct)
     {
         var total = 0;
         await Runner(repoRoot).StreamAsync(CommitLogParser.Arguments(heads), async (output, token) =>
         {
-            total = await CommitLogParser.ReadPagesAsync(output, pageSize, onPage, token).ConfigureAwait(false);
+            total = await CommitLogParser.ReadPagesAsync(output, _pageSize, onPage, token).ConfigureAwait(false);
             return true;
         }, [], ct).ConfigureAwait(false);
         return total;

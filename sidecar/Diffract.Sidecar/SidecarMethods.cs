@@ -13,11 +13,54 @@ namespace Diffract.Sidecar;
 /// <param name="GitProblem">Why Diffract cannot use this git, in plain English. Null when it can.</param>
 internal sealed record AppInfo(string SidecarVersion, string? GitVersion, bool GitSupported, string? GitProblem);
 
+/// <summary>The parts of the sidecar that tests replace. Anything left out is the real thing.</summary>
+internal sealed record SidecarDependencies
+{
+    public DiffractConfig Config { get; init; } = DiffractConfig.Default;
+
+    /// <summary>Sends a notification to the app, such as <c>repo.changed</c>. Tests may leave it out.</summary>
+    public Func<string, JsonElement, Task> Notify { get; init; } = (_, _) => Task.CompletedTask;
+
+    /// <summary>Where problems with no request to answer are reported.</summary>
+    public TextWriter Log { get; init; } = TextWriter.Null;
+
+    /// <summary>Starts Explorer and terminals. Tests pass a fake.</summary>
+    public IProcessStarter Processes { get; init; } = new ProcessStarter();
+
+    /// <summary>Where Windows keeps its programs, for finding terminals and winget. Tests describe their own.</summary>
+    public MachineLayout Machine { get; init; } = MachineLayout.Current;
+
+    /// <summary>Runs winget and waits for its answer. Null for the real one, on the runner's clock. Tests pass a fake.</summary>
+    public ICommandRunner? Commands { get; init; }
+
+    /// <summary>The processes on this machine, for who is using git. Tests describe their own.</summary>
+    public IProcessTable Running { get; init; } = new ProcessTable();
+}
+
+/// <summary>Answers one method: reads its params and returns its result, or throws <see cref="RpcException"/>.</summary>
+internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, CancellationToken ct);
+
 /// <summary>The methods the sidecar answers. Every git call goes through a read-only runner.</summary>
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
     public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.refs", "history.details", "history.file"];
+
+    /// <summary>
+    /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only violation,
+    /// marks a bug: the host logs it as an internal error.
+    /// </summary>
+    private static readonly (Type Type, ErrorKind? Kind)[] ErrorKinds =
+    [
+        (typeof(RpcException), null),
+        (typeof(NotAGitRepositoryException), ErrorKind.NotARepo),
+        (typeof(GitVersionTooOldException), ErrorKind.GitTooOld),
+        (typeof(GitTimeoutException), ErrorKind.TimedOut),
+        (typeof(ReadOnlyViolationException), null),
+        (typeof(GitException), ErrorKind.GitFailed),
+        (typeof(Win32Exception), ErrorKind.GitFailed),
+        (typeof(ConfigException), ErrorKind.ConfigInvalid),
+    ];
 
     private readonly RepoSessions _repos;
     private readonly IProcessStarter _processes;
@@ -26,40 +69,44 @@ internal sealed class SidecarMethods : IDisposable
     private readonly GitUpdater _updater;
     private readonly HistoryReader _history;
     private readonly Func<string, JsonElement, Task> _notify;
+    private readonly Dictionary<string, MethodHandler> _handlers;
 
-    /// <param name="notify">Sends a notification to the app, such as <c>repo.changed</c>. Tests may leave it out.</param>
-    /// <param name="log">Where problems with no request to answer are reported.</param>
-    /// <param name="processes">Starts Explorer and terminals. Tests pass a fake.</param>
-    /// <param name="machine">Where Windows keeps its programs, for finding terminals and winget. Tests describe their own.</param>
-    /// <param name="commands">Runs winget and waits for its answer. Tests pass a fake.</param>
-    /// <param name="running">The processes on this machine, for who is using git. Tests describe their own.</param>
-    public SidecarMethods(
-        GitRunnerOptions runnerOptions,
-        DiffractConfig? config = null,
-        Func<string, JsonElement, Task>? notify = null,
-        TextWriter? log = null,
-        IProcessStarter? processes = null,
-        MachineLayout? machine = null,
-        ICommandRunner? commands = null,
-        IProcessTable? running = null)
+    public SidecarMethods(GitRunnerOptions runnerOptions, SidecarDependencies? dependencies = null)
     {
+        var d = dependencies ?? new SidecarDependencies();
         RunnerOptions = runnerOptions with { ReadOnly = true };
-        notify ??= (_, _) => Task.CompletedTask;
-        _notify = notify;
+        _notify = d.Notify;
         _history = new HistoryReader(RunnerOptions);
-        machine ??= MachineLayout.Current;
-        _processes = processes ?? new ProcessStarter();
-        _terminal = new TerminalLauncher(_processes, machine);
-        commands ??= new CommandRunner(RunnerOptions.TimeProvider);
-        _updates = new GitUpdateChecker(commands, machine);
-        _updater = new GitUpdater(_updates, commands, running ?? new ProcessTable(), machine);
+        _processes = d.Processes;
+        _terminal = new TerminalLauncher(_processes, d.Machine);
+        var commands = d.Commands ?? new CommandRunner(RunnerOptions.TimeProvider);
+        _updates = new GitUpdateChecker(commands, d.Machine);
+        _updater = new GitUpdater(_updates, commands, d.Running, d.Machine);
         _repos = new RepoSessions(
             RunnerOptions,
-            config ?? DiffractConfig.Default,
+            d.Config,
             RunnerOptions.TimeProvider,
-            changed => notify("repo.changed", Result(changed)),
-            log ?? TextWriter.Null,
+            changed => _notify("repo.changed", Result(changed)),
+            d.Log,
             paused: () => _updater.IsRunning);
+        _handlers = new Dictionary<string, MethodHandler>
+        {
+            ["app.info"] = async (_, ct) => Result(await AppInfoAsync(ct).ConfigureAwait(false)),
+            ["repo.open"] = OpenRepoAsync,
+            ["repo.refresh"] = RefreshRepoAsync,
+            ["repo.close"] = CloseRepo,
+            ["history.read"] = ReadHistoryAsync,
+            ["history.refs"] = HistoryRefs,
+            ["history.details"] = HistoryDetailsAsync,
+            ["history.file"] = HistoryFileAsync,
+            ["system.openFolder"] = OpenFolder,
+            ["system.listTerminals"] = (_, _) => Task.FromResult(Result(_terminal.List())),
+            ["system.openTerminal"] = OpenTerminal,
+            ["git.checkUpdate"] = CheckGitUpdateAsync,
+            ["git.update"] = UpdateGitAsync,
+            ["git.inUse"] = (_, _) => Task.FromResult(Result(_updater.InUse())),
+            ["git.openDownloadPage"] = OpenDownloadPage,
+        };
     }
 
     /// <summary>The options every git call uses. Read-only, whatever was passed in.</summary>
@@ -67,77 +114,20 @@ internal sealed class SidecarMethods : IDisposable
 
     internal RepoSessions Repos => _repos;
 
+    /// <summary>The methods there is a handler for. A test checks they are exactly <see cref="Names"/>.</summary>
+    internal IEnumerable<string> HandledMethods => _handlers.Keys;
+
     public static string SidecarVersion { get; } =
         typeof(SidecarMethods).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0.0.0";
 
     public async Task<JsonElement> Dispatch(string method, JsonElement? parameters, CancellationToken ct)
     {
+        if (!_handlers.TryGetValue(method, out var handle))
+            throw new RpcException(RpcErrorCodes.MethodNotFound, $"Unknown method '{method}'");
+
         try
         {
-            switch (method)
-            {
-                case "app.info":
-                    return Result(await AppInfoAsync(ct).ConfigureAwait(false));
-
-                case "repo.open":
-                    var open = Params<RepoOpenParams>(parameters);
-                    return Result(await _repos.OpenAsync(Required(open.Path, "path"), ct).ConfigureAwait(false));
-
-                case "repo.refresh":
-                    var refresh = Params<RepoRefreshParams>(parameters);
-                    return Result(await _repos.RefreshAsync(Required(refresh.RepoId, "repoId"), refresh.IncludeUnreachable, ct).ConfigureAwait(false));
-
-                case "repo.close":
-                    _repos.Close(Required(Params<RepoCloseParams>(parameters).RepoId, "repoId"));
-                    return RpcResponse.NullResult;
-
-                case "history.read":
-                    var read = Params<HistoryReadParams>(parameters);
-                    return Result(await ReadHistoryAsync(Required(read.RepoId, "repoId"), Required(read.Token, "token"), ct).ConfigureAwait(false));
-
-                case "history.refs":
-                    return Result(HistoryRef.From(_repos.SnapshotOf(Required(Params<HistoryRefsParams>(parameters).RepoId, "repoId"))));
-
-                case "history.details":
-                    var details = Params<HistoryDetailsParams>(parameters);
-                    var commitRepo = _repos.SnapshotOf(Required(details.RepoId, "repoId")).RepoRoot;
-                    return Result(await _history.ReadDetailsAsync(commitRepo, RequiredObjectId(details.CommitId, "commitId"), ct).ConfigureAwait(false));
-
-                case "history.file":
-                    var file = Params<HistoryFileParams>(parameters);
-                    var fileRepo = _repos.SnapshotOf(Required(file.RepoId, "repoId")).RepoRoot;
-                    return Result(HistoryFile.From(await _history.ReadFileAsync(fileRepo, RequiredObjectId(file.BlobId, "blobId"), ct).ConfigureAwait(false)));
-
-                case "system.openFolder":
-                    OpenFolder(Required(Params<OpenFolderParams>(parameters).Path, "path"));
-                    return RpcResponse.NullResult;
-
-                case "system.listTerminals":
-                    return Result(_terminal.List());
-
-                case "system.openTerminal":
-                    var terminal = Params<OpenTerminalParams>(parameters);
-                    OpenTerminal(ExistingFolder(Required(terminal.Path, "path")), terminal.Terminal);
-                    return RpcResponse.NullResult;
-
-                case "git.checkUpdate":
-                    return Result(await _updates.CheckAsync(await InstalledGitAsync(ct).ConfigureAwait(false), ct).ConfigureAwait(false));
-
-                case "git.update":
-                    var version = Required(Params<GitUpdateParams>(parameters).Version, "version");
-                    return Result(await _updater.UpdateAsync(await InstalledGitAsync(ct).ConfigureAwait(false), version, ct).ConfigureAwait(false));
-
-                case "git.inUse":
-                    return Result(_updater.InUse());
-
-                case "git.openDownloadPage":
-                    // A fixed address, so the UI cannot make Explorer open anything else. Explorer hands it to the browser.
-                    _processes.Start(Explorer, [GitUpdateChecker.DownloadPage]);
-                    return RpcResponse.NullResult;
-
-                default:
-                    throw new RpcException(RpcErrorCodes.MethodNotFound, $"Unknown method '{method}'");
-            }
+            return await handle(parameters, ct).ConfigureAwait(false);
         }
         catch (Exception e) when (ToRpcException(e) is { } rpc)
         {
@@ -145,33 +135,93 @@ internal sealed class SidecarMethods : IDisposable
         }
     }
 
+    private async Task<JsonElement> OpenRepoAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var open = Params<RepoOpenParams>(parameters);
+        return Result(await _repos.OpenAsync(Required(open.Path, "path"), ct).ConfigureAwait(false));
+    }
+
+    private async Task<JsonElement> RefreshRepoAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var refresh = Params<RepoRefreshParams>(parameters);
+        return Result(await _repos.RefreshAsync(Required(refresh.RepoId, "repoId"), refresh.IncludeUnreachable, ct).ConfigureAwait(false));
+    }
+
+    private Task<JsonElement> CloseRepo(JsonElement? parameters, CancellationToken ct)
+    {
+        _repos.Close(Required(Params<RepoCloseParams>(parameters).RepoId, "repoId"));
+        return Task.FromResult(RpcResponse.NullResult);
+    }
+
     /// <summary>
     /// Streams the whole history as <c>history.page</c> notifications, then answers with the totals. One git call,
     /// whatever the size. Cancelling the request stops git.
     /// </summary>
-    private async Task<HistoryReadResult> ReadHistoryAsync(string repoId, string token, CancellationToken ct)
+    private async Task<JsonElement> ReadHistoryAsync(JsonElement? parameters, CancellationToken ct)
     {
-        var snapshot = _repos.SnapshotOf(repoId);
+        var read = Params<HistoryReadParams>(parameters);
+        var snapshot = _repos.SnapshotOf(Required(read.RepoId, "repoId"));
+        var token = Required(read.Token, "token");
         var pages = 0;
-        var commits = await _history.ReadAsync(snapshot.RepoRoot, HistoryReader.HeadsOf(snapshot), HistoryReader.PageSize,
+        var commits = await _history.ReadAsync(snapshot.RepoRoot, HistoryReader.HeadsOf(snapshot),
             page => _notify("history.page", Result(new HistoryPage(token, pages++, page))), ct).ConfigureAwait(false);
-        return new HistoryReadResult(commits, pages);
+        return Result(new HistoryReadResult(commits, pages));
     }
 
-    private void OpenTerminal(string folder, TerminalKind? terminal)
+    private Task<JsonElement> HistoryRefs(JsonElement? parameters, CancellationToken ct) =>
+        Task.FromResult(Result(HistoryRef.From(_repos.SnapshotOf(Required(Params<HistoryRefsParams>(parameters).RepoId, "repoId")))));
+
+    private async Task<JsonElement> HistoryDetailsAsync(JsonElement? parameters, CancellationToken ct)
     {
+        var details = Params<HistoryDetailsParams>(parameters);
+        var repoRoot = _repos.SnapshotOf(Required(details.RepoId, "repoId")).RepoRoot;
+        return Result(await _history.ReadDetailsAsync(repoRoot, RequiredObjectId(details.CommitId, "commitId"), ct).ConfigureAwait(false));
+    }
+
+    private async Task<JsonElement> HistoryFileAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var file = Params<HistoryFileParams>(parameters);
+        var repoRoot = _repos.SnapshotOf(Required(file.RepoId, "repoId")).RepoRoot;
+        return Result(HistoryFile.From(await _history.ReadFileAsync(repoRoot, RequiredObjectId(file.BlobId, "blobId"), ct).ConfigureAwait(false)));
+    }
+
+    /// <summary>Opens an existing folder in Explorer.</summary>
+    private Task<JsonElement> OpenFolder(JsonElement? parameters, CancellationToken ct)
+    {
+        _processes.Start(Explorer, [ExistingFolder(Required(Params<OpenFolderParams>(parameters).Path, "path"))]);
+        return Task.FromResult(RpcResponse.NullResult);
+    }
+
+    private Task<JsonElement> OpenTerminal(JsonElement? parameters, CancellationToken ct)
+    {
+        var terminal = Params<OpenTerminalParams>(parameters);
+        var folder = ExistingFolder(Required(terminal.Path, "path"));
         try
         {
-            _terminal.Open(folder, terminal);
+            _terminal.Open(folder, terminal.Terminal);
         }
         catch (ArgumentException e)
         {
             throw new RpcException(RpcErrorCodes.InvalidParams, e.Message);
         }
+        return Task.FromResult(RpcResponse.NullResult);
     }
 
-    /// <summary>Opens an existing folder in Explorer.</summary>
-    private void OpenFolder(string path) => _processes.Start(Explorer, [ExistingFolder(path)]);
+    private async Task<JsonElement> CheckGitUpdateAsync(JsonElement? parameters, CancellationToken ct) =>
+        Result(await _updates.CheckAsync(await InstalledGitAsync(ct).ConfigureAwait(false), ct).ConfigureAwait(false));
+
+    private async Task<JsonElement> UpdateGitAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var version = Required(Params<GitUpdateParams>(parameters).Version, "version");
+        return Result(await _updater.UpdateAsync(await InstalledGitAsync(ct).ConfigureAwait(false), version, ct).ConfigureAwait(false));
+    }
+
+    /// <summary>A fixed address, so the UI cannot make Explorer open anything else. Explorer hands it to the browser.</summary>
+    private Task<JsonElement> OpenDownloadPage(JsonElement? parameters, CancellationToken ct)
+    {
+        _processes.Start(Explorer, [GitUpdateChecker.DownloadPage]);
+        return Task.FromResult(RpcResponse.NullResult);
+    }
 
     /// <summary>The full path, so a program called explorer.exe elsewhere on PATH is never the one started.</summary>
     private static string Explorer => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
@@ -229,18 +279,10 @@ internal sealed class SidecarMethods : IDisposable
     /// Diffract's own errors become JSON-RPC errors with a kind, and the plain-English message the spike prints.
     /// Anything else, including a read-only violation, is a bug: null, so the host logs it as an internal error.
     /// </summary>
-    internal RpcException? ToRpcException(Exception e) => e switch
-    {
-        RpcException => null,
-        NotAGitRepositoryException => new(ErrorKind.NotARepo, e.Message),
-        GitVersionTooOldException => new(ErrorKind.GitTooOld, e.Message),
-        GitTimeoutException => new(ErrorKind.TimedOut, e.Message),
-        ReadOnlyViolationException => null,
-        GitException => new(ErrorKind.GitFailed, e.Message),
-        Win32Exception => new(ErrorKind.GitFailed, GitNotFound()),
-        ConfigException => new(ErrorKind.ConfigInvalid, e.Message),
-        _ => null,
-    };
+    internal RpcException? ToRpcException(Exception e) =>
+        ErrorKinds.FirstOrDefault(k => k.Type.IsInstanceOfType(e)).Kind is { } kind
+            ? new RpcException(kind, e is Win32Exception ? GitNotFound() : e.Message)
+            : null;
 
     private string GitNotFound() =>
         $"Git was not found ({RunnerOptions.GitExecutable}). Install Git for Windows {GitVersion.Minimum} or newer.";

@@ -29,7 +29,7 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
             await output.CopyToAsync(buffer, token).ConfigureAwait(false);
             return true;
         }, allowedExitCodes, ct).ConfigureAwait(false);
-        return new GitResult(args, result.ExitCode!.Value, buffer.ToArray(), result.StandardError, result.Duration);
+        return new GitResult(result, buffer.ToArray());
     }
 
     /// <summary>
@@ -54,8 +54,8 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
             process.StandardInput.Close();
             var result = await ReadAsync(process, args, read, ct).ConfigureAwait(false);
             var streamed = new GitStreamResult(args, result.ExitCode, result.StandardError, time.GetElapsedTime(started));
-            if (streamed.ExitCode is { } code && code != 0 && !allowedExitCodes.Contains(code))
-                throw new GitCommandException(args, code, streamed.StandardError);
+            if (Failed(streamed.ExitCode, allowedExitCodes))
+                throw new GitCommandException(args, streamed.ExitCode!.Value, streamed.StandardError);
             return streamed;
         }
         finally
@@ -99,6 +99,10 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
             throw;
         }
     }
+
+    /// <summary>A non-zero exit code that the caller did not allow. A stopped process has none and never failed.</summary>
+    private static bool Failed(int? exitCode, IReadOnlyCollection<int> allowedExitCodes) =>
+        exitCode is { } code && code != 0 && !allowedExitCodes.Contains(code);
 
     private static Task<string> StandardErrorSoFarAsync(Task<string> stderrTask) =>
         stderrTask.ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : "", CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);

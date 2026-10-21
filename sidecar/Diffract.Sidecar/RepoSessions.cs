@@ -71,9 +71,9 @@ internal sealed class RepoSessions(
     /// <summary>Stops watching. A live refresh that is running is cancelled and sends nothing.</summary>
     public void Close(string repoId)
     {
-        if (!_byId.TryRemove(repoId, out var session))
-            throw UnknownRepo(repoId);
-        session.Dispose();
+        var session = Get(repoId);
+        if (_byId.TryRemove(repoId, out _))
+            session.Dispose();
     }
 
     public void Dispose()
@@ -94,12 +94,13 @@ internal sealed class RepoSessions(
     }
 
     /// <summary>The repo's latest snapshot. History reads its refs and worktree HEADs from it, so it starts no git.</summary>
-    public RepoSnapshot SnapshotOf(string repoId) => Get(repoId).Snapshot ?? throw UnknownRepo(repoId);
+    public RepoSnapshot SnapshotOf(string repoId) =>
+        Get(repoId).Snapshot ?? throw new InvalidOperationException("The repo is still being opened.");
 
-    private RepoSession Get(string repoId) => _byId.TryGetValue(repoId, out var session) ? session : throw UnknownRepo(repoId);
-
-    private static RpcException UnknownRepo(string repoId) =>
-        new(RpcErrorCodes.InvalidParams, $"No open repo has the id '{repoId}'. Open it first with repo.open.");
+    private RepoSession Get(string repoId) =>
+        _byId.TryGetValue(repoId, out var session)
+            ? session
+            : throw new RpcException(RpcErrorCodes.InvalidParams, $"No open repo has the id '{repoId}'. Open it first with repo.open.");
 
     private RepoSnapshotBuilder Builder(bool includeUnreachable) =>
         new(runnerOptions, config.ToSnapshotOptions() with { IncludeUnreachable = includeUnreachable });

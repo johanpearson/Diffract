@@ -16,52 +16,36 @@ public static class WorktreeListParser
 {
     public static IReadOnlyList<string> Arguments { get; } = ["worktree", "list", "--porcelain", "-z"];
 
-    // Each attribute ends with NUL and each worktree ends with an extra NUL.
+    /// <summary>What each attribute after a worktree's first line sets. Unknown ones are ignored, so newer git does not break parsing.</summary>
+    private static readonly Dictionary<string, Func<WorktreeEntry, string?, WorktreeEntry>> Attributes = new()
+    {
+        ["HEAD"] = (w, value) => w with { Head = CommitOrNull(value) },
+        ["branch"] = (w, value) => w with { Branch = value },
+        ["bare"] = (w, _) => w with { IsBare = true },
+        ["detached"] = (w, _) => w with { IsDetached = true },
+        ["locked"] = (w, value) => w with { IsLocked = true, LockReason = value },
+        ["prunable"] = (w, value) => w with { IsPrunable = true, PrunableReason = value },
+    };
+
+    // Each attribute ends with NUL and each worktree ends with an extra NUL. A worktree starts with its 'worktree' line.
     public static IReadOnlyList<WorktreeEntry> Parse(string output)
     {
         var entries = new List<WorktreeEntry>();
-        WorktreeEntry? current = null;
-
-        foreach (var field in output.Split('\0'))
+        foreach (var field in output.Split('\0').Where(f => f.Length > 0))
         {
-            if (field.Length == 0)
-            {
-                if (current is not null)
-                    entries.Add(current);
-                current = null;
-                continue;
-            }
-
             var (key, value) = SplitAttribute(field);
             if (key == "worktree")
-            {
-                if (current is not null)
-                    entries.Add(current);
-                current = new WorktreeEntry(value ?? "", null, null, false, false, false, null, false, null);
-                continue;
-            }
-
-            if (current is null)
+                entries.Add(new WorktreeEntry(value ?? "", null, null, false, false, false, null, false, null));
+            else if (entries.Count == 0)
                 throw new FormatException($"Worktree attribute '{key}' before any 'worktree' line");
-
-            // Unknown attributes are ignored so newer git versions do not break parsing.
-            current = key switch
-            {
-                // An unborn branch has no commit yet: git prints a HEAD of all zeros.
-                "HEAD" => current with { Head = value is { Length: > 0 } && !ObjectId.IsZero(value) ? value : null },
-                "branch" => current with { Branch = value },
-                "bare" => current with { IsBare = true },
-                "detached" => current with { IsDetached = true },
-                "locked" => current with { IsLocked = true, LockReason = value },
-                "prunable" => current with { IsPrunable = true, PrunableReason = value },
-                _ => current,
-            };
+            else if (Attributes.TryGetValue(key, out var apply))
+                entries[^1] = apply(entries[^1], value);
         }
-
-        if (current is not null)
-            entries.Add(current);
         return entries;
     }
+
+    // An unborn branch has no commit yet: git prints a HEAD of all zeros.
+    private static string? CommitOrNull(string? value) => value is { Length: > 0 } && !ObjectId.IsZero(value) ? value : null;
 
     private static (string Key, string? Value) SplitAttribute(string field)
     {

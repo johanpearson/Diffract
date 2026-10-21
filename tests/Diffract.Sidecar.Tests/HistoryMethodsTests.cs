@@ -42,8 +42,11 @@ public sealed class HistoryMethodsTests : IAsyncDisposable
 
         _methods = new SidecarMethods(
             new GitRunnerOptions { Environment = IsolatedGit.Environment(_temp), OnCall = _calls.Enqueue },
-            notify: (method, parameters) => _host.Host.NotifyAsync(method, parameters),
-            running: new FakeProcessTable());
+            new SidecarDependencies
+            {
+                Notify = (method, parameters) => _host.Host.NotifyAsync(method, parameters),
+                Running = new FakeProcessTable(),
+            });
         _host = new HostHarness(_methods.Dispatch);
         var opened = await RequestAsync("repo.open", new { path = repo.Path });
         Assert.True(opened.TryGetProperty("result", out _), opened.ToString());

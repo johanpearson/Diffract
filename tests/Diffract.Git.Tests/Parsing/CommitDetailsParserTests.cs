@@ -15,17 +15,22 @@ public class CommitDetailsParserTests
     }
 
     [Fact]
-    public void Reads_author_committer_dates_with_their_time_zone_and_the_message()
+    public void Reads_author_committer_dates_and_the_message()
     {
-        var details = Details("files");
+        var d = Details("files");
 
-        Assert.Equal("Change every kind of file", details.Subject);
-        Assert.Equal("The body has two paragraphs.\n\nSecond paragraph, with åäö.", details.Body);
-        Assert.Equal(("Sample Author", "author@example.com"), (details.AuthorName, details.AuthorEmail));
-        Assert.Equal(("Sample Author", "author@example.com"), (details.CommitterName, details.CommitterEmail));
-        Assert.Equal(new DateTimeOffset(2026, 1, 19, 10, 0, 0, TimeSpan.Zero), details.AuthoredAt);
+        Assert.Equal(
+            ("Change every kind of file", "The body has two paragraphs.\n\nSecond paragraph, with åäö.",
+                "Sample Author", "author@example.com", "Sample Author", "author@example.com",
+                new DateTimeOffset(2026, 1, 19, 10, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 1, 19, 10, 0, 0, TimeSpan.Zero),
+                "c728b1576c0186c959a65353712b400542ab911f"),
+            (d.Subject, d.Body, d.AuthorName, d.AuthorEmail, d.CommitterName, d.CommitterEmail, d.AuthoredAt, d.CommittedAt, string.Join(" ", d.ParentIds)));
+    }
+
+    [Fact]
+    public void Dates_keep_the_authors_time_zone()
+    {
         Assert.Equal(TimeSpan.FromHours(2), Details("octopus").AuthoredAt.Offset);
-        Assert.Single(details.ParentIds);
     }
 
     [Fact]
@@ -60,34 +65,36 @@ public class CommitDetailsParserTests
     [Fact]
     public void A_rename_has_both_paths_its_similarity_and_its_line_counts()
     {
-        var renamed = File("renamed åäö.txt");
-
-        Assert.Equal("to rename.txt", renamed.OldPath);
-        Assert.Equal(85, renamed.Similarity);
-        Assert.Equal((1, 0), (renamed.Additions, renamed.Deletions));
-        Assert.NotEqual(renamed.OldId, renamed.NewId);
+        Assert.Equal(
+            new FileChange(FileChangeKind.Renamed, "renamed åäö.txt", "to rename.txt",
+                "b2f931a67315c95c5daab3aac6de62e534808476", "b5660615986901aceae1450e10650892e191f8dc",
+                Similarity: 85, Additions: 1, Deletions: 0, IsBinary: false, IsSubmodule: false),
+            File("renamed åäö.txt"));
     }
 
     [Fact]
     public void A_binary_file_has_no_line_counts()
     {
-        var binary = File("image.bin");
+        Assert.Equal(
+            new FileChange(FileChangeKind.Added, "image.bin", null, null, "0f49c4ae77b43dff338093c78e009676e7e308ba",
+                Similarity: null, Additions: null, Deletions: null, IsBinary: true, IsSubmodule: false),
+            File("image.bin"));
+    }
 
-        Assert.True(binary.IsBinary);
-        Assert.Null(binary.Additions);
-        Assert.Null(binary.Deletions);
+    [Fact]
+    public void A_text_file_is_not_binary()
+    {
         Assert.False(File("main.txt").IsBinary);
     }
 
     [Fact]
     public void A_mode_change_keeps_the_same_blob()
     {
-        var script = File("script.sh");
-
-        Assert.Equal(script.OldId, script.NewId);
-        Assert.Equal((0, 0), (script.Additions, script.Deletions));
-        Assert.Null(script.OldPath);
-        Assert.Null(script.Similarity);
+        Assert.Equal(
+            new FileChange(FileChangeKind.Modified, "script.sh", null,
+                "f5bdd214e01603ecd6c83be9f66d88579c588ec6", "f5bdd214e01603ecd6c83be9f66d88579c588ec6",
+                Similarity: null, Additions: 0, Deletions: 0, IsBinary: false, IsSubmodule: false),
+            File("script.sh"));
     }
 
     [Fact]
@@ -140,10 +147,16 @@ public class CommitDetailsParserTests
     [Fact]
     public void A_submodule_is_marked_so_its_content_is_never_asked_for()
     {
-        var submodule = Assert.Single(Details("submodule").Files);
+        // A submodule's "blob" is a commit in the other repo, and its line counts mean nothing.
+        Assert.Equal(
+            [new FileChange(FileChangeKind.Added, "vendor/lib", null, null, "2de7b44888e872d49faf7f37e6a5ef62152fa930",
+                Similarity: null, Additions: 1, Deletions: 0, IsBinary: false, IsSubmodule: true)],
+            Details("submodule").Files);
+    }
 
-        Assert.Equal("vendor/lib", submodule.Path);
-        Assert.True(submodule.IsSubmodule);
+    [Fact]
+    public void An_ordinary_file_is_not_a_submodule()
+    {
         Assert.False(File("main.txt").IsSubmodule);
     }
 
