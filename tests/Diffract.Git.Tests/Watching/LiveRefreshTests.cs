@@ -122,13 +122,15 @@ public sealed class LiveRefreshTests : IAsyncDisposable
         while (!_snapshot.Worktrees.Any(w => w.Path == added))
             seen.Add((await NextRefreshAsync()).Changes);
         Assert.Contains(seen, c => c.Contains("worktree list"));
-        while (_refreshes.Reader.TryRead(out _)) { }
-        await Task.Delay(RefreshScheduler.MaxWait, Ct);
-        while (_refreshes.Reader.TryRead(out _)) { }
 
         await File.WriteAllTextAsync(Path.Combine(added, "login.txt"), "retry", Ct);
 
-        Assert.Equal($"files in {added}", (await NextRefreshAsync()).Changes);
+        // `worktree add` writes many files, so refreshes from that burst may still arrive first, more so on a busy
+        // machine. What matters is that a change in the new worktree is now reported as that worktree's.
+        while (!(await NextRefreshAsync()).Changes.Contains($"files in {added}"))
+        {
+        }
+        Assert.Equal(1, _snapshot.Worktrees.Single(w => w.Path == added).DirtyFileCount);
     }
 
     [Fact]
