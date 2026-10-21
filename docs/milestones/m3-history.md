@@ -35,7 +35,7 @@ From the visual plan:
 
 **Checkpoint:** Johan decides the open questions below. Decided on 2026-10-21.
 
-**Done** 2026-10-21. The measurements are in `docs/findings/history.md`. Repo A has only 115 commits, so a generated 50,000-commit repo is the performance test: git reads all of it in under a second. Without a commit-graph, which Diffract cannot write, `--topo-order` reads every commit before printing the first, so history is read with one streamed call instead of one call per page. The budgets: the first rows on screen within a second for 50,000 commits, and lane layout under 300 ms on a CI runner. Starting git through its `cmd\git.exe` launcher costs about twice as much as starting the real git; whether to call the real git directly is Johan's decision.
+**Done** 2026-10-21. The measurements are in `docs/findings/history.md`. Repo A has only 115 commits, so a generated 50,000-commit repo is the performance test: git reads all of it in under a second. Without a commit-graph, which Diffract cannot write, `--topo-order` reads every commit before printing the first, so history is read with one streamed call instead of one call per page. The budgets: the first rows on screen within a second for 50,000 commits, and lane layout under 300 ms on a CI runner. Starting git through its `cmd\git.exe` launcher costs about twice as much as starting the real git; Johan decided that Diffract starts the real git directly, which is done in #31, and that keeping a commit-graph becomes a setting in milestone 6.
 
 ### Decisions
 

@@ -5,6 +5,7 @@ The spike from milestone 3, phase 0: how fast git can hand Diffract a repo's his
 ## The repos
 
 - **Repo A**, Johan's busiest work repo, is small: 115 commits on its branches, tags and HEAD, 277 counting every ref, and 188 refs. Most refs are Copilot checkpoints. It has no commit-graph file.
+- **Two of Johan's own projects** are smaller still: 83 commits with 19 tags, and 14 commits. Neither has a merge or a commit-graph file. Reading all of either takes about 0.1 to 0.2 seconds.
 - **The large test repo** is generated with `git fast-import` (`LargeHistory` in the fixtures library, or `diffract-spike fixtures <folder> --large-history 50000`): 50,000 commits, 5,262 merges, 6 open branches and 22 tags. Building it takes well under a minute.
 
 Repo A is too small to show anything about the graph's speed, so the large repo is the one that matters for performance.
@@ -46,6 +47,12 @@ Diffract runs the `git` it finds on PATH, which is `C:\Program Files\Git\cmd\git
 
 Every git call Diffract makes would save 200 ms on a quiet machine, and more on a busy one. Opening a repo starts git several times, so this matters well beyond history.
 
-The launcher also sets a few environment variables that some git features need: it puts Git for Windows' `mingw64\bin` and `usr\bin` folders on PATH, and sets `MSYSTEM`. Read-only commands such as `log` and `status` work without them, but pushing and pulling over SSH (milestone 4) may not. Calling the real git directly would mean setting the same variables on Diffract's side.
+What the launcher does differently, checked by printing the environment git hands its child processes through both executables:
 
-This needs Johan's decision, since it changes how every git call starts.
+- Git for Windows' source shows the launcher setting `MSYSTEM`, `PLINK_PROTOCOL` and `HOME`, and putting its own folders in front of PATH.
+- The real git sets `HOME`, `MSYSTEM` and `PLINK_PROTOCOL` itself, to the same values, and adds `mingw64\bin` and `usr\bin` to PATH too.
+- The only difference left is PATH's order: the launcher puts `mingw64\bin` and `usr\bin` before the user's own `%USERPROFILE%\bin`.
+
+**Decided** by Johan on 2026-10-21: Diffract starts the real git. It looks at the first `git.exe` on PATH, as Windows would. When that is Git for Windows' launcher (`cmd\git.exe` or `bin\git.exe`) or the real git, it starts `mingw64\bin\git.exe` and puts `mingw64\bin` and `usr\bin` in front of PATH, which makes the environment match the launcher's. Anything else on PATH, such as a package manager's shim, is started as before.
+
+Opening Repo A through the sidecar took 6.5 to 14 seconds both before and after the change, on a laptop busy enough that a single git start took over a second. Differences of a few hundred milliseconds disappear in that noise, so the end-to-end gain is not proven yet. Phase 7 checks it on Johan's laptop.
