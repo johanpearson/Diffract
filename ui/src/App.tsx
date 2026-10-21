@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorPanel } from "./components/ErrorPanel";
+import { GitUpdateDialog, type GitUpdateStage } from "./components/GitUpdateDialog";
 import { LeftoversView, type Filter } from "./components/LeftoversView";
 import { Sidebar } from "./components/Sidebar";
 import type { AppHost } from "./host";
 import { folderName } from "./model/format";
 import { FlashMs, initialRows, settleRows, updateRows, type Row } from "./model/rows";
-import { terminalKinds, type AppInfo, type RepoState, type TerminalInfo, type TerminalKind } from "./protocol";
+import { terminalKinds, type AppInfo, type GitUpdateCheck, type RepoState, type TerminalInfo, type TerminalKind } from "./protocol";
 import { ErrorCodes, RpcError, type RpcClient } from "./rpc";
 
 /** The storage key for the last repo that opened, which opens again on start. */
@@ -41,6 +42,10 @@ export function App({ host, client, clock = systemClock }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [starts, setStarts] = useState(0);
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
+  const [gitUpdate, setGitUpdate] = useState<GitUpdateCheck | null>(null);
+  // The available version the user said "Not now" to. A newer one is offered again.
+  const [declined, setDeclined] = useState<string | null>(null);
+  const [updateStage, setUpdateStage] = useState<GitUpdateStage | null>(null);
   const [terminalId, setTerminalId] = useState<TerminalKind | null>(() => {
     const stored = host.storage.get(TerminalKey);
     return terminalKinds.find((k) => k === stored) ?? null;
@@ -92,6 +97,8 @@ export function App({ host, client, clock = systemClock }: Props) {
         setInfo(appInfo);
         // Not knowing the terminals only means "Open terminal" uses the default one.
         client.call("system.listTerminals", undefined).then((list) => current && setTerminals(list), () => {});
+        // Asking winget takes a moment, so it never holds up the start. Not knowing only means no update is offered.
+        client.call("git.checkUpdate", undefined).then((check) => current && setGitUpdate(check), () => {});
         if (!appInfo.gitSupported) return setScreen({ kind: "gitProblem", problem: appInfo.gitProblem ?? "This git cannot be used." });
         const last = host.storage.get(LastRepoKey);
         if (last) void open(last);
@@ -172,6 +179,28 @@ export function App({ host, client, clock = systemClock }: Props) {
     }
   }, [client]);
 
+  const updateGit = useCallback(
+    async (version: string) => {
+      setUpdateStage({ kind: "running", version });
+      try {
+        const result = await client.call("git.update", { version });
+        setUpdateStage({ kind: "done", version, result });
+      } catch (error) {
+        setUpdateStage({ kind: "done", version, result: { outcome: "Failed", message: messageOf(error) } });
+      }
+      // Start again: app.info, a new update check, and a fresh open of the repo, with whichever git is there now.
+      setStarts((n) => n + 1);
+    },
+    [client],
+  );
+
+  const openDownloadPage = useCallback(() => {
+    client.call("git.openDownloadPage", undefined).catch((error: unknown) => setNotice(messageOf(error)));
+  }, [client]);
+
+  /** The newer Git for Windows that winget can install, or null. */
+  const offered = gitUpdate?.status === "UpdateAvailable" ? gitUpdate.availableVersion : null;
+
   const openFolder = useCallback(
     (path: string) => {
       client.call("system.openFolder", { path }).catch((error: unknown) => setNotice(messageOf(error)));
@@ -208,6 +237,20 @@ export function App({ host, client, clock = systemClock }: Props) {
         </button>
       </header>
 
+      {offered && info?.gitSupported && declined !== offered && !updateStage && (
+        <div className="notice quiet" role="status">
+          <span>
+            Git for Windows {offered} is available. You have {gitUpdate?.installedVersion}.
+          </span>
+          <button className="abtn" onClick={() => setUpdateStage({ kind: "confirm", version: offered })}>
+            Update…
+          </button>
+          <button className="abtn" onClick={() => setDeclined(offered)}>
+            Not now
+          </button>
+        </div>
+      )}
+
       {notice && (
         <div className="notice" role="status">
           <span>{notice}</span>
@@ -234,7 +277,17 @@ export function App({ host, client, clock = systemClock }: Props) {
             </div>
           )}
           {screen.kind === "gitProblem" && (
-            <ErrorPanel title="Diffract cannot use this git" message={screen.problem} actions={[{ label: "Check again", run: () => setStarts((n) => n + 1) }]} />
+            <ErrorPanel
+              title="Diffract cannot use this git"
+              message={screen.problem}
+              detail={gitUpdate?.status === "Unknown" ? gitUpdate.problem : null}
+              actions={[
+                offered
+                  ? { label: `Update to ${offered}…`, run: () => setUpdateStage({ kind: "confirm", version: offered }) }
+                  : { label: "Open download page", run: openDownloadPage },
+                { label: "Check again", run: () => setStarts((n) => n + 1) },
+              ]}
+            />
           )}
           {screen.kind === "failed" && (
             <ErrorPanel
@@ -262,6 +315,16 @@ export function App({ host, client, clock = systemClock }: Props) {
           )}
         </main>
       </div>
+
+      {updateStage && (
+        <GitUpdateDialog
+          stage={updateStage}
+          installed={info?.gitVersion ?? null}
+          onConfirm={() => void updateGit(updateStage.version)}
+          onClose={() => setUpdateStage(null)}
+          onDownloadPage={openDownloadPage}
+        />
+      )}
     </div>
   );
 }

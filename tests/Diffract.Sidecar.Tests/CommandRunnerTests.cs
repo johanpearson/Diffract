@@ -17,6 +17,14 @@ public sealed class CommandRunnerTests
     }
 
     [Fact]
+    public async Task Without_a_time_limit_the_program_runs_to_the_end()
+    {
+        var result = await Runner.RunAsync("git", ["version"], Timeout.InfiniteTimeSpan, CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+    }
+
+    [Fact]
     public async Task A_failing_program_returns_its_exit_code()
     {
         var result = await Runner.RunAsync(PowerShell, ["-NoProfile", "-NonInteractive", "-Command", "exit 7"], TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);

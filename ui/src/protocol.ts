@@ -54,6 +54,17 @@ export interface GitUpdateCheck {
   downloadPage: string;
 }
 
+/** How `git.update` ended. */
+export const gitUpdateOutcomes = ["Updated", "RestartNeeded", "Failed"] as const;
+export type GitUpdateOutcome = (typeof gitUpdateOutcomes)[number];
+
+/** Result of `git.update`. */
+export interface GitUpdateResult {
+  outcome: GitUpdateOutcome;
+  /** What happened, in plain English. */
+  message: string;
+}
+
 /** Result of `app.info`. */
 export interface AppInfo {
   sidecarVersion: string;
@@ -164,6 +175,13 @@ export interface Methods {
   "system.openTerminal": { params: { path: string; terminal?: TerminalKind }; result: null };
   /** Asks winget whether a newer Git for Windows is available. Installs nothing. Can take several seconds. */
   "git.checkUpdate": { params: undefined; result: GitUpdateCheck };
+  /**
+   * Updates Git for Windows to `version`, the availableVersion the user confirmed. Checks again first and installs
+   * nothing if winget now offers something else. Takes minutes, and Windows asks for permission.
+   */
+  "git.update": { params: { version: string }; result: GitUpdateResult };
+  /** Opens gitforwindows.org in the browser. */
+  "git.openDownloadPage": { params: undefined; result: null };
 }
 
 /** Every notification the sidecar sends, with its params. */

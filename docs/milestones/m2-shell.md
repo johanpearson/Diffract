@@ -73,7 +73,8 @@ JSON-RPC 2.0 over the sidecar's stdin and stdout.
 | `system.listTerminals` | none | the installed terminals, the default first (phase 5) |
 | `system.openTerminal` | `path`, optional `terminal` | none (phase 5) |
 | `git.checkUpdate` | none | installed and available Git for Windows versions (phase 6) |
-| `git.update` | none | starts the winget update (phase 6) |
+| `git.update` | `version`, the one the user confirmed | how the winget update ended (phase 6) |
+| `git.openDownloadPage` | none | none. Opens gitforwindows.org in the browser (phase 6) |
 | `app.shutdown` | none | none, then the sidecar exits |
 
 - **Notifications from the sidecar:** `repo.changed` with `repoId`, what changed, the new snapshot summary and the new leftovers. The UI replaces its state with what it receives and animates the difference.
@@ -151,7 +152,7 @@ Tests: Vitest and Testing Library for components, against the contract samples. 
 
 **Checkpoint:** Johan reviews how the update check works before it is wired into the UI.
 
-The spike's result, and the proposal for `git.update`, are in `docs/findings/winget.md`.
+The spike's result, and how the update runs, are in `docs/findings/winget.md`. At the checkpoint on 2026-10-21 (#25), Johan chose to read `winget list` with its exit code over installing the `Microsoft.WinGet.Client` module. He agreed that the update accepts the Git for Windows license with `--accept-package-agreements`, which the confirm dialog says, and that Diffract offers the download page instead of an update when the git it uses is not the one winget manages.
 
 ## Phase 7: real-world check
 

@@ -106,4 +106,6 @@ internal static class RpcJson
 [JsonSerializable(typeof(RepoState))]
 [JsonSerializable(typeof(RepoChanged))]
 [JsonSerializable(typeof(GitUpdateCheck))]
+[JsonSerializable(typeof(GitUpdateParams))]
+[JsonSerializable(typeof(GitUpdateResult))]
 internal sealed partial class RpcJsonContext : JsonSerializerContext;

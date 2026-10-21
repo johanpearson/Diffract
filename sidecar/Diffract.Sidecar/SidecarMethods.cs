@@ -16,12 +16,13 @@ internal sealed record AppInfo(string SidecarVersion, string? GitVersion, bool G
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.openDownloadPage"];
 
     private readonly RepoSessions _repos;
     private readonly IProcessStarter _processes;
     private readonly TerminalLauncher _terminal;
     private readonly GitUpdateChecker _updates;
+    private readonly GitUpdater _updater;
 
     /// <param name="notify">Sends a notification to the app, such as <c>repo.changed</c>. Tests may leave it out.</param>
     /// <param name="log">Where problems with no request to answer are reported.</param>
@@ -40,7 +41,9 @@ internal sealed class SidecarMethods : IDisposable
         RunnerOptions = runnerOptions with { ReadOnly = true };
         _processes = processes ?? new ProcessStarter();
         _terminal = new TerminalLauncher(_processes, machine ?? MachineLayout.Current);
-        _updates = new GitUpdateChecker(commands ?? new CommandRunner(RunnerOptions.TimeProvider), machine ?? MachineLayout.Current);
+        commands ??= new CommandRunner(RunnerOptions.TimeProvider);
+        _updates = new GitUpdateChecker(commands, machine ?? MachineLayout.Current);
+        _updater = new GitUpdater(_updates, commands);
         notify ??= (_, _) => Task.CompletedTask;
         _repos = new RepoSessions(
             RunnerOptions,
@@ -94,6 +97,15 @@ internal sealed class SidecarMethods : IDisposable
                 case "git.checkUpdate":
                     return Result(await _updates.CheckAsync(await InstalledGitAsync(ct).ConfigureAwait(false), ct).ConfigureAwait(false));
 
+                case "git.update":
+                    var version = Required(Params<GitUpdateParams>(parameters).Version, "version");
+                    return Result(await _updater.UpdateAsync(await InstalledGitAsync(ct).ConfigureAwait(false), version, ct).ConfigureAwait(false));
+
+                case "git.openDownloadPage":
+                    // A fixed address, so the UI cannot make Explorer open anything else. Explorer hands it to the browser.
+                    _processes.Start(Explorer, [GitUpdateChecker.DownloadPage]);
+                    return RpcResponse.NullResult;
+
                 default:
                     throw new RpcException(RpcErrorCodes.MethodNotFound, $"Unknown method '{method}'");
             }
@@ -117,9 +129,10 @@ internal sealed class SidecarMethods : IDisposable
     }
 
     /// <summary>Opens an existing folder in Explorer.</summary>
-    private void OpenFolder(string path) =>
-        // The full path, so a program called explorer.exe elsewhere on PATH is never the one started.
-        _processes.Start(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), [ExistingFolder(path)]);
+    private void OpenFolder(string path) => _processes.Start(Explorer, [ExistingFolder(path)]);
+
+    /// <summary>The full path, so a program called explorer.exe elsewhere on PATH is never the one started.</summary>
+    private static string Explorer => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
 
     /// <summary>
     /// The full path of an existing folder, without a trailing separator. Anything else is refused, so the UI can

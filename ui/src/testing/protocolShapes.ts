@@ -2,11 +2,13 @@ import {
   changeKinds,
   terminalKinds,
   errorKinds,
+  gitUpdateOutcomes,
   gitUpdateStatuses,
   leftoverKinds,
   verdicts,
   type AppInfo,
   type GitUpdateCheck,
+  type GitUpdateResult,
   type Leftover,
   type LeftoverFolderInfo,
   type LeftoverSummary,
@@ -96,6 +98,8 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
     problem: nullable(string),
     downloadPage: string,
   }),
+  "git.update": object<GitUpdateResult>({ outcome: oneOf(gitUpdateOutcomes), message: string }),
+  "git.openDownloadPage": nullValue,
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {

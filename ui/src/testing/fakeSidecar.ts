@@ -1,5 +1,5 @@
 import openSample from "../../../tests/Diffract.Sidecar.Tests/Contract/repo.open.json";
-import type { AppInfo, GitUpdateCheck, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
+import type { AppInfo, GitUpdateCheck, GitUpdateResult, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
 import { FakeTransport } from "./fakeTransport";
 
 /** The repo in the repo.open contract sample, which the sidecar's own tests write. */
@@ -33,6 +33,11 @@ export class FakeSidecar {
     problem: null,
     downloadPage: "https://gitforwindows.org/",
   };
+  /** How the next git.update ends. */
+  gitUpdateResult: GitUpdateResult = { outcome: "Updated", message: "Git for Windows 2.55.0.5 is installed." };
+  /** Every version git.update was asked to install. */
+  readonly gitUpdates: string[] = [];
+  downloadPageOpened = 0;
   /** Requests with these methods get no answer until `release` is called, like a slow sidecar. */
   readonly held = new Set<keyof Methods>();
   /** Set to make the next request to that method fail. */
@@ -80,7 +85,7 @@ export class FakeSidecar {
   }
 
   private respond(method: keyof Methods, params: unknown): unknown {
-    const p = (params ?? {}) as { path?: string; repoId?: string; terminal?: TerminalKind };
+    const p = (params ?? {}) as { path?: string; repoId?: string; terminal?: TerminalKind; version?: string };
     switch (method) {
       case "app.info":
         return this.info;
@@ -101,6 +106,12 @@ export class FakeSidecar {
         return null;
       case "git.checkUpdate":
         return this.gitUpdate;
+      case "git.update":
+        this.gitUpdates.push(p.version ?? "");
+        return this.gitUpdateResult;
+      case "git.openDownloadPage":
+        this.downloadPageOpened++;
+        return null;
       case "repo.close":
       case "app.shutdown":
         return null;

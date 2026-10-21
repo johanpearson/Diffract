@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "outcome": "Updated",
+    "message": "Git for Windows 2.55.0.5 is installed."
+  }
+}

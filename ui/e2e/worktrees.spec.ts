@@ -141,3 +141,33 @@ test("chooses a terminal from the arrow next to the button", async ({ page }) =>
   expect(await page.evaluate(() => window.diffractTest.sidecar.openedTerminals)).toEqual([String.raw`C:\src\shop in WindowsPowerShell`]);
   await expect(page.getByRole("button", { name: "Open in Windows PowerShell" })).toBeVisible();
 });
+
+test("offers a newer Git for Windows and installs it only after the user confirms", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Open a repo" })).toBeVisible();
+
+  // With no repo open, a restart makes the app start over, so it checks for an update again and finds this one.
+  await page.evaluate(() => {
+    window.diffractTest.sidecar.gitUpdate = {
+      status: "UpdateAvailable",
+      installedVersion: "2.47.1",
+      availableVersion: "2.55.0.5",
+      problem: null,
+      downloadPage: "https://gitforwindows.org/",
+    };
+    window.diffractTest.sidecarEvent({ kind: "restarted" });
+  });
+  await page.getByRole("button", { name: "Update…" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("From 2.47.1 to 2.55.0.5.");
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  expect(await page.evaluate(() => window.diffractTest.sidecar.gitUpdates)).toEqual([]);
+
+  await dialog.getByRole("button", { name: "Update" }).click();
+
+  await expect(dialog.getByRole("heading", { name: "Git for Windows is updated" })).toBeVisible();
+  expect(await page.evaluate(() => window.diffractTest.sidecar.gitUpdates)).toEqual(["2.55.0.5"]);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toBeHidden();
+});
