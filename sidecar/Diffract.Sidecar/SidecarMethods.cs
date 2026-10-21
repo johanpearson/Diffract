@@ -13,17 +13,29 @@ namespace Diffract.Sidecar;
 internal sealed record AppInfo(string SidecarVersion, string? GitVersion, bool GitSupported, string? GitProblem);
 
 /// <summary>The methods the sidecar answers. Every git call goes through a read-only runner.</summary>
-internal sealed class SidecarMethods
+internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
     public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close"];
 
     private readonly RepoSessions _repos;
 
-    public SidecarMethods(GitRunnerOptions runnerOptions, DiffractConfig? config = null)
+    /// <param name="notify">Sends a notification to the app, such as <c>repo.changed</c>. Tests may leave it out.</param>
+    /// <param name="log">Where problems with no request to answer are reported.</param>
+    public SidecarMethods(
+        GitRunnerOptions runnerOptions,
+        DiffractConfig? config = null,
+        Func<string, JsonElement, Task>? notify = null,
+        TextWriter? log = null)
     {
         RunnerOptions = runnerOptions with { ReadOnly = true };
-        _repos = new RepoSessions(RunnerOptions, config ?? DiffractConfig.Default, RunnerOptions.TimeProvider);
+        notify ??= (_, _) => Task.CompletedTask;
+        _repos = new RepoSessions(
+            RunnerOptions,
+            config ?? DiffractConfig.Default,
+            RunnerOptions.TimeProvider,
+            changed => notify("repo.changed", Result(changed)),
+            log ?? TextWriter.Null);
     }
 
     /// <summary>The options every git call uses. Read-only, whatever was passed in.</summary>
@@ -64,6 +76,9 @@ internal sealed class SidecarMethods
             throw rpc;
         }
     }
+
+    /// <summary>Stops watching every open repo.</summary>
+    public void Dispose() => _repos.Dispose();
 
     public async Task<AppInfo> AppInfoAsync(CancellationToken ct)
     {

@@ -16,8 +16,11 @@ internal static class Program
         using var input = new StreamReader(Console.OpenStandardInput(), utf8);
         await using var output = new StreamWriter(Console.OpenStandardOutput(), utf8) { AutoFlush = true, NewLine = "\n" };
 
-        var methods = new SidecarMethods(new GitRunnerOptions());
-        await new RpcHost(input, output, methods.Dispatch, Console.Error).RunAsync(CancellationToken.None);
+        // The methods send notifications through the host, and the host dispatches to the methods.
+        RpcHost? host = null;
+        using var methods = new SidecarMethods(new GitRunnerOptions(), notify: (method, parameters) => host!.NotifyAsync(method, parameters), log: Console.Error);
+        host = new RpcHost(input, output, methods.Dispatch, Console.Error);
+        await host.RunAsync(CancellationToken.None);
         return 0;
     }
 }

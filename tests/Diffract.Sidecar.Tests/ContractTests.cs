@@ -104,7 +104,8 @@ public class ContractTests
     {
         using var temp = new TempDirectory();
         var scenario = await new FixtureRepoBuilder(temp).StaleAgentWorktreeAsync();
-        await using var host = new HostHarness(new SidecarMethods(new GitRunnerOptions { Environment = IsolatedGit.Environment(temp) }).Dispatch);
+        using var methods = new SidecarMethods(new GitRunnerOptions { Environment = IsolatedGit.Environment(temp) });
+        await using var host = new HostHarness(methods.Dispatch);
 
         host.Send($$$"""{"jsonrpc":"2.0","id":1,"method":"repo.open","params":{"path":{{{JsonSerializer.Serialize(scenario.RepoPath)}}}}}""");
         var real = Paths(JsonDocument.Parse(await host.NextAsync()).RootElement);
