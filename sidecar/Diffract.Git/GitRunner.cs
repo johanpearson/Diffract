@@ -3,6 +3,11 @@ using System.Text;
 
 namespace Diffract.Git;
 
+/// <summary>
+/// Reads git's standard output while it is written. Returns true when it read to the end, false to stop git early.
+/// </summary>
+public delegate Task<bool> GitOutputReader(Stream output, CancellationToken ct);
+
 /// <summary>Runs git as a child process in one working directory.</summary>
 public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
 {
@@ -18,6 +23,23 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
     /// </summary>
     public async Task<GitResult> RunAsync(IReadOnlyList<string> args, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct)
     {
+        using var buffer = new MemoryStream();
+        var result = await StreamAsync(args, async (output, token) =>
+        {
+            await output.CopyToAsync(buffer, token).ConfigureAwait(false);
+            return true;
+        }, allowedExitCodes, ct).ConfigureAwait(false);
+        return new GitResult(args, result.ExitCode!.Value, buffer.ToArray(), result.StandardError, result.Duration);
+    }
+
+    /// <summary>
+    /// Runs git and hands its output to <paramref name="read"/> as it arrives, so large output never has to be held whole.
+    /// When <paramref name="read"/> returns false, git is stopped and its exit code is not checked. When it throws,
+    /// git is stopped and the exception is passed on. Timeout and cancellation cover the reading too.
+    /// </summary>
+    public async Task<GitStreamResult> StreamAsync(
+        IReadOnlyList<string> args, GitOutputReader read, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct)
+    {
         if (Options.ReadOnly && !ReadOnlyPolicy.IsAllowed(args, out var reason))
             throw new ReadOnlyViolationException(args, reason);
 
@@ -27,32 +49,59 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
 
         using var process = new Process { StartInfo = CreateStartInfo(args) };
         process.Start();
-        process.StandardInput.Close();
+        try
+        {
+            process.StandardInput.Close();
+            var result = await ReadAsync(process, args, read, ct).ConfigureAwait(false);
+            var streamed = new GitStreamResult(args, result.ExitCode, result.StandardError, time.GetElapsedTime(started));
+            if (streamed.ExitCode is { } code && code != 0 && !allowedExitCodes.Contains(code))
+                throw new GitCommandException(args, code, streamed.StandardError);
+            return streamed;
+        }
+        finally
+        {
+            Options.OnCall?.Invoke(new GitCall(args, time.GetElapsedTime(started)));
+        }
+    }
 
-        using var timeout = new CancellationTokenSource(Options.Timeout, time);
+    private async Task<(int? ExitCode, string StandardError)> ReadAsync(Process process, IReadOnlyList<string> args, GitOutputReader read, CancellationToken ct)
+    {
+        using var timeout = new CancellationTokenSource(Options.Timeout, Options.TimeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
-        var stdoutTask = ReadAllBytesAsync(process.StandardOutput.BaseStream, linked.Token);
+        var stdout = process.StandardOutput.BaseStream;
         var stderrTask = process.StandardError.ReadToEndAsync(linked.Token);
 
         try
         {
+            if (!await read(stdout, linked.Token).ConfigureAwait(false))
+            {
+                Kill(process);
+                return (null, await StandardErrorSoFarAsync(stderrTask).ConfigureAwait(false));
+            }
+
+            // Whatever the reader left unread, so git is never blocked writing to a full pipe.
+            await stdout.CopyToAsync(Stream.Null, linked.Token).ConfigureAwait(false);
             await process.WaitForExitAsync(linked.Token).ConfigureAwait(false);
-            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+            return (process.ExitCode, await stderrTask.ConfigureAwait(false));
         }
         catch (OperationCanceledException)
         {
             Kill(process);
-            await Task.WhenAll(stdoutTask, stderrTask).ContinueWith(_ => { }, CancellationToken.None).ConfigureAwait(false);
+            await StandardErrorSoFarAsync(stderrTask).ConfigureAwait(false);
             if (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
                 throw new GitTimeoutException(args, Options.Timeout);
             throw;
         }
-
-        var result = new GitResult(args, process.ExitCode, stdoutTask.Result, stderrTask.Result, time.GetElapsedTime(started));
-        if (result.ExitCode != 0 && !allowedExitCodes.Contains(result.ExitCode))
-            throw new GitCommandException(args, result.ExitCode, result.StandardError);
-        return result;
+        catch
+        {
+            Kill(process);
+            await StandardErrorSoFarAsync(stderrTask).ConfigureAwait(false);
+            throw;
+        }
     }
+
+    private static Task<string> StandardErrorSoFarAsync(Task<string> stderrTask) =>
+        stderrTask.ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : "", CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
 
     private ProcessStartInfo CreateStartInfo(IReadOnlyList<string> args)
     {
@@ -86,13 +135,6 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         psi.Environment["GIT_CONFIG_KEY_1"] = "core.fsmonitor";
         psi.Environment["GIT_CONFIG_VALUE_1"] = "false";
         return psi;
-    }
-
-    private static async Task<byte[]> ReadAllBytesAsync(Stream stream, CancellationToken ct)
-    {
-        using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, ct).ConfigureAwait(false);
-        return buffer.ToArray();
     }
 
     private static void Kill(Process process)

@@ -148,6 +148,74 @@ public class GitRunnerTests
     }
 
     [Fact]
+    public async Task Streams_output_and_stops_the_process_when_the_reader_has_enough()
+    {
+        using var temp = new TempDirectory();
+        // ping writes a line a second for 30 seconds, so returning early shows the process was stopped.
+        var runner = new GitRunner(temp.Path, new GitRunnerOptions { ReadOnly = false, GitExecutable = "cmd.exe" });
+        var started = DateTime.UtcNow;
+        var firstBytes = 0;
+
+        var result = await runner.StreamAsync(["/c", "ping", "-n", "30", "127.0.0.1"], async (output, ct) =>
+        {
+            firstBytes = await output.ReadAsync(new byte[16], ct);
+            return false;
+        }, [], Ct);
+
+        Assert.True(firstBytes > 0);
+        Assert.True(result.StoppedEarly);
+        Assert.Null(result.ExitCode);
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task A_reader_that_fails_stops_the_process_and_its_error_is_passed_on()
+    {
+        using var temp = new TempDirectory();
+        var runner = new GitRunner(temp.Path, new GitRunnerOptions { ReadOnly = false, GitExecutable = "cmd.exe" });
+        var started = DateTime.UtcNow;
+
+        await Assert.ThrowsAsync<FormatException>(() => runner.StreamAsync(["/c", "ping", "-n", "30", "127.0.0.1"], async (output, ct) =>
+        {
+            _ = await output.ReadAsync(new byte[16], ct);
+            throw new FormatException("Unexpected output");
+        }, [], Ct));
+
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task A_streamed_call_still_checks_the_exit_code()
+    {
+        using var temp = new TempDirectory();
+        await IsolatedGit.WritableRunner(temp, temp.Path).RunAsync(["init", "-q", "-b", "main"], Ct);
+        var runner = IsolatedGit.ReadOnlyRunner(temp, temp.Path);
+
+        var ex = await Assert.ThrowsAsync<GitCommandException>(() => runner.StreamAsync(["log", "refs/heads/nope", "--"], async (output, ct) =>
+        {
+            await output.CopyToAsync(Stream.Null, ct);
+            return true;
+        }, [], Ct));
+
+        Assert.Equal(128, ex.ExitCode);
+    }
+
+    [Fact]
+    public async Task Every_started_process_is_reported_whether_it_succeeds_or_fails()
+    {
+        using var temp = new TempDirectory();
+        await IsolatedGit.WritableRunner(temp, temp.Path).RunAsync(["init", "-q", "-b", "main"], Ct);
+        List<GitCall> calls = [];
+        var runner = new GitRunner(temp.Path, new GitRunnerOptions { Environment = IsolatedGit.Environment(temp), OnCall = calls.Add });
+
+        await runner.RunAsync(["version"], Ct);
+        await Assert.ThrowsAsync<GitCommandException>(() => runner.RunAsync(["rev-parse", "--verify", "refs/heads/nope"], Ct));
+        await Assert.ThrowsAsync<ReadOnlyViolationException>(() => runner.RunAsync(["branch", "x"], Ct));
+
+        Assert.Equal(["version", "rev-parse"], calls.Select(c => c.Arguments[0]));
+    }
+
+    [Fact]
     public async Task Round_trips_non_ascii_paths_from_real_git()
     {
         using var temp = new TempDirectory();
