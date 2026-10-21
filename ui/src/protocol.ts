@@ -54,6 +54,30 @@ export interface GitUpdateCheck {
   downloadPage: string;
 }
 
+/** How `git.update` ended. */
+export const gitUpdateOutcomes = ["Updated", "RestartNeeded", "Failed"] as const;
+export type GitUpdateOutcome = (typeof gitUpdateOutcomes)[number];
+
+/** A program using Git for Windows, from `git.inUse`. Its installer will not replace git while it runs. */
+export interface GitInUse {
+  /** Such as "Visual Studio Code" or "Git Bash". */
+  program: string;
+  /** The program that started it, when that tells more. */
+  startedBy: string | null;
+  /** How many of Git for Windows' processes it runs. */
+  processes: number;
+}
+
+/** Result of `git.update`. */
+export interface GitUpdateResult {
+  outcome: GitUpdateOutcome;
+  /** What happened, in plain English. */
+  message: string;
+  /** When programs using git stopped the update: who they are. Empty otherwise. */
+  inUse: GitInUse[];
+}
+
+
 /** Result of `app.info`. */
 export interface AppInfo {
   sidecarVersion: string;
@@ -164,6 +188,15 @@ export interface Methods {
   "system.openTerminal": { params: { path: string; terminal?: TerminalKind }; result: null };
   /** Asks winget whether a newer Git for Windows is available. Installs nothing. Can take several seconds. */
   "git.checkUpdate": { params: undefined; result: GitUpdateCheck };
+  /**
+   * Updates Git for Windows to `version`, the availableVersion the user confirmed. Checks again first and installs
+   * nothing if winget now offers something else. Takes minutes, and Windows asks for permission.
+   */
+  "git.update": { params: { version: string }; result: GitUpdateResult };
+  /** The programs using Git for Windows right now, apart from Diffract. Only reads the process list. */
+  "git.inUse": { params: undefined; result: GitInUse[] };
+  /** Opens gitforwindows.org in the browser. */
+  "git.openDownloadPage": { params: undefined; result: null };
 }
 
 /** Every notification the sidecar sends, with its params. */

@@ -8,6 +8,8 @@ export interface E2eControls {
   nextFolder: string | null;
   /** As if the Rust core had restarted the sidecar, or given up on it. */
   sidecarEvent(event: SidecarEvent): void;
+  /** The app's settings for this page load, such as the remembered answer from winget. */
+  storage: Map<string, string>;
 }
 
 declare global {
@@ -27,6 +29,7 @@ export function createE2eHost(): AppHost {
     sidecar: new FakeSidecar(),
     nextFolder: null,
     sidecarEvent: (event) => handlers.forEach((handler) => handler(event)),
+    storage: memory,
   };
   window.diffractTest = controls;
 

@@ -40,5 +40,10 @@
     "UpToDate",
     "UpdateAvailable",
     "Unknown"
+  ],
+  "gitUpdateOutcome": [
+    "Updated",
+    "RestartNeeded",
+    "Failed"
   ]
 }

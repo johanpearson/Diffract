@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": [
+    {
+      "program": "CodeScene cs-ide tool for windows",
+      "startedBy": "Visual Studio Code",
+      "processes": 2
+    },
+    {
+      "program": "Git Bash",
+      "startedBy": null,
+      "processes": 3
+    }
+  ]
+}

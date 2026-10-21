@@ -84,32 +84,9 @@ internal sealed class TerminalLauncher(IProcessStarter processes, MachineLayout 
         TerminalKind.PowerShell7 => Existing(Path.Combine(machine.ProgramFiles, "PowerShell", "7", "pwsh.exe"))
             ?? Existing(Path.Combine(machine.LocalAppData, "Microsoft", "WindowsApps", "pwsh.exe")),
         TerminalKind.CommandPrompt => Existing(Path.Combine(machine.SystemDirectory, "cmd.exe")),
-        TerminalKind.GitBash => FindGitBash(),
+        TerminalKind.GitBash => GitForWindows.FindFolder(machine) is { } folder ? Path.Combine(folder, "git-bash.exe") : null,
         _ => null,
     };
-
-    /// <summary>
-    /// git-bash.exe sits in Git for Windows' install folder, a level or two above the git.exe that is on PATH
-    /// (cmd\git.exe or mingw64\bin\git.exe). The default install folder is the fallback.
-    /// </summary>
-    private string? FindGitBash()
-    {
-        var gitFolders = (machine.Path ?? "")
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(dir => Path.IsPathFullyQualified(dir) && machine.FileExists(Path.Combine(dir, "git.exe")));
-
-        foreach (var folder in gitFolders)
-        {
-            // Two levels up at most: cmd\ and mingw64\bin\ are the layouts Git for Windows has.
-            var dir = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(folder));
-            for (var level = 0; level < 2 && dir is not null; level++, dir = Path.GetDirectoryName(dir))
-            {
-                if (Existing(Path.Combine(dir, "git-bash.exe")) is { } found)
-                    return found;
-            }
-        }
-        return Existing(Path.Combine(machine.ProgramFiles, "Git", "git-bash.exe"));
-    }
 
     private string? Existing(string path) => machine.FileExists(path) ? path : null;
 }

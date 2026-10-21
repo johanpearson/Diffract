@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorPanel } from "./components/ErrorPanel";
+import { GitUpdateBar } from "./components/GitUpdateBar";
+import { GitUpdateDialog } from "./components/GitUpdateDialog";
 import { LeftoversView, type Filter } from "./components/LeftoversView";
 import { Sidebar } from "./components/Sidebar";
 import type { AppHost } from "./host";
 import { folderName } from "./model/format";
 import { FlashMs, initialRows, settleRows, updateRows, type Row } from "./model/rows";
+import { useGitUpdate } from "./model/useGitUpdate";
 import { terminalKinds, type AppInfo, type RepoState, type TerminalInfo, type TerminalKind } from "./protocol";
 import { ErrorCodes, RpcError, type RpcClient } from "./rpc";
 
@@ -41,6 +44,10 @@ export function App({ host, client, clock = systemClock }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [starts, setStarts] = useState(0);
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
+  const git = useGitUpdate(client, host, clock);
+  const { checkForUpdate } = git;
+  // The available version the user said "Not now" to. A newer one is offered again.
+  const [declined, setDeclined] = useState<string | null>(null);
   const [terminalId, setTerminalId] = useState<TerminalKind | null>(() => {
     const stored = host.storage.get(TerminalKey);
     return terminalKinds.find((k) => k === stored) ?? null;
@@ -92,10 +99,21 @@ export function App({ host, client, clock = systemClock }: Props) {
         setInfo(appInfo);
         // Not knowing the terminals only means "Open terminal" uses the default one.
         client.call("system.listTerminals", undefined).then((list) => current && setTerminals(list), () => {});
-        if (!appInfo.gitSupported) return setScreen({ kind: "gitProblem", problem: appInfo.gitProblem ?? "This git cannot be used." });
+        // A git that is too old is the only thing on screen, so its update is checked at once. Otherwise winget is
+        // asked only once the repo is open, at most once a day: it starts processes, which slows opening the repo.
+        if (!appInfo.gitSupported) {
+          void checkForUpdate(appInfo.gitVersion, true);
+          return setScreen({ kind: "gitProblem", problem: appInfo.gitProblem ?? "This git cannot be used." });
+        }
         const last = host.storage.get(LastRepoKey);
-        if (last) void open(last);
-        else setScreen({ kind: "welcome" });
+        if (last)
+          void open(last).then(() => {
+            if (current) void checkForUpdate(appInfo.gitVersion, false);
+          });
+        else {
+          setScreen({ kind: "welcome" });
+          void checkForUpdate(appInfo.gitVersion, false);
+        }
       })
       .catch((error: unknown) => {
         if (current) setScreen({ kind: "failed", title: "The sidecar did not answer", message: messageOf(error), path: null });
@@ -103,7 +121,7 @@ export function App({ host, client, clock = systemClock }: Props) {
     return () => {
       current = false;
     };
-  }, [client, host, open, starts]);
+  }, [client, host, open, starts, checkForUpdate]);
 
   // Live updates for the repo on screen.
   useEffect(
@@ -156,12 +174,13 @@ export function App({ host, client, clock = systemClock }: Props) {
     [host, open],
   );
 
-  const refresh = useCallback(async () => {
+  /** `includeUnreachable` also runs `git fsck`, the slowest call by far. */
+  const refresh = useCallback(async (includeUnreachable = true) => {
     const current = repo.current;
     if (!current) return;
     setRefreshing(true);
     try {
-      const state = await client.call("repo.refresh", { repoId: current.id, includeUnreachable: true });
+      const state = await client.call("repo.refresh", { repoId: current.id, includeUnreachable });
       if (state.repoId !== repo.current?.id) return;
       setRows((previous) => updateRows(previous, state.leftovers));
       setScreen({ kind: "ready", state });
@@ -171,6 +190,31 @@ export function App({ host, client, clock = systemClock }: Props) {
       setRefreshing(false);
     }
   }, [client]);
+
+  /**
+   * After an update, whatever its outcome: the git now installed, a new update check, and the repo refreshed,
+   * since live refresh was paused meanwhile. A git that was too old and now works starts the app over.
+   */
+  const afterUpdate = useCallback(async () => {
+    try {
+      const appInfo = await client.call("app.info", undefined);
+      const wasSupported = info?.gitSupported ?? false;
+      setInfo(appInfo);
+      void checkForUpdate(appInfo.gitVersion, true);
+      if (appInfo.gitSupported && !wasSupported) setStarts((n) => n + 1);
+      else if (appInfo.gitSupported) await refresh(false);
+    } catch (error) {
+      setNotice(`Could not check git after the update: ${messageOf(error)}`);
+    }
+  }, [client, info, checkForUpdate, refresh]);
+
+
+  const openDownloadPage = useCallback(() => {
+    client.call("git.openDownloadPage", undefined).catch((error: unknown) => setNotice(messageOf(error)));
+  }, [client]);
+
+  /** The newer Git for Windows that winget can install, or null. */
+  const offered = git.check?.status === "UpdateAvailable" ? git.check.availableVersion : null;
 
   const openFolder = useCallback(
     (path: string) => {
@@ -203,10 +247,38 @@ export function App({ host, client, clock = systemClock }: Props) {
             git {info.gitVersion ?? "not found"} · sidecar {info.sidecarVersion}
           </span>
         )}
-        <button className="abtn" onClick={() => void pickAndOpen()} disabled={screen.kind === "starting" || screen.kind === "gitProblem"}>
+        <button
+          className="abtn"
+          onClick={() => void pickAndOpen()}
+          disabled={screen.kind === "starting" || screen.kind === "gitProblem" || git.running}
+          title={git.running ? "Wait until Git for Windows is updated" : undefined}
+        >
           Open repo…
         </button>
       </header>
+
+      {git.result && (
+        <GitUpdateBar
+          result={git.result}
+          onTryAgain={offered ? () => git.askToUpdate(offered) : null}
+          onDownloadPage={openDownloadPage}
+          onDismiss={git.dismissResult}
+        />
+      )}
+
+      {offered && info?.gitSupported && declined !== offered && !git.result && !git.running && (
+        <div className="notice quiet" role="status">
+          <span>
+            Git for Windows {offered} is available. You have {git.check?.installedVersion}.
+          </span>
+          <button className="abtn" onClick={() => git.askToUpdate(offered)}>
+            Update…
+          </button>
+          <button className="abtn" onClick={() => setDeclined(offered)}>
+            Not now
+          </button>
+        </div>
+      )}
 
       {notice && (
         <div className="notice" role="status">
@@ -234,7 +306,17 @@ export function App({ host, client, clock = systemClock }: Props) {
             </div>
           )}
           {screen.kind === "gitProblem" && (
-            <ErrorPanel title="Diffract cannot use this git" message={screen.problem} actions={[{ label: "Check again", run: () => setStarts((n) => n + 1) }]} />
+            <ErrorPanel
+              title="Diffract cannot use this git"
+              message={screen.problem}
+              detail={git.check?.status === "Unknown" ? git.check.problem : null}
+              actions={[
+                offered
+                  ? { label: `Update to ${offered}…`, run: () => git.askToUpdate(offered) }
+                  : { label: "Open download page", run: openDownloadPage },
+                { label: "Check again", run: () => setStarts((n) => n + 1) },
+              ]}
+            />
           )}
           {screen.kind === "failed" && (
             <ErrorPanel
@@ -257,11 +339,23 @@ export function App({ host, client, clock = systemClock }: Props) {
               terminalName={terminal?.name ?? null}
               onRefresh={() => void refresh()}
               refreshing={refreshing}
+              refreshBlocked={git.running ? "Wait until Git for Windows is updated" : null}
               now={now}
             />
           )}
         </main>
       </div>
+
+      {git.confirm && (
+        <GitUpdateDialog
+          installed={info?.gitVersion ?? null}
+          version={git.confirm.version}
+          inUse={git.confirm.inUse}
+          onCheckAgain={git.findUsers}
+          onConfirm={() => void git.update(git.confirm!.version, () => void afterUpdate())}
+          onCancel={git.cancelConfirm}
+        />
+      )}
     </div>
   );
 }
