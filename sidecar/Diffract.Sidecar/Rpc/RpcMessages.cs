@@ -14,14 +14,35 @@ internal sealed record RpcResponse(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? Result,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] RpcError? Error)
 {
+    /// <summary>A JSON <c>null</c>. A successful response must carry a result, even when there is nothing to say.</summary>
+    public static JsonElement NullResult { get; } = JsonDocument.Parse("null").RootElement;
+
     public static RpcResponse Success(JsonElement? id, JsonElement result) => new("2.0", id, result, null);
 
-    public static RpcResponse Failure(JsonElement? id, int code, string message) => new("2.0", id, null, new RpcError(code, message));
+    public static RpcResponse Failure(JsonElement? id, int code, string message, ErrorKind? kind = null) =>
+        new("2.0", id, null, new RpcError(code, message, kind is { } k ? new RpcErrorData(k) : null));
 }
 
-internal sealed record RpcError(int Code, string Message);
+/// <summary>A message from the sidecar that needs no answer, such as <c>repo.changed</c>.</summary>
+internal sealed record RpcNotification(string Jsonrpc, string Method, JsonElement Params)
+{
+    public RpcNotification(string method, JsonElement parameters) : this("2.0", method, parameters)
+    {
+    }
+}
 
-/// <summary>The error codes JSON-RPC 2.0 defines.</summary>
+internal sealed record RpcError(
+    int Code,
+    string Message,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] RpcErrorData? Data);
+
+/// <summary>Set on Diffract's own errors, so the UI can tell them apart without reading the message.</summary>
+internal sealed record RpcErrorData(ErrorKind Kind);
+
+/// <summary>What went wrong, for errors that are Diffract's own rather than the protocol's.</summary>
+internal enum ErrorKind { NotARepo, GitTooOld, GitFailed, TimedOut, ConfigInvalid }
+
+/// <summary>The error codes JSON-RPC 2.0 defines, the one LSP adds for cancellation, and Diffract's own.</summary>
 internal static class RpcErrorCodes
 {
     public const int ParseError = -32700;
@@ -29,15 +50,35 @@ internal static class RpcErrorCodes
     public const int MethodNotFound = -32601;
     public const int InvalidParams = -32602;
     public const int InternalError = -32603;
+
+    /// <summary>The request was cancelled with <c>$/cancelRequest</c> or because the sidecar is shutting down.</summary>
+    public const int RequestCancelled = -32800;
+
+    public static int For(ErrorKind kind) => kind switch
+    {
+        ErrorKind.NotARepo => -32001,
+        ErrorKind.GitTooOld => -32002,
+        ErrorKind.GitFailed => -32003,
+        ErrorKind.TimedOut => -32004,
+        ErrorKind.ConfigInvalid => -32005,
+        _ => InternalError,
+    };
 }
 
-internal sealed class RpcException(int code, string message) : Exception(message)
+/// <summary>Thrown by a method to answer with an error. <see cref="Kind"/> is set for Diffract's own errors.</summary>
+internal sealed class RpcException(int code, string message, ErrorKind? kind = null) : Exception(message)
 {
     public int Code { get; } = code;
+
+    public ErrorKind? Kind { get; } = kind;
+
+    public RpcException(ErrorKind kind, string message) : this(RpcErrorCodes.For(kind), message, kind)
+    {
+    }
 }
 
 /// <summary>
-/// Serializer settings for everything the sidecar writes. Relaxed escaping keeps quotes and å ä ö readable;
+/// Serializer settings for everything the sidecar reads and writes. Relaxed escaping keeps quotes and å ä ö readable;
 /// the output is read by the app, never embedded in HTML.
 /// </summary>
 internal static class RpcJson
@@ -47,13 +88,18 @@ internal static class RpcJson
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static JsonTypeInfo<RpcResponse> Response { get; } = (JsonTypeInfo<RpcResponse>)Options.GetTypeInfo(typeof(RpcResponse));
-
-    public static JsonTypeInfo<AppInfo> AppInfo { get; } = (JsonTypeInfo<AppInfo>)Options.GetTypeInfo(typeof(AppInfo));
+    public static JsonTypeInfo<T> Type<T>() => (JsonTypeInfo<T>)Options.GetTypeInfo(typeof(T));
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, UseStringEnumConverter = true)]
 [JsonSerializable(typeof(RpcRequest))]
 [JsonSerializable(typeof(RpcResponse))]
+[JsonSerializable(typeof(RpcNotification))]
+[JsonSerializable(typeof(CancelParams))]
 [JsonSerializable(typeof(AppInfo))]
+[JsonSerializable(typeof(RepoOpenParams))]
+[JsonSerializable(typeof(RepoRefreshParams))]
+[JsonSerializable(typeof(RepoCloseParams))]
+[JsonSerializable(typeof(RepoState))]
+[JsonSerializable(typeof(RepoChanged))]
 internal sealed partial class RpcJsonContext : JsonSerializerContext;

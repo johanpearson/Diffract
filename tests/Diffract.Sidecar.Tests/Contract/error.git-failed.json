@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32003,
+    "message": "git status --porcelain=v2 -z failed with exit code 128: fatal: unable to read tree",
+    "data": {
+      "kind": "GitFailed"
+    }
+  }
+}

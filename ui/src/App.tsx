@@ -10,7 +10,7 @@ export function App({ client }: { client: RpcClient }) {
   useEffect(() => {
     let current = true;
     client
-      .request<AppInfo>("app.info")
+      .call("app.info", undefined)
       .then((info) => current && setState({ kind: "ready", info }))
       .catch((error: unknown) => current && setState({ kind: "failed", message: error instanceof Error ? error.message : String(error) }));
     return () => {

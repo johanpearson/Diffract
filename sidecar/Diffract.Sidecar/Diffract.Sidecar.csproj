@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Diffract.Git\Diffract.Git.csproj" />
+    <ProjectReference Include="..\Diffract.Leftovers\Diffract.Leftovers.csproj" />
   </ItemGroup>
 
 </Project>

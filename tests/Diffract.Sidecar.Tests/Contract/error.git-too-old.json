@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32002,
+    "message": "Diffract needs git 2.40.0 or newer, but found 2.39.5. Update git from https://git-scm.com.",
+    "data": {
+      "kind": "GitTooOld"
+    }
+  }
+}

@@ -2,7 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod framing;
+mod sidecar_log;
 
+use sidecar_log::SidecarLog;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, RunEvent, State};
 use tauri_plugin_shell::ShellExt;
@@ -23,10 +25,24 @@ fn sidecar_send(sidecar: State<Sidecar>, message: String) -> Result<(), String> 
     }
 }
 
-/// Starts the bundled sidecar and relays every line it prints to the UI as a "sidecar-message" event.
+/// Starts the bundled sidecar and relays every line it prints to stdout to the UI as a "sidecar-message" event.
+/// Lines on stderr are its logs: they go to sidecar.log in the app's log folder.
 fn start_sidecar(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let (mut events, child) = app.shell().sidecar("diffract-sidecar")?.spawn()?;
     *app.state::<Sidecar>().0.lock().unwrap() = Some(child);
+
+    // Without a log file the app still works; the lines then only reach the console in dev builds.
+    let mut log = match app.path().app_log_dir().map(|dir| SidecarLog::open(&dir)) {
+        Ok(Ok(log)) => Some(log),
+        Ok(Err(e)) => {
+            eprintln!("Could not open the sidecar log: {e}");
+            None
+        }
+        Err(e) => {
+            eprintln!("No log folder for the sidecar log: {e}");
+            None
+        }
+    };
 
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -35,7 +51,13 @@ fn start_sidecar(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error
                 CommandEvent::Stdout(line) => {
                     let _ = app.emit("sidecar-message", framing::unframe(&line));
                 }
-                CommandEvent::Stderr(line) => eprintln!("sidecar: {}", framing::unframe(&line)),
+                CommandEvent::Stderr(line) => {
+                    let line = framing::unframe(&line);
+                    eprintln!("sidecar: {line}");
+                    if let Some(log) = log.as_mut() {
+                        let _ = log.write_line(&line);
+                    }
+                }
                 CommandEvent::Terminated(status) => {
                     *app.state::<Sidecar>().0.lock().unwrap() = None;
                     let _ = app.emit("sidecar-exited", status.code);

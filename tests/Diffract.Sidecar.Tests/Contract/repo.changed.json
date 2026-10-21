@@ -1,0 +1,109 @@
+{
+  "jsonrpc": "2.0",
+  "method": "repo.changed",
+  "params": {
+    "changes": [
+      {
+        "kind": "WorktreeFiles",
+        "path": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix"
+      },
+      {
+        "kind": "Refs",
+        "path": null
+      }
+    ],
+    "state": {
+      "repoId": "1",
+      "repoRoot": "C:\\src\\shop",
+      "mainBranch": "main",
+      "takenAt": "2026-10-21T09:30:00+02:00",
+      "unreachableCountedAt": "2026-10-21T09:20:00+02:00",
+      "snapshot": {
+        "worktrees": [
+          {
+            "path": "C:\\src\\shop",
+            "isMain": true,
+            "head": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+            "branch": "main",
+            "isBare": false,
+            "isDetached": false,
+            "isLocked": false,
+            "lockReason": null,
+            "isPrunable": false,
+            "prunableReason": null,
+            "dirtyFileCount": 0,
+            "aheadOfMain": 0,
+            "behindMain": 0,
+            "lastCommitAt": "2026-10-20T09:30:00+02:00",
+            "lastActivityAt": "2026-10-21T07:30:00+02:00"
+          },
+          {
+            "path": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+            "isMain": false,
+            "head": "9fceb02d0ae598e95dc970b74767f19372d61af8",
+            "branch": "claude/räksmörgås-fix",
+            "isBare": false,
+            "isDetached": false,
+            "isLocked": true,
+            "lockReason": "claude agent agent-a1b2c3 (pid 4242)",
+            "isPrunable": false,
+            "prunableReason": null,
+            "dirtyFileCount": 3,
+            "aheadOfMain": 2,
+            "behindMain": null,
+            "lastCommitAt": null,
+            "lastActivityAt": "2026-10-21T09:26:00+02:00"
+          }
+        ],
+        "localBranches": 0,
+        "remoteBranches": 0,
+        "tags": 0,
+        "stashes": 0,
+        "otherRefs": 0,
+        "unreachableCommits": 0,
+        "leftoverFolders": [
+          {
+            "path": "C:\\src\\shop\\.claude\\worktrees\\old-task",
+            "holdsNoFiles": true,
+            "wasWorktree": false
+          }
+        ]
+      },
+      "summary": {
+        "total": 3,
+        "safeToRemove": 1,
+        "needsReview": 1,
+        "inUse": 1
+      },
+      "leftovers": [
+        {
+          "kind": "LeftoverFolder",
+          "name": "old-task",
+          "path": "C:\\src\\shop\\.claude\\worktrees\\old-task",
+          "agent": "Claude Code",
+          "verdict": "SafeToRemove",
+          "commitsAtRisk": 0,
+          "reason": "Empty folder left in a worktree container. Removing it loses nothing."
+        },
+        {
+          "kind": "LocalBranch",
+          "name": "copilot/fix-login",
+          "path": null,
+          "agent": "GitHub Copilot",
+          "verdict": "NeedsReview",
+          "commitsAtRisk": 2,
+          "reason": "Not merged into main and untouched for 21 days."
+        },
+        {
+          "kind": "Worktree",
+          "name": "räksmörgås fix",
+          "path": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+          "agent": null,
+          "verdict": "InUse",
+          "commitsAtRisk": 2,
+          "reason": "Locked: claude agent agent-a1b2c3 (pid 4242)."
+        }
+      ]
+    }
+  }
+}
