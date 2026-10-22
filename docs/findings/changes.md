@@ -2,7 +2,27 @@
 
 The spike from milestone 4, phase 0: how git behaves for everything the Changes view and the history menu will do, checked before any code that writes is written. Checked on 2026-10-22 with Git for Windows 2.55.0.5, only in fixture repos created in a temp folder, with git's global and system config switched off and a bare repo standing in for the remote.
 
-Step 1, measuring `git status` on Johan's busiest repo, is still to do.
+Step 1 was measured read-only on Repo A, Johan's busiest repo, with `GIT_OPTIONAL_LOCKS=0`.
+
+## How long status takes
+
+Repo A has 391 tracked files and 10 worktrees. Five runs each, in milliseconds, starting the real git as Diffract does:
+
+| What | Time |
+|---|---|
+| `git version` (just starting git) | 170 / 128 / 93 / 99 / 96 |
+| status, no untracked files | 261 / 110 / 244 / 113 / 113 |
+| status, untracked folders shown as one entry | 116 / 107 / 119 / 112 / 311 |
+| status, every untracked file | 168 / 135 / 177 / 125 / 193 |
+| status of all 10 worktrees, one after another | 2,693 in total |
+
+Its busiest recent day touched 148 files across its commits.
+
+What it means:
+
+- **Status costs little more than starting git.** One call per refresh is fine, with every untracked file listed, so a new file in a new folder can be staged on its own.
+- **Only the worktree on screen is read.** Reading all 10 takes almost 3 seconds. Picking another worktree reads that one.
+
 
 ## Staging a hunk
 

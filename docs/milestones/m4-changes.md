@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** planned. Phase 0 is next. All its decisions are made; the checks in steps 1 to 4 are still to do.
+**Status:** in progress. Phase 0 is done; phase 1, status and working tree diffs, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -57,7 +57,9 @@ Never: `--force` or `--force-with-lease` (milestone 8), `reset --hard`, `checkou
 
 **Checkpoint:** Johan decides the open questions below before any code that writes is written. Decided on 2026-10-22.
 
-Steps 2 to 4 were checked on 2026-10-22, in `docs/findings/changes.md`. Every case stages correctly, as long as patches are handled as bytes. They led to three changes to the allowlist above, waiting for Johan's yes: hunks are read with `-U0` so nearby changes stage on their own, pull is a fetch followed by `merge --ff-only` so Diffract decides from data instead of an error message, and push uses `--porcelain`. Step 1 is still to do.
+Steps 2 to 4 were checked on 2026-10-22, in `docs/findings/changes.md`. Every case stages correctly, as long as patches are handled as bytes. They led to three changes to the allowlist above, which Johan accepted on 2026-10-22: hunks are read with `-U0` so nearby changes stage on their own, pull is a fetch followed by `merge --ff-only` so Diffract decides from data instead of an error message, and push uses `--porcelain`.
+
+**Done** 2026-10-22. Status on Repo A takes 110 to 190 ms, little more than starting git, so the view reads the worktree it shows once per refresh, untracked files included. Reading all 10 of its worktrees takes 2.7 seconds, so the others are read only when picked.
 
 ### Decisions
 
