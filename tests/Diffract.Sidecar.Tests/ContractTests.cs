@@ -145,17 +145,25 @@ public class ContractTests
     {
         using var temp = new TempDirectory();
         var scenario = await new FixtureRepoBuilder(temp).StaleAgentWorktreeAsync();
-        using var methods = new SidecarMethods(new GitRunnerOptions { Environment = IsolatedGit.Environment(temp) });
-        await using var host = new HostHarness(methods.Dispatch);
+        HostHarness host = null!;
+        using var methods = new SidecarMethods(
+            new GitRunnerOptions { Environment = IsolatedGit.Environment(temp) },
+            new SidecarDependencies { Notify = (method, parameters) => host.Host.NotifyAsync(method, parameters), Running = new FakeProcessTable() });
+        await using var _ = host = new HostHarness(methods.Dispatch);
 
         host.Send($$$"""{"jsonrpc":"2.0","id":1,"method":"repo.open","params":{"path":{{{JsonSerializer.Serialize(scenario.RepoPath)}}}}}""");
-        var real = Paths(JsonDocument.Parse(await host.NextAsync()).RootElement);
+        var opened = Paths(JsonDocument.Parse(await host.NextAsync()).RootElement);
+        var scanned = Paths(JsonDocument.Parse(await host.NextAsync()).RootElement);
 
-        var sample = Paths(JsonDocument.Parse(File.ReadAllText(Path.Combine(Directory, "repo.open.json"))).RootElement);
-        Assert.Empty(real.Except(sample));
-        Assert.Contains("result.leftovers[].reason", real);
-        Assert.Contains("result.snapshot.worktrees[].lastActivityAt", real);
+        Assert.Empty(opened.Except(SamplePaths("repo.open")));
+        Assert.Contains("result.scanning", opened);
+        Assert.Empty(scanned.Except(SamplePaths("repo.changed")));
+        Assert.Contains("params.state.leftovers[].reason", scanned);
+        Assert.Contains("params.state.snapshot.worktrees[].lastActivityAt", scanned);
     }
+
+    private static HashSet<string> SamplePaths(string name) =>
+        Paths(JsonDocument.Parse(File.ReadAllText(Path.Combine(Directory, name + ".json"))).RootElement);
 
     /// <summary>Every property path in a JSON document, with arrays written as [].</summary>
     private static HashSet<string> Paths(JsonElement element, string prefix = "")
@@ -246,6 +254,6 @@ public class ContractTests
                 "Locked: claude agent agent-a1b2c3 (pid 4242)."),
         ];
 
-        return RepoState.From(repoId, snapshot, leftovers, unreachableCountedAt: Now.AddMinutes(-10));
+        return RepoState.From(repoId, snapshot, leftovers, new ScanStatus(UnreachableCountedAt: Now.AddMinutes(-10), Scanning: false, Problem: null));
     }
 }

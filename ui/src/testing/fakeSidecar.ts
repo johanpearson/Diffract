@@ -102,6 +102,23 @@ export class FakeSidecar {
     this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "repo.changed", params: { changes, state } }));
   }
 
+  /**
+   * When true, repo.open answers as the real sidecar does for a repo it has not scanned yet: refs and worktrees, no
+   * leftovers, `scanning`. Then `finishScan` or `failScan` sends the scan's repo.changed. When false, it answers in full.
+   */
+  scanOnOpen = false;
+
+  /** Sends the scan's result for a repo opened with `scanOnOpen`. */
+  finishScan(repoId: string): void {
+    this.change(repoId, (s) => s, [{ kind: "Scanned", path: null }]);
+  }
+
+  /** Sends a failed scan for a repo opened with `scanOnOpen`. */
+  failScan(repoId: string, problem: string): void {
+    const state = { ...scanningState(this.state(repoId)), scanning: false, scanProblem: problem };
+    this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "repo.changed", params: { changes: [{ kind: "Scanned", path: null }], state } }));
+  }
+
   /** Replaces the history with a generated one of `count` commits, with its branches and a tag. */
   useGeneratedHistory(count: number): void {
     ({ commits: this.history, refs: this.refs } = generateHistory(count));
@@ -180,7 +197,7 @@ export class FakeSidecar {
       case "repo.open": {
         const state = this.repos.get((p.path ?? "").toLowerCase());
         if (!state) throw { code: -32001, message: `Not a git repository: ${p.path}`, data: { kind: "NotARepo" } };
-        return state;
+        return this.scanOnOpen ? scanningState(state) : state;
       }
       case "repo.refresh":
         return this.state(p.repoId ?? "");
@@ -207,4 +224,16 @@ export class FakeSidecar {
         return null;
     }
   }
+}
+
+/** A repo's state before its scan: worktrees and refs only, as the sidecar's quick snapshot has them. */
+export function scanningState(state: RepoState): RepoState {
+  return {
+    ...state,
+    scanning: true,
+    scanProblem: null,
+    unreachableCountedAt: null,
+    summary: { total: 0, safeToRemove: 0, needsReview: 0, inUse: 0 },
+    leftovers: [],
+  };
 }

@@ -27,7 +27,8 @@
     "WorktreeHead",
     "Refs",
     "WorktreeList",
-    "Everything"
+    "Everything",
+    "Scanned"
   ],
   "terminalKind": [
     "WindowsTerminal",

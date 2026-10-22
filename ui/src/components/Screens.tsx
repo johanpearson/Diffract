@@ -115,6 +115,11 @@ function Ready(props: ScreenProps) {
   );
 }
 
+function refreshBlocked(updatingGit: boolean, scanning: boolean): string | null {
+  if (updatingGit) return "Wait until Git for Windows is updated";
+  return scanning ? "Wait until the scan has finished" : null;
+}
+
 function Leftovers({ repo, git, terminals, filter, onFilter, onOpenFolder, now }: ScreenProps) {
   if (repo.screen.kind !== "ready") return null;
   return (
@@ -128,7 +133,7 @@ function Leftovers({ repo, git, terminals, filter, onFilter, onOpenFolder, now }
       terminalName={terminals.current?.name ?? null}
       onRefresh={() => void repo.refresh()}
       refreshing={repo.refreshing}
-      refreshBlocked={git.running ? "Wait until Git for Windows is updated" : null}
+      refreshBlocked={refreshBlocked(git.running, repo.screen.state.scanning)}
       now={now}
     />
   );

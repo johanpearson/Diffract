@@ -1,6 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { AppHost, SidecarEvent } from "../host";
-import type { RepoState } from "../protocol";
+import type { RepoChange, RepoState } from "../protocol";
 import { isCancelled, type RpcClient } from "../rpc";
 import { folderName, messageOf } from "./format";
 import { initialRows, updateRows, type Row } from "./rows";
@@ -32,6 +32,11 @@ export interface Session {
   repo: MutableRefObject<{ id: string; path: string } | null>;
   /** Only the newest open may change the screen; a slower earlier one is ignored. */
   openSeq: MutableRefObject<number>;
+  /**
+   * The last state for a repo that was not on screen. The scan after opening can in principle finish before the
+   * answer to repo.open arrives; then this is it, and the open uses it.
+   */
+  early: MutableRefObject<RepoState | null>;
   setScreen: Dispatch<SetStateAction<Screen>>;
   setRows: Dispatch<SetStateAction<Row[]>>;
   setRefreshing: Dispatch<SetStateAction<boolean>>;
@@ -42,10 +47,12 @@ export interface Session {
 export async function openRepo(session: Session, path: string): Promise<void> {
   const seq = ++session.openSeq.current;
   closeRepo(session);
+  session.early.current = null;
   session.setScreen({ kind: "opening", path });
   try {
-    const state = await session.client.call("repo.open", { path });
+    const opened = await session.client.call("repo.open", { path });
     if (seq !== session.openSeq.current) return;
+    const state = earlyOr(session, opened);
     session.repo.current = { id: state.repoId, path };
     session.host.storage.set(LastRepoKey, path);
     session.setRows(initialRows(state.leftovers));
@@ -54,6 +61,12 @@ export async function openRepo(session: Session, path: string): Promise<void> {
     if (seq !== session.openSeq.current) return;
     session.setScreen({ kind: "failed", title: `Could not open ${folderName(path)}`, message: messageOf(error), path });
   }
+}
+
+/** The scan's state when it arrived before the answer to repo.open, otherwise that answer. */
+function earlyOr(session: Session, opened: RepoState): RepoState {
+  const early = session.early.current;
+  return early !== null && early.repoId === opened.repoId ? early : opened;
 }
 
 function closeRepo(session: Session): void {
@@ -92,10 +105,17 @@ export async function refreshRepo(session: Session, includeUnreachable: boolean)
   }
 }
 
-/** A new state for the repo on screen. States for a repo that is no longer on screen are ignored. */
-export function showIfCurrent(session: Session, state: RepoState): void {
-  if (state.repoId !== session.repo.current?.id) return;
-  session.setRows((previous) => updateRows(previous, state.leftovers));
+/**
+ * A new state for the repo on screen. A state for another repo is kept as `early`, in case it is for the repo being
+ * opened. The first full state after opening shows its rows plainly: they are not news, just the scan's result.
+ */
+export function showIfCurrent(session: Session, state: RepoState, changes: readonly RepoChange[] = []): void {
+  if (state.repoId !== session.repo.current?.id) {
+    session.early.current = state;
+    return;
+  }
+  const scanned = changes.some((change) => change.kind === "Scanned");
+  session.setRows((previous) => (scanned ? initialRows(state.leftovers) : updateRows(previous, state.leftovers)));
   session.setScreen({ kind: "ready", state });
 }
 

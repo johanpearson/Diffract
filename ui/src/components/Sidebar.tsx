@@ -56,7 +56,7 @@ export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTermin
       </ul>
       <ul className="nav">
         <li aria-current="page">
-          Leftovers <span className="count" aria-label={`${notInUse} not in use`}>{notInUse}</span>
+          Leftovers <LeftoverCount state={state} notInUse={notInUse} />
         </li>
       </ul>
 
@@ -80,6 +80,21 @@ export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTermin
         />
       )}
     </nav>
+  );
+}
+
+/** How many leftovers are not in use, or a quiet "…" while the scan after opening runs. */
+function LeftoverCount({ state, notInUse }: { state: RepoState; notInUse: number }) {
+  if (state.scanning)
+    return (
+      <span className="count" aria-label="still looking">
+        …
+      </span>
+    );
+  return (
+    <span className="count" aria-label={`${notInUse} not in use`}>
+      {notInUse}
+    </span>
   );
 }
 

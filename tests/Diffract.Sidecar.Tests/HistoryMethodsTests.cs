@@ -50,6 +50,8 @@ public sealed class HistoryMethodsTests : IAsyncDisposable
         _host = new HostHarness(_methods.Dispatch);
         var opened = await RequestAsync("repo.open", new { path = repo.Path });
         Assert.True(opened.TryGetProperty("result", out _), opened.ToString());
+        // The scan after opening runs git too; let it finish, and take its repo.changed, before counting calls.
+        Assert.Equal("Scanned", (await _host.NextJsonAsync()).GetProperty("params").GetProperty("changes")[0].GetProperty("kind").GetString());
         _calls.Clear();
         return repo;
     }

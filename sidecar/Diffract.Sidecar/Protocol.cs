@@ -33,23 +33,32 @@ internal sealed record OpenTerminalParams(string? Path, TerminalKind? Terminal);
 /// <summary>What the UI shows for one open repo. The result of <c>repo.open</c> and <c>repo.refresh</c>.</summary>
 /// <param name="RepoRoot">The main worktree, whatever path the repo was opened with.</param>
 /// <param name="TakenAt">When this snapshot was taken.</param>
-/// <param name="UnreachableCountedAt">When unreachable commits were last counted. Their rows are as old as this.</param>
+/// <param name="UnreachableCountedAt">When unreachable commits were last counted. Their rows are as old as this. Null until the first scan.</param>
+/// <param name="Scanning">
+/// The scan after opening is still running: worktree state, leftovers and unreachable commits are not known yet, and
+/// arrive in a <c>repo.changed</c> with the change kind <see cref="ChangeKind.Scanned"/>. Refs and worktrees are known.
+/// </param>
+/// <param name="ScanProblem">Why the scan after opening failed, in plain English. A refresh tries again.</param>
 internal sealed record RepoState(
     string RepoId,
     string RepoRoot,
     string MainBranch,
     DateTimeOffset TakenAt,
-    DateTimeOffset UnreachableCountedAt,
+    DateTimeOffset? UnreachableCountedAt,
+    bool Scanning,
+    string? ScanProblem,
     SnapshotSummary Snapshot,
     LeftoverSummary Summary,
     IReadOnlyList<Leftover> Leftovers)
 {
-    public static RepoState From(string repoId, RepoSnapshot s, IReadOnlyList<Leftover> leftovers, DateTimeOffset unreachableCountedAt) => new(
+    public static RepoState From(string repoId, RepoSnapshot s, IReadOnlyList<Leftover> leftovers, ScanStatus scan) => new(
         RepoId: repoId,
         RepoRoot: s.RepoRoot,
         MainBranch: s.MainBranch,
         TakenAt: s.TakenAt,
-        UnreachableCountedAt: unreachableCountedAt,
+        UnreachableCountedAt: scan.UnreachableCountedAt,
+        Scanning: scan.Scanning,
+        ScanProblem: scan.Problem,
         Snapshot: new SnapshotSummary(
             Worktrees: s.Worktrees,
             LocalBranches: s.Branches.Count(b => !b.IsRemote),
@@ -66,6 +75,9 @@ internal sealed record RepoState(
             InUse: leftovers.Count(l => l.Verdict == Verdict.InUse)),
         Leftovers: leftovers);
 }
+
+/// <summary>Where the scan after opening stands, for <see cref="RepoState"/>.</summary>
+internal sealed record ScanStatus(DateTimeOffset? UnreachableCountedAt, bool Scanning, string? Problem);
 
 /// <summary>Counts for refs, which can number in the hundreds; worktrees and leftover folders in full.</summary>
 internal sealed record SnapshotSummary(
@@ -119,6 +131,9 @@ internal enum ChangeKind
 
     /// <summary>The watcher lost track and everything was rebuilt.</summary>
     Everything,
+
+    /// <summary>The scan after opening finished, or failed: the first full state, leftovers included.</summary>
+    Scanned,
 }
 
 /// <summary>

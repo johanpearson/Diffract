@@ -24,14 +24,8 @@ interface Props {
 }
 
 /** The read-only "Worktrees and agents" view: counts, filter chips and one row per leftover. */
-export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onOpenTerminal, terminalName, onRefresh, refreshing, refreshBlocked = null, now }: Props) {
-  const counts: Record<Verdict, number> = {
-    SafeToRemove: state.summary.safeToRemove,
-    NeedsReview: state.summary.needsReview,
-    InUse: state.summary.inUse,
-  };
-  const shown = rows.filter((row) => filter === "all" || row.leftover.verdict === filter);
-
+export function LeftoversView(props: Props) {
+  const { state, refreshing, refreshBlocked = null, onRefresh, now } = props;
   return (
     <section className="view" aria-labelledby="view-title">
       <div className="bar">
@@ -46,36 +40,74 @@ export function LeftoversView({ state, rows, filter, onFilter, onOpenFolder, onO
           {refreshing ? "Refreshing…" : "Refresh"}
         </button>
       </div>
-
-      <div className="summary">
-        {verdicts.map((v) => (
-          <div key={v} className={`sum ${verdictClass[v]}`}>
-            <b>{counts[v]}</b>
-            <span>{verdictLabels[v]}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="chips" role="group" aria-label="Show">
-        {(["all", ...verdicts] as const).map((f) => (
-          <button key={f} className="chip" aria-pressed={filter === f} onClick={() => onFilter(f)}>
-            {f === "all" ? "All" : verdictLabels[f]}
-          </button>
-        ))}
-      </div>
-
-      {shown.length === 0 ? (
-        <p className="empty">{rows.length === 0 ? "Nothing here. Agents left your repo tidy." : "Nothing with this verdict."}</p>
-      ) : (
-        <ul className="items" aria-label="Leftovers">
-          {shown.map((row) => (
-            <LeftoverRow key={row.key} row={row} onOpenFolder={onOpenFolder} onOpenTerminal={onOpenTerminal} terminalName={terminalName} />
-          ))}
-        </ul>
-      )}
-
+      <ScanResult {...props} />
       <StatusLine state={state} now={now} />
     </section>
+  );
+}
+
+/** The leftovers once the scan after opening has found them, or why there are none to show yet. */
+function ScanResult({ state, ...props }: Props) {
+  if (state.scanning)
+    return (
+      <p className="empty" role="status">
+        Looking for leftovers. History is ready to use meanwhile.
+      </p>
+    );
+  if (state.scanProblem !== null)
+    return (
+      <p className="empty" role="alert">
+        Could not finish looking for leftovers: {state.scanProblem} Refresh to try again.
+      </p>
+    );
+  return (
+    <>
+      <Summary state={state} />
+      <Chips filter={props.filter} onFilter={props.onFilter} />
+      <LeftoverList {...props} />
+    </>
+  );
+}
+
+function Summary({ state }: { state: RepoState }) {
+  const counts: Record<Verdict, number> = {
+    SafeToRemove: state.summary.safeToRemove,
+    NeedsReview: state.summary.needsReview,
+    InUse: state.summary.inUse,
+  };
+  return (
+    <div className="summary">
+      {verdicts.map((v) => (
+        <div key={v} className={`sum ${verdictClass[v]}`}>
+          <b>{counts[v]}</b>
+          <span>{verdictLabels[v]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Chips({ filter, onFilter }: Pick<Props, "filter" | "onFilter">) {
+  return (
+    <div className="chips" role="group" aria-label="Show">
+      {(["all", ...verdicts] as const).map((f) => (
+        <button key={f} className="chip" aria-pressed={filter === f} onClick={() => onFilter(f)}>
+          {f === "all" ? "All" : verdictLabels[f]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LeftoverList({ rows, filter, onOpenFolder, onOpenTerminal, terminalName }: Omit<Props, "state">) {
+  const shown = rows.filter((row) => filter === "all" || row.leftover.verdict === filter);
+  if (shown.length === 0) return <p className="empty">{rows.length === 0 ? "Nothing here. Agents left your repo tidy." : "Nothing with this verdict."}</p>;
+  return (
+    <ul className="items" aria-label="Leftovers">
+      {shown.map((row) => (
+        <LeftoverRow key={row.key} row={row} onOpenFolder={onOpenFolder} onOpenTerminal={onOpenTerminal} terminalName={terminalName} />
+      ))}
+    </ul>
   );
 }
 

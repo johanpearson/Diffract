@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppHost } from "../host";
+import type { RepoState } from "../protocol";
 import type { RpcClient } from "../rpc";
 import { FlashMs, settleRows, type Row } from "./rows";
 import { pickAndOpen, refreshRepo, restart, retry, showIfCurrent, sidecarStopped, type Screen, type Session, type ShowNotice } from "./session";
@@ -12,8 +13,9 @@ export function useRepoSession(client: RpcClient, host: AppHost, showNotice: Sho
   const [starts, setStarts] = useState(0);
   const repo = useRef<{ id: string; path: string } | null>(null);
   const openSeq = useRef(0);
+  const early = useRef<RepoState | null>(null);
   const session = useMemo<Session>(
-    () => ({ client, host, showNotice, repo, openSeq, setScreen, setRows, setRefreshing, setStarts }),
+    () => ({ client, host, showNotice, repo, openSeq, early, setScreen, setRows, setRefreshing, setStarts }),
     [client, host, showNotice],
   );
 
@@ -31,7 +33,7 @@ export type RepoSession = ReturnType<typeof useRepoSession>;
 export function useRepoEvents(session: Session, rows: Row[]): void {
   const { client, host, setRows } = session;
 
-  useEffect(() => client.onNotification("repo.changed", ({ state }) => showIfCurrent(session, state)), [client, session]);
+  useEffect(() => client.onNotification("repo.changed", ({ state, changes }) => showIfCurrent(session, state, changes)), [client, session]);
 
   // Highlights fade, and removed rows go, a moment after the last update.
   useEffect(() => {

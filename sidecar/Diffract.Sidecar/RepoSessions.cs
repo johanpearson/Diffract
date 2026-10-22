@@ -10,8 +10,10 @@ namespace Diffract.Sidecar;
 
 /// <summary>
 /// The repos the UI has open, by id. Opening a repo that is already open, through any of its worktrees, returns the same id.
-/// Each open repo is watched: changes refresh only the part of the snapshot they touch, and each refresh is sent as
-/// <c>repo.changed</c>.
+/// Opening answers with a quick snapshot, which is all history needs, and scans the rest in the background: worktree
+/// state, leftovers and unreachable commits, <c>fsck</c> included. The scan's result is sent as <c>repo.changed</c>.
+/// From then on the repo is watched: changes refresh only the part of the snapshot they touch, and each refresh is
+/// sent as <c>repo.changed</c>.
 /// </summary>
 /// <param name="notify">Sends a <c>repo.changed</c> notification.</param>
 /// <param name="log">Where failed live refreshes are reported. They have no request to answer.</param>
@@ -26,28 +28,39 @@ internal sealed class RepoSessions(
 
     public int Count => _byId.Count;
 
-    /// <summary>Builds a full snapshot, including unreachable commits, and starts watching the repo.</summary>
+    /// <summary>
+    /// Answers with a quick snapshot and starts the scan, unless the repo is already open and scanned: then it answers
+    /// with what it knows, which the watcher keeps current.
+    /// </summary>
     public async Task<RepoState> OpenAsync(string path, CancellationToken ct)
     {
-        var snapshot = await Builder(includeUnreachable: true).BuildAsync(path, ct).ConfigureAwait(false);
+        var quick = await Builder(includeUnreachable: false).BuildQuickAsync(path, ct).ConfigureAwait(false);
 
         RepoSession session;
         lock (_openLock)
         {
-            session = _byId.Values.FirstOrDefault(s => string.Equals(s.RepoRoot, snapshot.Snapshot.RepoRoot, StringComparison.OrdinalIgnoreCase))
-                ?? Add(snapshot.Snapshot.RepoRoot);
+            session = _byId.Values.FirstOrDefault(s => string.Equals(s.RepoRoot, quick.Snapshot.RepoRoot, StringComparison.OrdinalIgnoreCase))
+                ?? Add(quick.Snapshot.RepoRoot);
         }
 
         await session.Refreshing.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            return Remember(session, snapshot.Snapshot, unreachableCounted: true);
+            if (!session.Scanned)
+            {
+                session.Snapshot = quick.Snapshot;
+                session.StartScan(() => ScanAsync(session));
+            }
+            return StateOf(session);
         }
         finally
         {
             session.Refreshing.Release();
         }
     }
+
+    /// <summary>Completes when the scan after opening has finished and its <c>repo.changed</c> is sent, or failed.</summary>
+    public Task ScannedAsync(string repoId) => Get(repoId).Scan ?? Task.CompletedTask;
 
     /// <summary>
     /// A full rebuild. Without <paramref name="includeUnreachable"/>, unreachable commits keep their last known value.
@@ -105,6 +118,41 @@ internal sealed class RepoSessions(
     private RepoSnapshotBuilder Builder(bool includeUnreachable) =>
         new(runnerOptions, config.ToSnapshotOptions() with { IncludeUnreachable = includeUnreachable });
 
+    /// <summary>The full snapshot, <c>fsck</c> included, sent as <c>repo.changed</c>. A failure is sent too, with why.</summary>
+    private async Task ScanAsync(RepoSession session)
+    {
+        var ct = session.Closing;
+        try
+        {
+            var state = await ScanOnceAsync(session, ct).ConfigureAwait(false);
+            if (!ct.IsCancellationRequested)
+                await notify(new RepoChanged([new RepoChange(ChangeKind.Scanned, null)], state)).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task<RepoState> ScanOnceAsync(RepoSession session, CancellationToken ct)
+    {
+        await session.Refreshing.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var full = await Builder(includeUnreachable: true).BuildAsync(session.RepoRoot, ct).ConfigureAwait(false);
+            return Remember(session, full.Snapshot, unreachableCounted: true);
+        }
+        catch (Exception e) when (!ct.IsCancellationRequested)
+        {
+            session.ScanProblem = e.Message;
+            await log.WriteLineAsync($"Scan of {session.RepoRoot} failed: {e.Message}").ConfigureAwait(false);
+            return StateOf(session);
+        }
+        finally
+        {
+            session.Refreshing.Release();
+        }
+    }
+
     private async Task LiveRefreshAsync(RepoSession session, ChangeSet changes)
     {
         if (paused?.Invoke() == true)
@@ -141,7 +189,10 @@ internal sealed class RepoSessions(
         }
     }
 
-    /// <summary>Keeps the snapshot for the next partial refresh, and points the watcher at its worktrees.</summary>
+    /// <summary>
+    /// Keeps a full snapshot for the next partial refresh, and points the watcher at its worktrees. Any full snapshot
+    /// counts as the scan, so a refresh after a failed scan puts things right.
+    /// </summary>
     private RepoState Remember(RepoSession session, RepoSnapshot snapshot, bool unreachableCounted)
     {
         if (unreachableCounted)
@@ -150,10 +201,18 @@ internal sealed class RepoSessions(
             snapshot = snapshot with { UnreachableCommits = session.Unreachable };
 
         session.Snapshot = snapshot;
+        (session.Scanned, session.ScanProblem) = (true, null);
         session.Watch(WatchLayout.From(snapshot, config.WorktreeContainerPatterns));
+        return StateOf(session);
+    }
 
-        var leftovers = new LeftoverClassifier().Classify(snapshot, config, time);
-        return RepoState.From(session.Id, snapshot, leftovers, session.UnreachableCountedAt);
+    /// <summary>The state to send. Leftovers only from a full snapshot: a quick one lacks what the rules need.</summary>
+    private RepoState StateOf(RepoSession session)
+    {
+        var snapshot = session.Snapshot!;
+        var leftovers = session.Scanned ? new LeftoverClassifier().Classify(snapshot, config, time) : [];
+        var scanning = !session.Scanned && session.ScanProblem is null;
+        return RepoState.From(session.Id, snapshot, leftovers, new ScanStatus(session.UnreachableCountedAt, scanning, session.ScanProblem));
     }
 
     private sealed class RepoSession(string id, string repoRoot) : IDisposable
@@ -173,7 +232,25 @@ internal sealed class RepoSessions(
 
         public IReadOnlyList<UnreachableCommit> Unreachable { get; set; } = [];
 
-        public DateTimeOffset UnreachableCountedAt { get; set; }
+        public DateTimeOffset? UnreachableCountedAt { get; set; }
+
+        /// <summary>A full snapshot has been taken: by the scan after opening, or by a refresh.</summary>
+        public bool Scanned { get; set; }
+
+        /// <summary>Why the last scan failed. Cleared by the next full snapshot.</summary>
+        public string? ScanProblem { get; set; }
+
+        /// <summary>The scan after opening, the last one started. Null before the first open.</summary>
+        public Task? Scan { get; private set; }
+
+        /// <summary>Starts the scan, unless one is running. Opening again after a failed scan tries again.</summary>
+        public void StartScan(Func<Task> scan)
+        {
+            if (Scan is { IsCompleted: false })
+                return;
+            ScanProblem = null;
+            Scan = Task.Run(scan);
+        }
 
         public CancellationToken Closing => _closing.Token;
 
