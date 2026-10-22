@@ -53,9 +53,25 @@ jobs:
         if: steps.scope.outputs.code == 'true'
         run: dotnet build Diffract.slnx -c Release
 
+      # Each failing test also becomes an annotation, with the lines that say why, so it shows on the PR page and
+      # in the checks API without opening the log.
       - name: Test
         if: steps.scope.outputs.code == 'true'
-        run: dotnet test --solution Diffract.slnx -c Release --no-build
+        shell: pwsh
+        run: |
+          dotnet test --solution Diffract.slnx -c Release --no-build 2>&1 | ForEach-Object { "$_" } | Tee-Object -Variable lines
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            # Colour codes are removed first. When no test is named, the end of the output says why the run failed.
+            $plain = @($lines | ForEach-Object { $_ -replace "\e\[[0-9;]*[A-Za-z]", '' })
+            $failures = @($plain | Select-String -Pattern '^\s*failed ' -Context 0,4 | ForEach-Object { (@($_.Line.Trim()) + $_.Context.PostContext) -join "`n" })
+            if ($failures.Count -eq 0) { $failures = @(($plain | Select-Object -Last 25) -join "`n") }
+            foreach ($message in $failures) {
+              $escaped = $message.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+              Write-Output "::error title=Test failed::$escaped"
+            }
+          }
+          exit $code
 
       - name: Publish the sidecar (Native AOT)
         if: steps.scope.outputs.code == 'true'
