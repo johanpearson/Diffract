@@ -82,30 +82,22 @@ public class ContractTests
                 new FileChange(FileChangeKind.Added, "docs/logo.png", null, null, BlobC, null, null, null, IsBinary: true, IsSubmodule: false),
             ])),
         ["history.file"] = () => Response(HistoryFile.From(new FileContent(FileContentKind.Text, "namespace Shop;\r\n"))),
-        ["changes.status"] = () => Response(new WorktreeChanges
-        {
-            Worktree = AgentWorktree,
-            Branch = "claude/räksmörgås-fix",
-            HeadCommit = Merge,
-            Upstream = "origin/claude/räksmörgås-fix",
-            Ahead = 2,
-            Behind = 1,
-            Files =
+        ["changes.status"] = () => Response(Changes),
+        ["changes.stage"] = () => Response(Changes),
+        ["changes.unstage"] = () => Response(Changes),
+        ["changes.file"] = () => Response(ChangesFile.From(new FileDiff(
+            new FileContent(FileContentKind.Text, "one\r\ntwo\r\n"),
+            new FileContent(FileContentKind.Text, "one\r\nTWO\r\nthree\r\n"),
             [
-                new ChangedFile
-                {
-                    Path = "src/räksmörgås.cs", OldPath = "src/cart.cs", Kind = ChangedFileKind.Tracked,
-                    Staged = FileChangeKind.Renamed, Unstaged = FileChangeKind.Modified, HeadId = BlobA, IndexId = BlobB,
-                },
-                new ChangedFile { Path = "docs/new file.md", Kind = ChangedFileKind.Untracked, Unstaged = FileChangeKind.Added },
-                new ChangedFile { Path = "src/merge.cs", Kind = ChangedFileKind.Conflicted },
-            ],
-        }),
-        ["changes.file"] = () => Response(ChangesFile.From(new FileDiff(null, new FileContent(FileContentKind.Text, "# Notes\r\n")))),
+                new Hunk { Id = "5d41402abc4b2a76b9719d911017c592", OldStart = 2, OldLines = 1, NewStart = 2, NewLines = 1 },
+                new Hunk { Id = "7d793037a0760186574b0282f2f435e7", OldStart = 2, OldLines = 0, NewStart = 3, NewLines = 1 },
+            ]))),
         ["error.not-a-repo"] = () => Error(new NotAGitRepositoryException(@"C:\Users\johan\Downloads")),
         ["error.git-too-old"] = () => Error(new GitVersionTooOldException(new GitVersion(2, 39, 5))),
         ["error.git-failed"] = () => Error(new GitCommandException(["status", "--porcelain=v2", "-z"], 128, "fatal: unable to read tree\n")),
         ["error.timed-out"] = () => Error(new GitTimeoutException(["fsck", "--unreachable", "--no-reflogs"], TimeSpan.FromSeconds(30))),
+        ["error.index-locked"] = () => Error(new IndexLockedException()),
+        ["error.changed-since-shown"] = () => Error(new ChangedSinceShownException("src/räksmörgås.cs")),
         ["error.config-invalid"] = () => Error(new ConfigException("staleAfterDays must be at least 1.")),
         ["error.cancelled"] = () => Line(RpcResponse.Failure(Id, RpcErrorCodes.RequestCancelled, "The request was cancelled")),
         ["error.invalid-params"] = () => Line(RpcResponse.Failure(Id, RpcErrorCodes.InvalidParams, "'path' is required")),
@@ -114,6 +106,27 @@ public class ContractTests
 
     private static IReadOnlyList<GitInUse> InUse =>
         [new("CodeScene cs-ide tool for windows", "Visual Studio Code", 2), new("Git Bash", null, 3)];
+
+    /// <summary>A worktree with a rename that is also changed, a new file and a conflict.</summary>
+    private static WorktreeChanges Changes => new()
+    {
+        Worktree = AgentWorktree,
+        Branch = "claude/räksmörgås-fix",
+        HeadCommit = Merge,
+        Upstream = "origin/claude/räksmörgås-fix",
+        Ahead = 2,
+        Behind = 1,
+        Files =
+        [
+            new ChangedFile
+            {
+                Path = "src/räksmörgås.cs", OldPath = "src/cart.cs", Kind = ChangedFileKind.Tracked,
+                Staged = FileChangeKind.Renamed, Unstaged = FileChangeKind.Modified, HeadId = BlobA, IndexId = BlobB,
+            },
+            new ChangedFile { Path = "docs/new file.md", Kind = ChangedFileKind.Untracked, Unstaged = FileChangeKind.Added },
+            new ChangedFile { Path = "src/merge.cs", Kind = ChangedFileKind.Conflicted },
+        ],
+    };
 
     private const string Merge = "9fceb02d0ae598e95dc970b74767f19372d61af8";
     private const string Parent = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";

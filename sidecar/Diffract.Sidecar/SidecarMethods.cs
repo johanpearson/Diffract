@@ -40,15 +40,18 @@ internal sealed record SidecarDependencies
 /// <summary>Answers one method: reads its params and returns its result, or throws <see cref="RpcException"/>.</summary>
 internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, CancellationToken ct);
 
-/// <summary>The methods the sidecar answers. Every git call goes through a read-only runner.</summary>
+/// <summary>
+/// The methods the sidecar answers. Every git call goes through a read-only runner, apart from staging, which goes
+/// through a changes runner that allows nothing but <see cref="ChangesPolicy"/>.
+/// </summary>
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage"];
 
     /// <summary>
-    /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only violation,
-    /// marks a bug: the host logs it as an internal error.
+    /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only or changes
+    /// policy violation, marks a bug: the host logs it as an internal error.
     /// </summary>
     private static readonly (Type Type, ErrorKind? Kind)[] ErrorKinds =
     [
@@ -57,6 +60,9 @@ internal sealed class SidecarMethods : IDisposable
         (typeof(GitVersionTooOldException), ErrorKind.GitTooOld),
         (typeof(GitTimeoutException), ErrorKind.TimedOut),
         (typeof(ReadOnlyViolationException), null),
+        (typeof(ChangesPolicyViolationException), null),
+        (typeof(IndexLockedException), ErrorKind.IndexLocked),
+        (typeof(ChangedSinceShownException), ErrorKind.ChangedSinceShown),
         (typeof(GitException), ErrorKind.GitFailed),
         (typeof(Win32Exception), ErrorKind.GitFailed),
         (typeof(ConfigException), ErrorKind.ConfigInvalid),
@@ -108,6 +114,8 @@ internal sealed class SidecarMethods : IDisposable
             ["history.file"] = HistoryFileAsync,
             ["changes.status"] = _changes.StatusAsync,
             ["changes.file"] = _changes.FileAsync,
+            ["changes.stage"] = _changes.StageAsync,
+            ["changes.unstage"] = _changes.UnstageAsync,
             ["system.openFolder"] = OpenFolder,
             ["system.listTerminals"] = (_, _) => Task.FromResult(Result(_terminal.List())),
             ["system.openTerminal"] = OpenTerminal,

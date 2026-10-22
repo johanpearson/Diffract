@@ -24,6 +24,10 @@ public sealed class ChangesReaderTests : IDisposable
 
     private static FileContent Text(string text) => new(FileContentKind.Text, text);
 
+    private static (FileContent? Old, FileContent? New) Sides(FileContent? oldSide, FileContent? newSide) => (oldSide, newSide);
+
+    private static (FileContent? Old, FileContent? New) Sides(FileDiff diff) => (diff.Old, diff.New);
+
     /// <summary>A repo whose first commit holds the given files, with no other changes.</summary>
     private async Task<FixtureRepo> RepoAsync(params (string Path, string Content)[] files)
     {
@@ -43,7 +47,7 @@ public sealed class ChangesReaderTests : IDisposable
     {
         var file = await StatusOfAsync(repo, path);
         _calls.Clear();
-        return await Reader.ReadFileAsync(repo.Path, new FileDiffRequest(path, staged, file.HeadId, file.IndexId), Ct);
+        return await Reader.ReadFileAsync(repo.Path, new FileDiffRequest { Path = path, OldPath = file.OldPath, Staged = staged, HeadId = file.HeadId, IndexId = file.IndexId }, Ct);
     }
 
     [Fact]
@@ -132,19 +136,21 @@ public sealed class ChangesReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task Unstaged_diff_is_the_index_against_the_disk_with_one_git_call()
+    public async Task Unstaged_diff_is_the_index_against_the_disk_with_one_git_call_and_one_for_its_hunks()
     {
         var repo = await RepoAsync(("file.txt", "one\ntwo\n"));
         repo.WriteFile("file.txt", "one\nTWO\n");
 
         var diff = await DiffAsync(repo, "file.txt", staged: false);
 
-        Assert.Equal(new FileDiff(Text("one\ntwo\n"), Text("one\nTWO\n")), diff);
-        Assert.Single(_calls);
+        Assert.Equal(Sides(Text("one\ntwo\n"), Text("one\nTWO\n")), Sides(diff));
+        var hunk = Assert.Single(diff.Hunks);
+        Assert.Equal((2, 1, 2, 1), (hunk.OldStart, hunk.OldLines, hunk.NewStart, hunk.NewLines));
+        Assert.Equal(2, _calls.Count);
     }
 
     [Fact]
-    public async Task Staged_diff_is_head_against_the_index_with_one_git_call_per_side()
+    public async Task Staged_diff_is_head_against_the_index_with_one_git_call_per_side_and_one_for_its_hunks()
     {
         var repo = await RepoAsync(("file.txt", "one\n"));
         repo.WriteFile("file.txt", "two\n");
@@ -152,11 +158,11 @@ public sealed class ChangesReaderTests : IDisposable
         repo.WriteFile("file.txt", "three\n");
 
         var staged = await DiffAsync(repo, "file.txt", staged: true);
-        Assert.Equal(2, _calls.Count);
+        Assert.Equal(3, _calls.Count);
         var unstaged = await DiffAsync(repo, "file.txt", staged: false);
 
-        Assert.Equal(new FileDiff(Text("one\n"), Text("two\n")), staged);
-        Assert.Equal(new FileDiff(Text("two\n"), Text("three\n")), unstaged);
+        Assert.Equal(Sides(Text("one\n"), Text("two\n")), Sides(staged));
+        Assert.Equal(Sides(Text("two\n"), Text("three\n")), Sides(unstaged));
     }
 
     [Fact]
@@ -167,7 +173,8 @@ public sealed class ChangesReaderTests : IDisposable
 
         var diff = await DiffAsync(repo, "new folder/räksmörgås.txt", staged: false);
 
-        Assert.Equal(new FileDiff(null, Text("smörgås\n")), diff);
+        Assert.Equal(Sides(null, Text("smörgås\n")), Sides(diff));
+        Assert.Empty(diff.Hunks);
         Assert.Empty(_calls);
     }
 
@@ -178,7 +185,7 @@ public sealed class ChangesReaderTests : IDisposable
         repo.WriteFile("new.txt", "new\n");
         await repo.GitAsync("add", "--intent-to-add", "new.txt");
 
-        Assert.Equal(new FileDiff(null, Text("new\n")), await DiffAsync(repo, "new.txt", staged: false));
+        Assert.Equal(Sides(null, Text("new\n")), Sides(await DiffAsync(repo, "new.txt", staged: false)));
     }
 
     [Fact]
@@ -190,9 +197,9 @@ public sealed class ChangesReaderTests : IDisposable
         await repo.GitAsync("rm", "-q", "staged gone.txt");
         File.Delete(Path.Combine(repo.Path, "gone.txt"));
 
-        Assert.Equal(new FileDiff(null, Text("new\n")), await DiffAsync(repo, "added.txt", staged: true));
-        Assert.Equal(new FileDiff(Text("a\n"), null), await DiffAsync(repo, "staged gone.txt", staged: true));
-        Assert.Equal(new FileDiff(Text("b\n"), null), await DiffAsync(repo, "gone.txt", staged: false));
+        Assert.Equal(Sides(null, Text("new\n")), Sides(await DiffAsync(repo, "added.txt", staged: true)));
+        Assert.Equal(Sides(Text("a\n"), null), Sides(await DiffAsync(repo, "staged gone.txt", staged: true)));
+        Assert.Equal(Sides(Text("b\n"), null), Sides(await DiffAsync(repo, "gone.txt", staged: false)));
     }
 
     [Fact]
@@ -205,7 +212,7 @@ public sealed class ChangesReaderTests : IDisposable
 
         var diff = await DiffAsync(repo, "ny räka.txt", staged: true);
 
-        Assert.Equal(new FileDiff(Text("one\ntwo\nthree\nfour\n"), Text("one\ntwo\nthree\nFOUR\n")), diff);
+        Assert.Equal(Sides(Text("one\ntwo\nthree\nfour\n"), Text("one\ntwo\nthree\nFOUR\n")), Sides(diff));
     }
 
     [Fact]
@@ -222,8 +229,8 @@ public sealed class ChangesReaderTests : IDisposable
         await repo.GitAsync("add", "crlf.txt");
         var staged = await DiffAsync(repo, "crlf.txt", staged: true);
 
-        Assert.Equal(new FileDiff(Text("one\r\ntwo\r\n"), Text("one\r\nTWO\r\n")), unstaged);
-        Assert.Equal(new FileDiff(Text("one\ntwo\n"), Text("one\nTWO\n")), staged);
+        Assert.Equal(Sides(Text("one\r\ntwo\r\n"), Text("one\r\nTWO\r\n")), Sides(unstaged));
+        Assert.Equal(Sides(Text("one\ntwo\n"), Text("one\nTWO\n")), Sides(staged));
     }
 
     [Fact]
@@ -234,7 +241,7 @@ public sealed class ChangesReaderTests : IDisposable
 
         var diff = await DiffAsync(repo, "crlf.txt", staged: false);
 
-        Assert.Equal(new FileDiff(Text("one\r\ntwo\r\n"), Text("one\r\ntwo\r\nthree\r\n")), diff);
+        Assert.Equal(Sides(Text("one\r\ntwo\r\n"), Text("one\r\ntwo\r\nthree\r\n")), Sides(diff));
     }
 
     [Fact]
@@ -245,7 +252,7 @@ public sealed class ChangesReaderTests : IDisposable
 
         var diff = await DiffAsync(repo, "image.bin", staged: false);
 
-        Assert.Equal(new FileDiff(null, new FileContent(FileContentKind.Binary, null)), diff);
+        Assert.Equal(Sides(null, new FileContent(FileContentKind.Binary, null)), Sides(diff));
     }
 
     [Fact]
@@ -267,7 +274,7 @@ public sealed class ChangesReaderTests : IDisposable
         await writer.WriteAsync(Encoding.UTF8.GetBytes("being written\n"), Ct);
         await writer.FlushAsync(Ct);
 
-        var diff = await Reader.ReadFileAsync(repo.Path, new FileDiffRequest("open.txt", Staged: false, null, null), Ct);
+        var diff = await Reader.ReadFileAsync(repo.Path, new FileDiffRequest { Path = "open.txt", Staged = false }, Ct);
 
         Assert.Equal(Text("being written\n"), diff.New);
     }
@@ -285,7 +292,7 @@ public sealed class ChangesReaderTests : IDisposable
         var repo = await RepoAsync(("file.txt", "a\n"));
         _calls.Clear();
 
-        await Assert.ThrowsAsync<ArgumentException>(() => Reader.ReadFileAsync(repo.Path, new FileDiffRequest(path, Staged: false, null, null), Ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => Reader.ReadFileAsync(repo.Path, new FileDiffRequest { Path = path, Staged = false }, Ct));
         Assert.Empty(_calls);
     }
 
@@ -295,7 +302,7 @@ public sealed class ChangesReaderTests : IDisposable
         var repo = await RepoAsync(("file.txt", "a\n"));
         var rooted = Path.Combine(repo.Path, "file.txt");
 
-        await Assert.ThrowsAsync<ArgumentException>(() => Reader.ReadFileAsync(repo.Path, new FileDiffRequest(rooted, Staged: false, null, null), Ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => Reader.ReadFileAsync(repo.Path, new FileDiffRequest { Path = rooted, Staged = false }, Ct));
     }
 
     [Theory]
@@ -307,7 +314,7 @@ public sealed class ChangesReaderTests : IDisposable
         var repo = await RepoAsync(("file.txt", "a\n"));
         _calls.Clear();
 
-        await Assert.ThrowsAsync<ArgumentException>(() => Reader.ReadFileAsync(repo.Path, new FileDiffRequest("file.txt", Staged: true, id, null), Ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => Reader.ReadFileAsync(repo.Path, new FileDiffRequest { Path = "file.txt", Staged = true, HeadId = id }, Ct));
         Assert.Empty(_calls);
     }
 }

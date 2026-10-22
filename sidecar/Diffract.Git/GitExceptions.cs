@@ -24,6 +24,24 @@ public sealed class ReadOnlyViolationException(IReadOnlyList<string> arguments, 
     public string Reason { get; } = reason;
 }
 
+public sealed class ChangesPolicyViolationException(IReadOnlyList<string> arguments, string reason)
+    : GitException($"git {string.Join(' ', arguments)} is not an allowed change: {reason}")
+{
+    public IReadOnlyList<string> Arguments { get; } = arguments;
+    public string Reason { get; } = reason;
+}
+
+/// <summary>Another git process holds the worktree's index lock, and still did after waiting.</summary>
+public sealed class IndexLockedException()
+    : GitException("Another git process is using this repo, probably an agent. Try again in a moment.");
+
+/// <summary>What the user saw is no longer what is there, so nothing was changed.</summary>
+public sealed class ChangedSinceShownException(string path)
+    : GitException($"{path} changed since it was shown, so nothing was staged or unstaged. Look at it again.")
+{
+    public string Path { get; } = path;
+}
+
 /// <param name="detail">Why, when there is more to say than "not a repo", as a full sentence.</param>
 public sealed class NotAGitRepositoryException(string path, string? detail = null)
     : GitException(detail is null ? $"Not a git repository: {path}" : $"Not a git repository: {path}. {detail}")

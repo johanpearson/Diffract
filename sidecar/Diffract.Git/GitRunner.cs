@@ -13,7 +13,18 @@ public delegate Task<bool> GitOutputReader(Stream output, CancellationToken ct);
 /// Such as the revisions for <c>--stdin</c>, which has no length limit as the command line has. Written while git
 /// runs, then closed. Git stopping before it has read them all is no error.
 /// </param>
-public sealed record GitCommandLine(IReadOnlyList<string> Arguments, IReadOnlyList<string> Input);
+public sealed record GitCommandLine(IReadOnlyList<string> Arguments, IReadOnlyList<string> Input)
+{
+    /// <summary>
+    /// Bytes for standard input, written exactly as they are instead of <see cref="Input"/>. A patch must be, so that
+    /// its CRs survive, and paths for <c>--pathspec-file-nul</c> are separated by NULs, not line feeds.
+    /// </summary>
+    public byte[]? RawInput { get; init; }
+
+    public static GitCommandLine WithBytes(IReadOnlyList<string> arguments, byte[] input) => new(arguments, []) { RawInput = input };
+
+    internal byte[] InputBytes() => RawInput ?? Encoding.UTF8.GetBytes(string.Concat(Input.Select(line => line + "\n")));
+}
 
 /// <summary>Runs git as a child process in one working directory.</summary>
 public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
@@ -24,14 +35,20 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
     public Task<GitResult> RunAsync(IReadOnlyList<string> args, CancellationToken ct) =>
         RunAsync(args, [], ct);
 
+    /// <summary>As <see cref="RunAsync(IReadOnlyList{string}, CancellationToken)"/>, with standard input. Any non-zero exit code fails.</summary>
+    public Task<GitResult> RunAsync(GitCommandLine command, CancellationToken ct) => BufferAsync(command, [], ct);
+
     /// <summary>
     /// Runs git. A non-zero exit code throws <see cref="GitCommandException"/> unless it is in
     /// <paramref name="allowedExitCodes"/>, for commands like <c>merge-base --is-ancestor</c> that answer with it.
     /// </summary>
-    public async Task<GitResult> RunAsync(IReadOnlyList<string> args, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct)
+    public Task<GitResult> RunAsync(IReadOnlyList<string> args, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct) =>
+        BufferAsync(new GitCommandLine(args, []), allowedExitCodes, ct);
+
+    private async Task<GitResult> BufferAsync(GitCommandLine command, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct)
     {
         using var buffer = new MemoryStream();
-        var result = await StreamAsync(args, async (output, token) =>
+        var result = await StreamAsync(command, async (output, token) =>
         {
             await output.CopyToAsync(buffer, token).ConfigureAwait(false);
             return true;
@@ -53,9 +70,8 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
 
     private async Task<GitStreamResult> StreamAsync(GitCommandLine command, GitOutputReader read, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct)
     {
-        var (args, input) = command;
-        if (Options.ReadOnly && !ReadOnlyPolicy.IsAllowed(args, out var reason))
-            throw new ReadOnlyViolationException(args, reason);
+        var args = command.Arguments;
+        CheckPolicy(args);
 
         ct.ThrowIfCancellationRequested();
         var time = Options.TimeProvider;
@@ -65,7 +81,7 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         process.Start();
         try
         {
-            var writing = WriteInputAsync(process.StandardInput.BaseStream, input);
+            var writing = WriteInputAsync(process.StandardInput.BaseStream, command.InputBytes());
             var result = await ReadAsync(process, args, read, ct).ConfigureAwait(false);
             await writing.ConfigureAwait(false);
             var streamed = new GitStreamResult(args, result.ExitCode, result.StandardError, time.GetElapsedTime(started));
@@ -115,13 +131,37 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         }
     }
 
-    /// <summary>Writes one line per item, ending each with a line feed, then closes standard input so git sees the end.</summary>
-    private static async Task WriteInputAsync(Stream stdin, IReadOnlyList<string> lines)
+    /// <summary>
+    /// A changes runner allows only <see cref="ChangesPolicy"/>, reads included, so it can never be used for anything
+    /// else. A read-only runner allows only <see cref="ReadOnlyPolicy"/>.
+    /// </summary>
+    private void CheckPolicy(IReadOnlyList<string> args)
+    {
+        if (Options.ChangesOnly)
+            CheckChange(args);
+        else if (Options.ReadOnly)
+            CheckRead(args);
+    }
+
+    private static void CheckChange(IReadOnlyList<string> args)
+    {
+        if (!ChangesPolicy.IsAllowed(args, out var reason))
+            throw new ChangesPolicyViolationException(args, reason);
+    }
+
+    private static void CheckRead(IReadOnlyList<string> args)
+    {
+        if (!ReadOnlyPolicy.IsAllowed(args, out var reason))
+            throw new ReadOnlyViolationException(args, reason);
+    }
+
+    /// <summary>Writes the input, then closes standard input so git sees the end.</summary>
+    private static async Task WriteInputAsync(Stream stdin, byte[] input)
     {
         try
         {
-            if (lines.Count > 0)
-                await stdin.WriteAsync(Encoding.UTF8.GetBytes(string.Concat(lines.Select(line => line + "\n")))).ConfigureAwait(false);
+            if (input.Length > 0)
+                await stdin.WriteAsync(input).ConfigureAwait(false);
             await stdin.FlushAsync().ConfigureAwait(false);
             stdin.Close();
         }
@@ -160,6 +200,9 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         // Set last so options can never turn them off.
         psi.Environment["GIT_OPTIONAL_LOCKS"] = "0";
         psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        // A path such as "*.txt" or ":x" is that file and nothing else, never a pattern that stages other files.
+        if (Options.ChangesOnly)
+            psi.Environment["GIT_LITERAL_PATHSPECS"] = "1";
         // Same as `-c core.longpaths=true`: git for Windows can then reach paths over 260 characters,
         // whatever the user's config says. It changes how paths are opened, never what is written.
         // And `-c core.fsmonitor=false`: with fsmonitor on, even `git status` starts a background

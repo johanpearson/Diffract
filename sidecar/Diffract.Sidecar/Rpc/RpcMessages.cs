@@ -40,7 +40,7 @@ internal sealed record RpcError(
 internal sealed record RpcErrorData(ErrorKind Kind);
 
 /// <summary>What went wrong, for errors that are Diffract's own rather than the protocol's.</summary>
-internal enum ErrorKind { NotARepo, GitTooOld, GitFailed, TimedOut, ConfigInvalid }
+internal enum ErrorKind { NotARepo, GitTooOld, GitFailed, TimedOut, ConfigInvalid, IndexLocked, ChangedSinceShown }
 
 /// <summary>The error codes JSON-RPC 2.0 defines, the one LSP adds for cancellation, and Diffract's own.</summary>
 internal static class RpcErrorCodes
@@ -54,15 +54,18 @@ internal static class RpcErrorCodes
     /// <summary>The request was cancelled with <c>$/cancelRequest</c> or because the sidecar is shutting down.</summary>
     public const int RequestCancelled = -32800;
 
-    public static int For(ErrorKind kind) => kind switch
+    private static readonly Dictionary<ErrorKind, int> Codes = new()
     {
-        ErrorKind.NotARepo => -32001,
-        ErrorKind.GitTooOld => -32002,
-        ErrorKind.GitFailed => -32003,
-        ErrorKind.TimedOut => -32004,
-        ErrorKind.ConfigInvalid => -32005,
-        _ => InternalError,
+        [ErrorKind.NotARepo] = -32001,
+        [ErrorKind.GitTooOld] = -32002,
+        [ErrorKind.GitFailed] = -32003,
+        [ErrorKind.TimedOut] = -32004,
+        [ErrorKind.ConfigInvalid] = -32005,
+        [ErrorKind.IndexLocked] = -32006,
+        [ErrorKind.ChangedSinceShown] = -32007,
     };
+
+    public static int For(ErrorKind kind) => Codes.GetValueOrDefault(kind, InternalError);
 }
 
 /// <summary>Thrown by a method to answer with an error. <see cref="Kind"/> is set for Diffract's own errors.</summary>
@@ -124,4 +127,5 @@ internal static class RpcJson
 [JsonSerializable(typeof(ChangesFileParams))]
 [JsonSerializable(typeof(Diffract.Git.Changes.WorktreeChanges))]
 [JsonSerializable(typeof(ChangesFile))]
+[JsonSerializable(typeof(ChangesStageParams))]
 internal sealed partial class RpcJsonContext : JsonSerializerContext;

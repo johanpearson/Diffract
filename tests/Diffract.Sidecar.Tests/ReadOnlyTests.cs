@@ -4,7 +4,8 @@ using Diffract.Git;
 namespace Diffract.Sidecar.Tests;
 
 /// <summary>
-/// The sidecar never creates a writable <see cref="GitRunner"/>. <see cref="GitRunnerOptions.ReadOnly"/> is true unless
+/// The sidecar never creates a writable <see cref="GitRunner"/> other than a changes runner, which allows nothing but
+/// <see cref="ChangesPolicy"/> (see ChangesPolicyTests). <see cref="GitRunnerOptions.ReadOnly"/> is true unless
 /// something sets it, so it is enough to prove two things: the options the sidecar is given are forced to read-only,
 /// and no code in the sidecar sets ReadOnly to anything but true.
 /// </summary>

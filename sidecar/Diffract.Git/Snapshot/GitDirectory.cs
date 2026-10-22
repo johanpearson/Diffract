@@ -17,6 +17,17 @@ public static class GitDirectory
     }
 
     /// <summary>
+    /// Where git takes the worktree's index lock: <c>index.lock</c> next to its index. Null when the git directory
+    /// cannot be found. Diffract only ever checks for it, and never removes it.
+    /// </summary>
+    public static string? FindIndexLock(string worktreePath)
+    {
+        var dotGit = Path.Combine(worktreePath, ".git");
+        var gitDir = Directory.Exists(dotGit) ? dotGit : ReadGitFileLink(worktreePath);
+        return gitDir is null ? null : Path.Combine(gitDir, "index.lock");
+    }
+
+    /// <summary>
     /// The full path in a <c>.git</c> file holding "gitdir: &lt;path&gt;", as linked worktrees have.
     /// Null when there is no such file. Reads that one file and nothing else in the folder.
     /// </summary>

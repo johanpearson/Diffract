@@ -13,6 +13,7 @@ import {
   type AppInfo,
   type ChangedFile,
   type ChangesFile,
+  type Hunk,
   type CommitDetails,
   type CommitEntry,
   type FileChange,
@@ -151,6 +152,18 @@ const changedFile = object<ChangedFile>({
   indexId: nullable(string),
 });
 
+const worktreeChanges = object<WorktreeChanges>({
+  worktree: string,
+  branch: nullable(string),
+  headCommit: nullable(string),
+  upstream: nullable(string),
+  ahead: nullable(number),
+  behind: nullable(number),
+  files: arrayOf(changedFile),
+});
+
+const hunk = object<Hunk>({ id: string, oldStart: number, oldLines: number, newStart: number, newLines: number });
+
 /** The result of every method. Adding a method to `Methods` without a shape here fails the type check. */
 export const resultShapes: { [M in keyof Methods]: Shape } = {
   "app.info": appInfo,
@@ -180,16 +193,10 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   }),
   "history.details": commitDetails,
   "history.file": historyFile,
-  "changes.status": object<WorktreeChanges>({
-    worktree: string,
-    branch: nullable(string),
-    headCommit: nullable(string),
-    upstream: nullable(string),
-    ahead: nullable(number),
-    behind: nullable(number),
-    files: arrayOf(changedFile),
-  }),
-  "changes.file": object<ChangesFile>({ old: nullable(historyFile), new: nullable(historyFile) }),
+  "changes.status": worktreeChanges,
+  "changes.file": object<ChangesFile>({ old: nullable(historyFile), new: nullable(historyFile), hunks: arrayOf(hunk) }),
+  "changes.stage": worktreeChanges,
+  "changes.unstage": worktreeChanges,
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {

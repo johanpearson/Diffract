@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32006,
+    "message": "Another git process is using this repo, probably an agent. Try again in a moment.",
+    "data": {
+      "kind": "IndexLocked"
+    }
+  }
+}

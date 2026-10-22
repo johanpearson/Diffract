@@ -6,7 +6,7 @@
 # Nothing outside that folder is written by git. Run from Git Bash, or any bash:
 #   tests/Diffract.Git.Tests/Samples/capture-changes-samples.sh
 #
-# The arguments must match StatusParser.ChangesArguments. The tests check that they do.
+# The arguments must match StatusParser.ChangesArguments and FilePatch.Arguments. The tests check that they do.
 # Status prints paths relative to the worktree, so no temp path ends up in a sample.
 set -euo pipefail
 
@@ -42,7 +42,8 @@ git push -q -u origin main
 git clone -q "$tmp/origin.git" "$tmp/other"
 (cd "$tmp/other" && commit other1.txt "1" "Other 1" && commit other2.txt "2" "Other 2" && git push -q)
 git fetch -q
-git submodule -q add "$tmp/library" "vendor/library"
+# A relative URL, so .gitmodules, and with it every commit id, is the same on every run.
+git submodule -q add ../library "vendor/library"
 for f in modified.txt staged.txt both.txt deleted.txt removed.txt "to rename.txt" "rename then edit.txt"; do
   # Each file its own content, so git pairs each rename with the right file.
   printf '%s, line 1\n%s, line 2\n' "$f" "$f" > "$f"
@@ -77,5 +78,30 @@ commit clean.txt "clean" "Unrelated"
 git merge -q other > /dev/null 2>&1 || true
 echo "staged during the merge" > clean.txt && git add clean.txt
 status > "$out/changes-status-conflict.bin"
+
+# --- hunks: diffs without context, as the Changes view stages them ------------
+# The diff samples are byte for byte what git wrote, CRs included.
+diff_args='-U0 --no-color --no-ext-diff --no-textconv --src-prefix=a/ --dst-prefix=b/'
+hunks() { git diff $diff_args "$@"; }
+git init -q -b main "$tmp/hunks"
+cd "$tmp/hunks"
+printf '1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n' > "near åäö.txt"
+printf 'one\r\ntwo\r\nthree\r\n' > crlf.txt
+printf 'first\nlast' > no-newline.txt
+printf 'keep\nrename me\nplease\n' > old.txt
+printf 'bin\0ary' > image.bin
+git add -A && git commit -q -m "Files"
+printf '1\nTWO\n3\n4\n5\nSIX\n7\n8\n9\n10\n' > "near åäö.txt"
+printf 'one\r\nTWO\r\nthree\r\n' > crlf.txt
+printf 'first\nlast\nafter' > no-newline.txt
+printf 'new\nfile\n' > new.txt && git add --intent-to-add new.txt
+printf 'b\0in' > image.bin
+hunks -- ":(literal)near åäö.txt" > "$out/diff-two-hunks.bin"
+hunks -- ":(literal)crlf.txt" > "$out/diff-crlf.bin"
+hunks -- ":(literal)no-newline.txt" > "$out/diff-no-newline.bin"
+hunks -- ":(literal)new.txt" > "$out/diff-new-file.bin"
+hunks -- ":(literal)image.bin" > "$out/diff-binary.bin"
+git mv old.txt "renamed.txt" && printf 'keep\nrenamed\nplease\n' > renamed.txt && git add renamed.txt
+hunks --cached -M -- ":(literal)renamed.txt" ":(literal)old.txt" > "$out/diff-staged-rename.bin"
 
 echo "Samples written to $out"
