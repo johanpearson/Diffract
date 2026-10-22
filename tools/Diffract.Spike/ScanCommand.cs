@@ -27,39 +27,34 @@ internal sealed class ScanCommand(TextWriter output, TextWriter error, GitRunner
             var elapsed = time.GetElapsedTime(started);
 
             var leftovers = new LeftoverClassifier().Classify(result.Snapshot, config, time, runningFrom);
-            var report = new ScanReport(result.Snapshot, leftovers, elapsed, scan.Timing ? result.Timings : null);
-            if (scan.Json)
-                ScanJson.Write(output, report);
-            else
-                ScanText.Write(output, report);
+            Write(scan, new ScanReport(result.Snapshot, leftovers, elapsed, scan.Timing ? result.Timings : null));
             return ExitCodes.Success;
         }
-        catch (NotAGitRepositoryException e)
+        catch (Exception e) when (Failure(e, ct) is { } failure)
         {
-            error.WriteLine(e.Message);
-            return ExitCodes.NotAGitRepository;
-        }
-        catch (GitVersionTooOldException e)
-        {
-            error.WriteLine(e.Message);
-            return ExitCodes.GitTooOld;
-        }
-        catch (Exception e) when (e is GitException or ConfigException)
-        {
-            error.WriteLine(e.Message);
-            return ExitCodes.Error;
-        }
-        catch (Win32Exception e)
-        {
-            error.WriteLine($"Could not start git ({runnerOptions.GitExecutable}): {e.Message}. Is git installed and on PATH?");
-            return ExitCodes.Error;
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            error.WriteLine("Cancelled.");
-            return ExitCodes.Error;
+            error.WriteLine(failure.Message);
+            return failure.ExitCode;
         }
     }
+
+    private void Write(ScanOptions scan, ScanReport report)
+    {
+        if (scan.Json)
+            ScanJson.Write(output, report);
+        else
+            ScanText.Write(output, report);
+    }
+
+    /// <summary>What to print and which exit code to return for an error the scan expects. Null for any other.</summary>
+    private (string Message, int ExitCode)? Failure(Exception e, CancellationToken ct) => e switch
+    {
+        NotAGitRepositoryException => (e.Message, ExitCodes.NotAGitRepository),
+        GitVersionTooOldException => (e.Message, ExitCodes.GitTooOld),
+        GitException or ConfigException => (e.Message, ExitCodes.Error),
+        Win32Exception => ($"Could not start git ({runnerOptions.GitExecutable}): {e.Message}. Is git installed and on PATH?", ExitCodes.Error),
+        OperationCanceledException when ct.IsCancellationRequested => ("Cancelled.", ExitCodes.Error),
+        _ => null,
+    };
 }
 
 internal sealed record ScanOptions(bool Json, bool Timing, string? ConfigPath)
