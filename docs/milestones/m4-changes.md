@@ -33,12 +33,13 @@ A first proposal, to settle in phase 0.
 | Action | Command |
 |---|---|
 | Stage files | `git add -- <paths>`, paths passed on standard input with `--pathspec-from-file=- --pathspec-file-nul` |
+| Prepare a new file for hunk staging | `git add --intent-to-add -- <path>` |
 | Unstage files | `git restore --staged`, paths as above |
 | Stage or unstage a hunk | `git apply --cached` (with `--reverse` to unstage), the patch on standard input |
 | Commit | `git commit -F -`, the message on standard input; `--amend` only as in decision 5 |
 | Fetch | `git fetch <remote>`, never `--prune` from here (that is a setting in milestone 6) |
-| Pull | `git pull --ff-only`, see decision 6 |
-| Push | `git push <remote> <branch>`, with `--set-upstream` on a branch's first push |
+| Pull | `git fetch <remote>`, then `git merge --ff-only <upstream>` only when the branch is behind and not ahead, see decision 6 |
+| Push | `git push --porcelain <remote> <branch>`, with `--set-upstream` on a branch's first push |
 | Create a branch | `git branch <name> <commit>` |
 | Switch | `git switch <branch>`, `git switch -c <name> <commit>`, `git switch --track <remote>/<branch>`, `git switch --detach <commit>`, never `--discard-changes` or `--force` |
 | Create a tag | `git tag -a <name> <commit> -F -` |
@@ -54,7 +55,9 @@ Never: `--force` or `--force-with-lease` (milestone 8), `reset --hard`, `checkou
 4. Check how the working tree side of a diff is read so its line endings match what `git diff` shows, so Monaco does not mark every line as changed.
 5. Settle the decisions below.
 
-**Checkpoint:** Johan decides the open questions below before any code that writes is written. Decided on 2026-10-22; the checks in steps 1 to 4 are still to do.
+**Checkpoint:** Johan decides the open questions below before any code that writes is written. Decided on 2026-10-22.
+
+Steps 2 to 4 were checked on 2026-10-22, in `docs/findings/changes.md`. Every case stages correctly, as long as patches are handled as bytes. They led to three changes to the allowlist above, waiting for Johan's yes: hunks are read with `-U0` so nearby changes stage on their own, pull is a fetch followed by `merge --ff-only` so Diffract decides from data instead of an error message, and push uses `--porcelain`. Step 1 is still to do.
 
 ### Decisions
 
