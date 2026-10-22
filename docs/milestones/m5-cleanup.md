@@ -20,7 +20,7 @@ These come from the brief and the visual plan.
 - **"In use" is never offered.** Rows with that verdict have no checkbox. A row can also become "In use" while the dialog is open, and the step check catches that.
 - **Unique work gets a backup first.** When a leftover has commits at risk, except a branch whose upstream is gone (decision 8), an annotated tag under `archive/` is created before anything is removed. If the tag cannot be created, nothing of that leftover is removed.
 - **Every step can be undone or is shown as final.** The operation log records each step with what it needs to reverse it. Steps that cannot be undone are marked so in the dialog before the user confirms.
-- **Diffract writes through a separate runner.** The read-only runner stays as it is. A cleanup runner allows only the commands in the table below. The sidecar test changes from "never creates a writable runner" to "only the cleanup executor creates the cleanup runner, and it rejects everything else".
+- **Diffract writes through a separate runner.** The read-only runner stays as it is. A cleanup runner allows only the commands in the table below, next to the changes runner milestone 4 adds. The sidecar test proves that only the cleanup executor creates the cleanup runner, and that it rejects everything else.
 
 ## What cleaning up does, per kind
 
@@ -115,6 +115,14 @@ As described under "Hiding rows" in phase 0. Tests: a hidden row stays hidden ac
 3. Every surprise becomes a test and a fix.
 
 **Checkpoint:** Johan signs off.
+
+## Moved in from milestone 4
+
+Johan decided on 2026-10-22, in #43, that these wait for this milestone's backup and undo, since each can throw work away. They are planned in more detail when this milestone starts.
+
+- **Discard changes** in the Changes view, for a file or a hunk. The changes are kept first, for example with `git stash create` and a backup ref, so "Undo" can bring them back.
+- **Reset current branch to here: hard**, from the history menu. Uncommitted work is kept the same way before the reset.
+- **Delete branch**, from the history menu, through this milestone's planner, backup tag and undo.
 
 ## Acceptance criteria
 

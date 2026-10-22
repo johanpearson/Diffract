@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** planned. Phase 0 is next.
+**Status:** planned. Phase 0 is next. Decisions 1 to 10 are made; decision 11 is open.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -11,7 +11,7 @@ The Changes view shows what is different in a worktree, lets the user stage whol
 This is the first milestone where Diffract changes a repo. Cleanup, which was planned to come first, now builds on what this milestone sets up.
 
 - **Diffract writes to real repos** when the user stages, commits, pulls or pushes. That is the product working.
-- **Coding agents still never do.** The safety rules in `AGENTS.md` do not change. Every test writes only to fixture repos in a temp folder, and pull and push are tested against a bare fixture repo standing in for the remote. Agents never stage, commit, pull or push in one of Johan's repos, not even to try it. Johan does the real-world check himself, in phase 7.
+- **Coding agents still never do.** The safety rules in `AGENTS.md` do not change. Every test writes only to fixture repos in a temp folder, and pull and push are tested against a bare fixture repo standing in for the remote. Agents never stage, commit, pull or push in one of Johan's repos, not even to try it. Johan does the real-world check himself, in phase 8.
 
 ## What milestone 3 taught us
 
@@ -39,8 +39,12 @@ A first proposal, to settle in phase 0.
 | Fetch | `git fetch <remote>`, never `--prune` from here (that is a setting in milestone 6) |
 | Pull | `git pull --ff-only`, see decision 6 |
 | Push | `git push <remote> <branch>`, with `--set-upstream` on a branch's first push |
+| Create a branch | `git branch <name> <commit>` |
+| Switch | `git switch <branch>`, `git switch -c <name> <commit>`, `git switch --track <remote>/<branch>`, `git switch --detach <commit>`, never `--discard-changes` or `--force` |
+| Create a tag | `git tag -a <name> <commit> -F -` |
+| Reset the current branch | `git reset --soft <commit>` and `git reset --mixed <commit>`, never `--hard`, `--merge` or `--keep` |
 
-Never: `--force` or `--force-with-lease` (milestone 8), `reset`, `checkout`, `switch` (unless decision 10 brings it in), `clean`, `stash`, `restore` without `--staged`, `rebase`, `merge` other than through `pull --ff-only`.
+Never: `--force` or `--force-with-lease` (milestone 8), `reset --hard`, `checkout`, `clean`, `stash`, `restore` without `--staged`, `rebase`, `merge` other than through `pull --ff-only`.
 
 ## Phase 0: spike and decisions
 
@@ -50,11 +54,11 @@ Never: `--force` or `--force-with-lease` (milestone 8), `reset`, `checkout`, `sw
 4. Check how the working tree side of a diff is read so its line endings match what `git diff` shows, so Monaco does not mark every line as changed.
 5. Settle the decisions below.
 
-**Checkpoint:** Johan decides the open questions below before any code that writes is written.
+**Checkpoint:** Johan decides the open questions below before any code that writes is written. Decisions 1 to 10 were made on 2026-10-22; decision 11 is still open.
 
-### Open questions
+### Decisions
 
-Each has a proposal. Johan decides.
+Johan accepted the proposals for 1 to 10 on 2026-10-22, in #43. Decision 11 came from his question there and still needs his yes.
 
 1. **Which worktree.** Proposal: Changes shows the worktree the repo was opened from, with a picker for the other worktrees. A worktree that is "In use" by an agent shows a warning before anything is staged in it.
 2. **Hunks or lines.** Proposal: whole files and single hunks in this milestone. Staging single lines comes later.
@@ -66,6 +70,22 @@ Each has a proposal. Johan decides.
 8. **Hooks and signing.** Proposal: git's hooks run as they always do, and a failing hook shows its output. Signing follows the repo's config. Credentials come from Git Credential Manager, which shows its own window; Diffract never asks for a password.
 9. **When the index is locked.** Proposal: try again for up to 2 seconds, then say "Another git process is using this repo, probably an agent. Try again in a moment." Nothing is retried after that without the user.
 10. **Switching and creating branches.** Not in the visual plan for this milestone, but hard to do a day's work without. Proposal: "Create branch here" and "Switch to" from the history view's menu, using plain `git switch` and `git switch -c`, which refuse rather than overwrite uncommitted changes. If Johan says no, they stay out of scope and he keeps Git Extensions or a terminal for them.
+11. **A right-click menu on history rows**, as in Git Extensions. It opens with a right-click, the menu key or Shift+F10, like the worktree menu from milestone 2. It shows only what is safe in this milestone, and the rest comes with the milestone that makes it safe:
+
+    | Menu item | Milestone | Why then |
+    |---|---|---|
+    | Copy hash, Copy subject | 4 | read-only |
+    | Create branch here, with "Switch to it" ticked | 4 | `git branch` or `git switch -c`, adds a ref and changes nothing else |
+    | Switch to a branch on this commit | 4 | `git switch`, which refuses rather than overwrite uncommitted changes. For a remote-tracking branch it creates the local branch that tracks it |
+    | Check out this commit (detached) | 4 | `git switch --detach`, which refuses in the same way |
+    | Create tag here | 4 | `git tag -a`, adds a ref |
+    | Reset current branch to here: soft or mixed | 4 | Every change stays in the working tree or the index. A confirm dialog says how many commits leave the branch, and "Undo reset" moves it back, after checking that the branch has not moved since |
+    | Reset current branch to here: hard | 5 | It throws away uncommitted work, so it needs milestone 5's backup and undo, like "Discard" in decision 4 |
+    | Delete branch | 5 | uses cleanup's planner, backup tag and undo |
+    | Merge into current branch, Cherry-pick, Revert | 7 | each can end in conflicts |
+    | Rebase current branch onto here | 8 | interactive rebase |
+
+    Resetting a branch that is already pushed is allowed, but the dialog warns that pushing it afterwards needs a force push, which comes in milestone 8.
 
 ## Phase 1: status and working tree diffs
 
@@ -103,7 +123,14 @@ From the visual plan:
 - Fetch, pull and push as in decisions 6 and 7, against the remote of the current branch. They run in the background and can be cancelled. The bar shows they are running and what came of it.
 - Tests: against a bare fixture remote: fetch with new commits, pull that fast-forwards, pull refused because the branch diverged, first push that sets the upstream, push refused because the remote moved on. A remote that cannot be reached gives a plain message within the timeout.
 
-## Phase 6: protocol and contract samples
+## Phase 6: the history menu
+
+- The menu from decision 11, on the selected history row, with only the items for this milestone.
+- "Create branch here" and "Create tag here" ask for a name, and say before anything runs if the name is taken or not valid (`git check-ref-format`).
+- Reset asks soft or mixed in a confirm dialog that lists the commits leaving the branch. "Undo reset" is offered in the result, and moves the branch back only if it is still where the reset left it.
+- Tests: fixture repos for each item, including switching with uncommitted changes that git refuses, a remote-tracking branch, a detached HEAD, a taken branch name, and reset then undo, ending where it started. Playwright: the menu opens by mouse and keyboard, and runs each item against the fake sidecar.
+
+## Phase 7: protocol and contract samples
 
 The methods grow phase by phase. Listed here so their shapes are decided together.
 
@@ -114,10 +141,12 @@ The methods grow phase by phase. Listed here so their shapes are decided togethe
 | `changes.stage` / `changes.unstage` | `repoId`, worktree, paths or one hunk | the new status |
 | `changes.commit` | `repoId`, worktree, message, amend | the new commit |
 | `remote.fetch` / `remote.pull` / `remote.push` | `repoId`, worktree | what happened, or why git refused |
+| `branch.create` / `branch.switch` / `tag.create` | `repoId`, worktree, commit, name | the new ref, or why git refused |
+| `branch.reset` / `branch.undoReset` | `repoId`, worktree, commit, soft or mixed | the old and new commit of the branch |
 
 Status changes arrive as `repo.changed`, as they already do. Contract samples for every shape, as in milestone 2.
 
-## Phase 7: real-world check
+## Phase 8: real-world check
 
 1. Johan installs the CI build and does a day of his own work with it: stage, commit, pull and push in his own repos.
 2. Every wrong, slow or surprising thing becomes a test and a fix.
@@ -137,4 +166,4 @@ Status changes arrive as `repo.changed`, as they already do. Contract samples fo
 
 ## Out of scope for milestone 4
 
-Discarding changes (decision 4), staging single lines, pull with merge or rebase and resolving conflicts (milestone 7), force push (milestone 8), stashing, switching and creating branches unless decision 10 brings them in, and settings such as identity or prune on fetch (milestone 6).
+Discarding changes (decision 4), staging single lines, pull with merge or rebase and resolving conflicts (milestone 7), force push (milestone 8), stashing, the history menu items decision 11 leaves to later milestones, and settings such as identity or prune on fetch (milestone 6).
