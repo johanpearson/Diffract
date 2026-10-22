@@ -142,3 +142,128 @@ test("selects a commit by clicking it, and goes to its parent from the details",
   await expect(selected(page)).not.toHaveAttribute("aria-posinset", "5");
   await expect(subjectOf(page)).not.toHaveText(subject!);
 });
+
+test("shows a file's diff side by side, and loads Monaco only then", async ({ page }) => {
+  const monaco: string[] = [];
+  page.on("request", (request) => {
+    if (/editor\.api|monacoEditor|editor\.worker/.test(request.url())) monaco.push(request.url());
+  });
+  await openHistory(page, 200);
+  const file = panel(page).getByRole("button", { name: /src\/cart\.cs/ });
+  await expect(file).toBeVisible();
+  expect(monaco).toEqual([]);
+
+  await file.click();
+
+  const diff = page.getByRole("region", { name: "Diff of src/cart.cs" });
+  const original = diff.locator(".editor.original");
+  const modified = diff.locator(".editor.modified");
+  await expect(modified).toContainText("Lines.Sum(l => l.Price)");
+  await expect(original).toContainText("Total => 0m");
+  const [left, right] = [(await original.boundingBox())!, (await modified.boundingBox())!];
+  expect(left.x + left.width).toBeLessThanOrEqual(right.x + 1);
+  expect(monaco.length).toBeGreaterThan(0);
+
+  await page.keyboard.press("Escape");
+  await expect(diff).toBeHidden();
+});
+
+test("the diff follows the Windows theme", async ({ page }) => {
+  for (const colorScheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await openHistory(page, 50);
+    await panel(page).getByRole("button", { name: /src\/cart\.cs/ }).click();
+
+    const editor = page.locator(".monaco-diff-editor .editor.modified .monaco-editor");
+    await expect(editor).toBeVisible();
+    await expect(editor).toHaveClass(colorScheme === "dark" ? /vs-dark/ : /\bvs\b/);
+  }
+});
+
+test("finds commits from the find box and jumps to them", async ({ page }) => {
+  await openHistory(page);
+
+  await page.keyboard.press("Control+f");
+  const find = page.getByRole("searchbox", { name: "Find commits" });
+  await expect(find).toBeFocused();
+  await find.fill("Change 25000 on");
+  await find.press("Enter");
+
+  await expect(selected(page)).toContainText("Change 25000 on main");
+  await expect(selected(page)).toBeInViewport();
+  await expect(page.getByText("1 of 1")).toBeVisible();
+});
+
+test("switches the diff between side by side and inline, and remembers it", async ({ page }) => {
+  await openHistory(page, 50);
+  await panel(page).getByRole("button", { name: /src\/cart\.cs/ }).click();
+  const diff = page.getByRole("region", { name: "Diff of src/cart.cs" });
+  await expect(diff.locator(".monaco-diff-editor")).toHaveClass(/side-by-side/);
+
+  await diff.getByRole("button", { name: "Inline" }).click();
+
+  await expect(diff.locator(".monaco-diff-editor")).not.toHaveClass(/side-by-side/);
+  await expect(diff.locator(".editor.modified")).toContainText("Total => 0m");
+  expect(await page.evaluate(() => window.diffractTest.storage.get("diffract.diffLayout"))).toBe("inline");
+});
+
+test("shows an added file on its own, without a diff", async ({ page }) => {
+  await openHistory(page, 50);
+
+  await panel(page).getByRole("button", { name: /docs\/changes\.md/ }).click();
+
+  const view = page.getByRole("region", { name: "Diff of docs/changes.md" });
+  await expect(view).toContainText("The cart now sums its lines.");
+  await expect(view.locator(".monaco-diff-editor")).toHaveCount(0);
+  await expect(view.getByRole("group", { name: "Diff layout" })).toHaveCount(0);
+});
+
+test("scrolls to the first change, and moves between changes", async ({ page }) => {
+  await openHistory(page, 50);
+
+  await panel(page).getByRole("button", { name: /src\/long\.cs/ }).click();
+
+  const diff = page.getByRole("region", { name: "Diff of src/long.cs" });
+  await expect(diff.getByText("// the new line 301")).toBeInViewport();
+  await expect(diff.getByText("// line 1", { exact: true })).toHaveCount(0);
+  await diff.getByRole("button", { name: "Previous change" }).click();
+  await expect(diff.getByText("// the new line 301")).toBeInViewport();
+});
+
+test("resizes the panels by dragging, and remembers the sizes", async ({ page }) => {
+  await openHistory(page, 50);
+  await panel(page).getByRole("button", { name: /src\/cart\.cs/ }).click();
+  const before = (await panel(page).boundingBox())!.width;
+  const diffBefore = (await page.locator(".diff-frame").boundingBox())!.height;
+
+  await drag(page, page.getByRole("separator", { name: "Resize commit details" }), -100, 0);
+  await drag(page, page.getByRole("separator", { name: "Resize diff" }), 0, 60);
+  await drag(page, page.getByRole("separator", { name: "Resize sidebar" }), 40, 0);
+
+  expect((await panel(page).boundingBox())!.width).toBeCloseTo(before + 100, -1);
+  expect((await page.locator(".diff-frame").boundingBox())!.height).toBeCloseTo(diffBefore - 60, -1);
+  expect((await page.locator(".sidebar-frame").boundingBox())!.width).toBeCloseTo(290, -1);
+  const stored = await page.evaluate(() => [...window.diffractTest.storage.keys()].filter((k) => k.startsWith("diffract.size.")).sort());
+  expect(stored).toEqual(["diffract.size.details", "diffract.size.diff", "diffract.size.sidebar"]);
+});
+
+async function drag(page: Page, handle: ReturnType<Page["getByRole"]>, dx: number, dy: number) {
+  const box = (await handle.boundingBox())!;
+  const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + dx, y + dy, { steps: 5 });
+  await page.mouse.up();
+}
+
+test("finds a commit by a tag or branch on it", async ({ page }) => {
+  await openHistory(page);
+  const find = page.getByRole("searchbox", { name: "Find commits" });
+
+  await find.fill("v1.0");
+  await find.press("Enter");
+
+  await expect(selected(page)).toHaveAttribute("aria-posinset", String(BigHistory));
+  await expect(selected(page)).toContainText("v1.0");
+  await expect(selected(page)).toBeInViewport();
+});

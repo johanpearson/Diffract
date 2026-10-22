@@ -1,4 +1,5 @@
-import type { CommitDetails, CommitEntry, HistoryRef } from "../protocol";
+import detailsSample from "../../../tests/Diffract.Sidecar.Tests/Contract/history.details.json";
+import type { CommitDetails, CommitEntry, FileChange, FileChangeKind, HistoryFile, HistoryRef } from "../protocol";
 
 const authors = [
   { name: "Johan Pearson", email: "johan@example.com" },
@@ -78,18 +79,34 @@ export function detailsOf(commit: CommitEntry): CommitDetails {
     committerEmail: commit.authorEmail,
     body: `Details of ${commit.subject}.`,
     files: [
-      {
-        kind: "Modified",
-        path: "src/cart.cs",
-        oldPath: null,
-        oldId: "1".repeat(40),
-        newId: "2".repeat(40),
-        similarity: null,
-        additions: 3,
-        deletions: 1,
-        isBinary: false,
-        isSubmodule: false,
-      },
+      textFile("Modified", "src/cart.cs", "1", "2", [3, 1]),
+      textFile("Modified", "src/long.cs", "4", "5", [1, 1]),
+      textFile("Added", "docs/changes.md", null, "3", [2, 0]),
     ],
   };
 }
+
+/** A changed text file whose blob ids repeat one digit, so they find their content in sampleFiles. */
+function textFile(kind: FileChangeKind, path: string, oldDigit: string | null, newDigit: string, [additions, deletions]: [number, number]): FileChange {
+  const id = (digit: string | null) => (digit === null ? null : digit.repeat(40));
+  return { kind, path, oldPath: null, oldId: id(oldDigit), newId: id(newDigit), similarity: null, additions, deletions, isBinary: false, isSubmodule: false };
+}
+
+const cartBefore = ["namespace Shop;", "", "public class Cart", "{", "    public decimal Total => 0m;", "}", ""].join("\n");
+const cartAfter = ["namespace Shop;", "", "public class Cart", "{", "    public decimal Total => Lines.Sum(l => l.Price);", "    public List<Line> Lines { get; } = [];", "}", ""].join("\n");
+/** 400 lines, with one changed far down, so the diff must scroll to show it. */
+const longFile = (changed: string) => Array.from({ length: 400 }, (_, i) => (i === 300 ? changed : `// line ${i + 1}`)).join("\n");
+
+const [renamed, picture] = (detailsSample as { result: CommitDetails }).result.files;
+
+/** File contents by blob id: the generated history's files, and those of the history.details contract sample. */
+export const sampleFiles: [string, HistoryFile][] = [
+  ["1".repeat(40), { kind: "Text", text: cartBefore, message: null }],
+  ["2".repeat(40), { kind: "Text", text: cartAfter, message: null }],
+  ["3".repeat(40), { kind: "Text", text: "# Changes\n\nThe cart now sums its lines.\n", message: null }],
+  ["4".repeat(40), { kind: "Text", text: longFile("// the old line 301"), message: null }],
+  ["5".repeat(40), { kind: "Text", text: longFile("// the new line 301"), message: null }],
+  [renamed!.oldId!, { kind: "Text", text: cartBefore, message: null }],
+  [renamed!.newId!, { kind: "Text", text: cartAfter.replace("Cart", "Räksmörgås"), message: null }],
+  [picture!.newId!, { kind: "Binary", text: null, message: "This is a binary file." }],
+];

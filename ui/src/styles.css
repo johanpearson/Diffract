@@ -172,12 +172,17 @@ body {
 }
 
 /* Sidebar */
-.sidebar {
-  width: 250px;
+.sidebar-frame {
+  display: flex;
   flex: none;
+  min-height: 0;
+}
+
+.sidebar {
+  flex: 1;
+  min-width: 0;
   overflow: auto;
   padding: 14px 10px;
-  border-right: 1px solid var(--line);
   background: var(--panel);
 }
 
@@ -820,7 +825,6 @@ body {
 .commit-panel {
   overflow: auto;
   padding: 14px 16px;
-  border-left: 1px solid var(--line);
   background: var(--panel);
   font-size: 13px;
 }
@@ -899,13 +903,167 @@ body {
   padding: 0;
 }
 
-.files li {
+.files button.file {
   display: flex;
   gap: 8px;
-  padding: 2px 0;
+  width: 100%;
+  padding: 3px 6px;
+  margin: 0 -6px;
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ink-2);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.files button.file:hover {
+  background: var(--panel-2);
+}
+
+.files button.file[aria-pressed="true"] {
+  background: var(--sel);
+  color: var(--ink);
+}
+
+/* The list on top and, once a file is opened, its diff below. */
+.history-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.history-main .history-scroll {
+  flex: 1;
+  min-height: 120px;
+}
+
+/* The diff's height is the user's, but the list above always keeps some room. */
+.diff-frame {
+  display: flex;
+  flex: none;
+  max-height: calc(100% - 126px);
+  min-height: 0;
+}
+
+.diff-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--panel);
+}
+
+.segmented {
+  display: flex;
+}
+
+.segmented .abtn {
+  border-radius: 0;
+}
+
+.segmented .abtn:first-child {
+  border-radius: 7px 0 0 7px;
+}
+
+.segmented .abtn:last-child {
+  border-radius: 0 7px 7px 0;
+  margin-left: -1px;
+}
+
+.segmented .abtn[aria-pressed="true"] {
+  background: var(--sel);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* A bar to drag between panels. It looks like the line between them until it is hovered or focused. */
+.splitter {
+  flex: none;
+  position: relative;
+  z-index: 2;
+  background: var(--line);
+  touch-action: none;
+}
+
+.splitter.vertical {
+  width: 1px;
+  cursor: col-resize;
+}
+
+.splitter.horizontal {
+  height: 1px;
+  cursor: row-resize;
+}
+
+/* A wider grip than the line itself, so it is easy to catch. */
+.splitter::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.splitter.vertical::before {
+  inset: 0 -4px;
+}
+
+.splitter.horizontal::before {
+  inset: -4px 0;
+}
+
+.splitter:hover,
+.splitter:focus-visible {
+  background: var(--focus);
+  outline: none;
+}
+
+.diff-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.diff-path {
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monaco-host {
+  flex: 1;
+  min-height: 0;
+}
+
+.find {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.find input {
+  width: 260px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.find-count {
+  color: var(--ink-3);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .files .file-path {

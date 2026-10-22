@@ -9,6 +9,7 @@ import type {
   GitInUse,
   GitUpdateCheck,
   GitUpdateResult,
+  HistoryFile,
   HistoryPage,
   HistoryRef,
   Methods,
@@ -17,7 +18,7 @@ import type {
   TerminalInfo,
   TerminalKind,
 } from "../protocol";
-import { detailsOf, generateHistory } from "./fakeHistory";
+import { detailsOf, generateHistory, sampleFiles } from "./fakeHistory";
 import { FakeTransport } from "./fakeTransport";
 
 /** The repo in the repo.open contract sample, which the sidecar's own tests write. */
@@ -76,6 +77,10 @@ export class FakeSidecar {
   refs: HistoryRef[] = sampleRefs;
   /** Every commit history.details was asked for. */
   readonly detailsAsked: string[] = [];
+  /** What history.file answers, by blob id. Any other blob is a one-line text naming it. */
+  readonly files = new Map<string, HistoryFile>(sampleFiles);
+  /** Every blob history.file was asked for. */
+  readonly filesAsked: string[] = [];
 
   private readonly waiting: (() => void)[] = [];
 
@@ -154,6 +159,11 @@ export class FakeSidecar {
     return detailsOf(commit);
   }
 
+  private file(blobId: string): HistoryFile {
+    this.filesAsked.push(blobId);
+    return this.files.get(blobId) ?? { kind: "Text", text: `blob ${blobId}\n`, message: null };
+  }
+
   private respond(method: keyof Methods, params: unknown): unknown {
     const p = (params ?? {}) as { path?: string; repoId?: string; terminal?: TerminalKind; version?: string; commitId?: string };
     switch (method) {
@@ -164,7 +174,7 @@ export class FakeSidecar {
       case "history.details":
         return this.details(p.commitId ?? "");
       case "history.file":
-        return { kind: "Text", text: "", message: null };
+        return this.file((params as { blobId: string }).blobId);
       case "app.info":
         return this.info;
       case "repo.open": {

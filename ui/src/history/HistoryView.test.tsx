@@ -14,7 +14,7 @@ afterEach(() => {
 const [merge, root] = sampleCommits as [(typeof sampleCommits)[0], (typeof sampleCommits)[0]];
 
 function setup(sidecar = new FakeSidecar()) {
-  render(<HistoryView client={new RpcClient(sidecar.transport)} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} />);
+  render(<HistoryView client={new RpcClient(sidecar.transport)} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} storage={{ get: () => null, set: () => {} }} />);
   return sidecar;
 }
 
@@ -77,7 +77,7 @@ describe("HistoryView", () => {
 
   it("goes to a parent from the details, and cannot go to one that is not loaded", async () => {
     setup();
-    const parents = await within(panel()).findAllByRole("button");
+    const parents = await within(panel()).findAllByRole("button", { name: /^[0-9a-f]{8}$/ });
 
     expect(parents.map((b) => [b.textContent, (b as HTMLButtonElement).disabled])).toEqual([
       [root.id.slice(0, 8), false],
