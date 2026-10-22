@@ -142,3 +142,54 @@ test("selects a commit by clicking it, and goes to its parent from the details",
   await expect(selected(page)).not.toHaveAttribute("aria-posinset", "5");
   await expect(subjectOf(page)).not.toHaveText(subject!);
 });
+
+test("shows a file's diff side by side, and loads Monaco only then", async ({ page }) => {
+  const monaco: string[] = [];
+  page.on("request", (request) => {
+    if (/editor\.api|monacoEditor|editor\.worker/.test(request.url())) monaco.push(request.url());
+  });
+  await openHistory(page, 200);
+  const file = panel(page).getByRole("button", { name: /src\/cart\.cs/ });
+  await expect(file).toBeVisible();
+  expect(monaco).toEqual([]);
+
+  await file.click();
+
+  const diff = page.getByRole("region", { name: "Diff of src/cart.cs" });
+  const original = diff.locator(".editor.original");
+  const modified = diff.locator(".editor.modified");
+  await expect(modified).toContainText("Lines.Sum(l => l.Price)");
+  await expect(original).toContainText("Total => 0m");
+  const [left, right] = [(await original.boundingBox())!, (await modified.boundingBox())!];
+  expect(left.x + left.width).toBeLessThanOrEqual(right.x + 1);
+  expect(monaco.length).toBeGreaterThan(0);
+
+  await page.keyboard.press("Escape");
+  await expect(diff).toBeHidden();
+});
+
+test("the diff follows the Windows theme", async ({ page }) => {
+  for (const colorScheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await openHistory(page, 50);
+    await panel(page).getByRole("button", { name: /src\/cart\.cs/ }).click();
+
+    const editor = page.locator(".monaco-diff-editor .editor.modified .monaco-editor");
+    await expect(editor).toBeVisible();
+    await expect(editor).toHaveClass(colorScheme === "dark" ? /vs-dark/ : /\bvs\b/);
+  }
+});
+
+test("finds commits from the find box and jumps to them", async ({ page }) => {
+  await openHistory(page);
+
+  await page.keyboard.press("Control+f");
+  const find = page.getByRole("searchbox", { name: "Find commits" });
+  await expect(find).toBeFocused();
+  await find.fill("Change 25000 on");
+  await find.press("Enter");
+
+  await expect(selected(page)).toContainText("Change 25000 on main");
+  await expect(selected(page)).toBeInViewport();
+  await expect(page.getByText("1 of 1")).toBeVisible();
+});

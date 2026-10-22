@@ -77,7 +77,7 @@ describe("HistoryView", () => {
 
   it("goes to a parent from the details, and cannot go to one that is not loaded", async () => {
     setup();
-    const parents = await within(panel()).findAllByRole("button");
+    const parents = await within(panel()).findAllByRole("button", { name: /^[0-9a-f]{8}$/ });
 
     expect(parents.map((b) => [b.textContent, (b as HTMLButtonElement).disabled])).toEqual([
       [root.id.slice(0, 8), false],

@@ -10,13 +10,17 @@ interface Props {
   /** Selects a parent, when it is in the history read so far. */
   onSelect(commitId: string): void;
   isLoaded(commitId: string): boolean;
+  /** Shows a changed file's diff. */
+  onOpenFile(file: FileChange): void;
+  /** The file whose diff is open, or null. */
+  openFile: FileChange | null;
 }
 
 /** The selected commit: message, author and committer, parents, refs and changed files. */
-export const CommitPanel = forwardRef<HTMLElement, Props>(function CommitPanel({ state, markers, onSelect, isLoaded }, ref) {
+export const CommitPanel = forwardRef<HTMLElement, Props>(function CommitPanel(props, ref) {
   return (
     <aside className="commit-panel" aria-label="Commit details" tabIndex={-1} ref={ref}>
-      <PanelBody state={state} markers={markers} onSelect={onSelect} isLoaded={isLoaded} />
+      <PanelBody {...props} />
     </aside>
   );
 });
@@ -38,7 +42,7 @@ function PanelBody({ state, ...props }: Props) {
   }
 }
 
-function Details({ details: d, markers, onSelect, isLoaded }: Omit<Props, "state"> & { details: CommitDetails }) {
+function Details({ details: d, markers, onSelect, isLoaded, onOpenFile, openFile }: Omit<Props, "state"> & { details: CommitDetails }) {
   return (
     <>
       <h2 className="commit-subject">{d.subject || "(no subject)"}</h2>
@@ -71,7 +75,7 @@ function Details({ details: d, markers, onSelect, isLoaded }: Omit<Props, "state
       <h3 className="files-title">{filesTitle(d.files.length)}</h3>
       <ul className="files" aria-label="Changed files">
         {d.files.map((f) => (
-          <FileRow key={`${f.oldPath ?? ""}>${f.path}`} file={f} />
+          <FileRow key={`${f.oldPath ?? ""}>${f.path}`} file={f} isOpen={f === openFile} onOpen={onOpenFile} />
         ))}
       </ul>
     </>
@@ -101,14 +105,16 @@ function Parents({ ids, onSelect, isLoaded }: { ids: string[] } & Pick<Props, "o
 const fileLetters: Record<FileChangeKind, string> = { Added: "A", Deleted: "D", Modified: "M", Renamed: "R", Copied: "C", TypeChanged: "T", Unknown: "?" };
 const fileClasses: Partial<Record<FileChangeKind, string>> = { Added: "add", Deleted: "del" };
 
-function FileRow({ file: f }: { file: FileChange }) {
+function FileRow({ file: f, isOpen, onOpen }: { file: FileChange; isOpen: boolean; onOpen(file: FileChange): void }) {
   return (
-    <li title={f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}>
-      <b className={fileClasses[f.kind] ?? "mod"} aria-label={f.kind}>
-        {fileLetters[f.kind]}
-      </b>
-      <span className="file-path">{f.path}</span>
-      <span className="file-stat">{f.isBinary ? "binary" : `+${f.additions ?? 0} −${f.deletions ?? 0}`}</span>
+    <li>
+      <button className="file" aria-pressed={isOpen} title={f.oldPath ? `${f.oldPath} → ${f.path}` : f.path} onClick={() => onOpen(f)}>
+        <b className={fileClasses[f.kind] ?? "mod"} aria-label={f.kind}>
+          {fileLetters[f.kind]}
+        </b>
+        <span className="file-path">{f.path}</span>
+        <span className="file-stat">{f.isBinary ? "binary" : `+${f.additions ?? 0} −${f.deletions ?? 0}`}</span>
+      </button>
     </li>
   );
 }

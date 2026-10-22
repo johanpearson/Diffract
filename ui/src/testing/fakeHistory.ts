@@ -1,4 +1,5 @@
-import type { CommitDetails, CommitEntry, HistoryRef } from "../protocol";
+import detailsSample from "../../../tests/Diffract.Sidecar.Tests/Contract/history.details.json";
+import type { CommitDetails, CommitEntry, HistoryFile, HistoryRef } from "../protocol";
 
 const authors = [
   { name: "Johan Pearson", email: "johan@example.com" },
@@ -93,3 +94,16 @@ export function detailsOf(commit: CommitEntry): CommitDetails {
     ],
   };
 }
+
+const cartBefore = ["namespace Shop;", "", "public class Cart", "{", "    public decimal Total => 0m;", "}", ""].join("\n");
+const cartAfter = ["namespace Shop;", "", "public class Cart", "{", "    public decimal Total => Lines.Sum(l => l.Price);", "    public List<Line> Lines { get; } = [];", "}", ""].join("\n");
+const [renamed, picture] = (detailsSample as { result: CommitDetails }).result.files;
+
+/** File contents by blob id: the generated history's cart.cs, and the files of the history.details contract sample. */
+export const sampleFiles: [string, HistoryFile][] = [
+  ["1".repeat(40), { kind: "Text", text: cartBefore, message: null }],
+  ["2".repeat(40), { kind: "Text", text: cartAfter, message: null }],
+  [renamed!.oldId!, { kind: "Text", text: cartBefore, message: null }],
+  [renamed!.newId!, { kind: "Text", text: cartAfter.replace("Cart", "Räksmörgås"), message: null }],
+  [picture!.newId!, { kind: "Binary", text: null, message: "This is a binary file." }],
+];
