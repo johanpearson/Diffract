@@ -1,6 +1,6 @@
 # Milestone 3: history graph
 
-**Status:** in progress. Phases 0 to 2 are done; phase 3, the Canvas renderer, is next.
+**Status:** in progress. Phases 0 to 3 are done; phase 4, the diff and the find box, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** opening Johan's busiest repo shows its history within a second or two, scrolling stays smooth on a repo with 50,000 commits, and the graph keeps up while agents add commits.
 
@@ -68,6 +68,8 @@ Johan decided these on 2026-10-21, in #30.
 - Canvas 2D with virtualized rows: only visible rows are drawn, and text uses the DOM next to it so it stays crisp and selectable. Dark and light theme follow Windows, with the colours from the visual plan.
 - Selection, keyboard and the details panel.
 - Tests: Vitest for the details panel and selection. Playwright for scrolling, selecting and the keyboard, against a fake sidecar with a large generated history.
+
+**Done** 2026-10-22. History is a second tab next to "Worktrees and agents"; phase 5 makes it the first. The graph is drawn on a canvas that covers only the rows in view, so a 50,000-commit history keeps fewer than 100 rows in the page. The canvas sits above the rows, so a selected row never hides its dot. Lanes past the 24th are cut off, to leave room for the subjects. The details of the selected commit are asked for once the selection rests for 120 ms, so holding an arrow key starts no git process per row. Enter moves to the details. In Playwright, 95% of frames while scrolling 50,000 commits take under 50 ms, the budget the test sets for a slow CI runner.
 
 ## Phase 4: the diff and the find box
 
