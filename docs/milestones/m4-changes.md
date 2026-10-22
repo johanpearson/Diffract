@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** planned. Phase 0 is next. Decisions 1 to 10 are made; decision 11 is open.
+**Status:** planned. Phase 0 is next. All its decisions are made; the checks in steps 1 to 4 are still to do.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -54,11 +54,11 @@ Never: `--force` or `--force-with-lease` (milestone 8), `reset --hard`, `checkou
 4. Check how the working tree side of a diff is read so its line endings match what `git diff` shows, so Monaco does not mark every line as changed.
 5. Settle the decisions below.
 
-**Checkpoint:** Johan decides the open questions below before any code that writes is written. Decisions 1 to 10 were made on 2026-10-22; decision 11 is still open.
+**Checkpoint:** Johan decides the open questions below before any code that writes is written. Decided on 2026-10-22; the checks in steps 1 to 4 are still to do.
 
 ### Decisions
 
-Johan accepted the proposals for 1 to 10 on 2026-10-22, in #43. Decision 11 came from his question there and still needs his yes.
+Johan accepted all these proposals on 2026-10-22, in #43. Decision 11 came from his question there about a right-click menu like Git Extensions has.
 
 1. **Which worktree.** Proposal: Changes shows the worktree the repo was opened from, with a picker for the other worktrees. A worktree that is "In use" by an agent shows a warning before anything is staged in it.
 2. **Hunks or lines.** Proposal: whole files and single hunks in this milestone. Staging single lines comes later.
