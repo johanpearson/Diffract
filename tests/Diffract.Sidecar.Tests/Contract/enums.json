@@ -67,5 +67,12 @@
     "Text",
     "Binary",
     "TooLarge"
+  ],
+  "changedFileKind": [
+    "Tracked",
+    "Untracked",
+    "Conflicted",
+    "Submodule",
+    "NestedRepo"
   ]
 }

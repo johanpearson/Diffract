@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   changeKinds,
+  changedFileKinds,
   errorKinds,
   fileChangeKinds,
   fileContentKinds,
@@ -68,6 +69,7 @@ describe("contract samples from the sidecar", () => {
       historyRefKind: [...historyRefKinds],
       fileChangeKind: [...fileChangeKinds],
       fileContentKind: [...fileContentKinds],
+      changedFileKind: [...changedFileKinds],
     });
   });
 

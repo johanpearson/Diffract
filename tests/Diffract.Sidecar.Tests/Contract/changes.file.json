@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "old": null,
+    "new": {
+      "kind": "Text",
+      "text": "# Notes\r\n",
+      "message": null
+    }
+  }
+}
