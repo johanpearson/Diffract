@@ -82,12 +82,25 @@ public class ContractTests
                 new FileChange(FileChangeKind.Added, "docs/logo.png", null, null, BlobC, null, null, null, IsBinary: true, IsSubmodule: false),
             ])),
         ["history.file"] = () => Response(HistoryFile.From(new FileContent(FileContentKind.Text, "namespace Shop;\r\n"))),
-        ["changes.status"] = () => Response(new WorktreeChanges(AgentWorktree, "claude/räksmörgås-fix", Merge, "origin/claude/räksmörgås-fix", 2, 1,
-        [
-            new ChangedFile("src/räksmörgås.cs", "src/cart.cs", ChangedFileKind.Tracked, FileChangeKind.Renamed, FileChangeKind.Modified, BlobA, BlobB),
-            new ChangedFile("docs/new file.md", null, ChangedFileKind.Untracked, null, FileChangeKind.Added, null, null),
-            new ChangedFile("src/merge.cs", null, ChangedFileKind.Conflicted, null, null, null, null),
-        ])),
+        ["changes.status"] = () => Response(new WorktreeChanges
+        {
+            Worktree = AgentWorktree,
+            Branch = "claude/räksmörgås-fix",
+            HeadCommit = Merge,
+            Upstream = "origin/claude/räksmörgås-fix",
+            Ahead = 2,
+            Behind = 1,
+            Files =
+            [
+                new ChangedFile
+                {
+                    Path = "src/räksmörgås.cs", OldPath = "src/cart.cs", Kind = ChangedFileKind.Tracked,
+                    Staged = FileChangeKind.Renamed, Unstaged = FileChangeKind.Modified, HeadId = BlobA, IndexId = BlobB,
+                },
+                new ChangedFile { Path = "docs/new file.md", Kind = ChangedFileKind.Untracked, Unstaged = FileChangeKind.Added },
+                new ChangedFile { Path = "src/merge.cs", Kind = ChangedFileKind.Conflicted },
+            ],
+        }),
         ["changes.file"] = () => Response(ChangesFile.From(new FileDiff(null, new FileContent(FileContentKind.Text, "# Notes\r\n")))),
         ["error.not-a-repo"] = () => Error(new NotAGitRepositoryException(@"C:\Users\johan\Downloads")),
         ["error.git-too-old"] = () => Error(new GitVersionTooOldException(new GitVersion(2, 39, 5))),

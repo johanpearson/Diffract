@@ -43,8 +43,8 @@ public static class StatusParser
             '1' => WithIds(Tracked(field, StatusEntryKind.Changed, partCount: 9, originalPath: null), field),
             '2' => WithIds(Renamed(fields, ref i), field),
             'u' => Tracked(field, StatusEntryKind.Unmerged, partCount: 11, originalPath: null),
-            '?' => new StatusEntry(StatusEntryKind.Untracked, '?', '?', field[2..], null),
-            '!' => new StatusEntry(StatusEntryKind.Ignored, '!', '!', field[2..], null),
+            '?' => Untracked(StatusEntryKind.Untracked, '?', field),
+            '!' => Untracked(StatusEntryKind.Ignored, '!', field),
             _ => throw new FormatException($"Unknown status entry: '{field}'"),
         };
     }
@@ -64,8 +64,20 @@ public static class StatusParser
         var parts = field.Split(' ', partCount);
         if (parts.Length != partCount || parts[1].Length != 2)
             throw new FormatException($"Malformed status entry: '{field}'");
-        return new StatusEntry(kind, parts[1][0], parts[1][1], parts[^1], originalPath) { IsSubmodule = parts[2][0] == 'S' };
+        return new StatusEntry
+        {
+            Kind = kind,
+            IndexStatus = parts[1][0],
+            WorktreeStatus = parts[1][1],
+            Path = parts[^1],
+            OriginalPath = originalPath,
+            IsSubmodule = parts[2][0] == 'S',
+        };
     }
+
+    // "? path" and "! path": the same letter in both columns.
+    private static StatusEntry Untracked(StatusEntryKind kind, char status, string field) =>
+        new() { Kind = kind, IndexStatus = status, WorktreeStatus = status, Path = field[2..] };
 
     // "1 XY sub mH mI mW hH hI path" and "2 XY sub mH mI mW hH hI Xscore path": the blob ids are the 7th and 8th parts.
     // An id of all zeros means that side has no file.

@@ -11,8 +11,7 @@ public static class WorktreeFile
     /// </summary>
     public static string Resolve(string worktree, string path)
     {
-        var segments = path.Split('/', '\\');
-        if (path.Length == 0 || Path.IsPathRooted(path) || segments.Any(IsRefused))
+        if (!IsRelativeAndPlain(path))
             throw new ArgumentException($"Not a path inside the worktree: '{path}'.", nameof(path));
 
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(worktree));
@@ -21,6 +20,9 @@ public static class WorktreeFile
             ? full
             : throw new ArgumentException($"Not a path inside the worktree: '{path}'.", nameof(path));
     }
+
+    private static bool IsRelativeAndPlain(string path) =>
+        path.Length > 0 && !Path.IsPathRooted(path) && !path.Split('/', '\\').Any(IsRefused);
 
     /// <summary>Git never tracks a path with these, so no status entry has one.</summary>
     private static bool IsRefused(string segment) =>
