@@ -22,13 +22,15 @@ interface Props {
   client: RpcClient;
   /** The clock for "5 min ago". Tests pass a fixed one. */
   clock?: () => Date;
+  /** The view a repo opens on. History, unless a test is about another view. */
+  initialView?: View;
 }
 
 const systemClock = () => new Date();
 
-export function App({ host, client, clock = systemClock }: Props) {
+export function App({ host, client, clock = systemClock, initialView = "history" }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
-  const [view, setView] = useState<View>("leftovers");
+  const [view, setView] = useState<View>(initialView);
   const [notice, setNotice] = useState<string | null>(null);
   const git = useGitUpdate(client, host, clock);
   const terminals = useTerminals(client, host, setNotice);

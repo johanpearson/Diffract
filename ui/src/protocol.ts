@@ -23,7 +23,8 @@ export const errorKinds = ["NotARepo", "GitTooOld", "GitFailed", "TimedOut", "Co
 export type ErrorKind = (typeof errorKinds)[number];
 
 /** What a live change refreshed. */
-export const changeKinds = ["WorktreeFiles", "WorktreeHead", "Refs", "WorktreeList", "Everything"] as const;
+/** "Scanned": the scan after opening finished or failed, and this is the first full state. */
+export const changeKinds = ["WorktreeFiles", "WorktreeHead", "Refs", "WorktreeList", "Everything", "Scanned"] as const;
 export type ChangeKind = (typeof changeKinds)[number];
 
 /** The terminals Diffract can open, in the order the sidecar lists them. */
@@ -153,8 +154,15 @@ export interface RepoState {
   repoRoot: string;
   mainBranch: string;
   takenAt: string;
-  /** When unreachable commits were last counted. Their rows are as old as this. */
-  unreachableCountedAt: string;
+  /** When unreachable commits were last counted. Their rows are as old as this. Null until the first scan. */
+  unreachableCountedAt: string | null;
+  /**
+   * The scan after opening is still running: worktree state, leftovers and unreachable commits are not known yet, and
+   * arrive in a `repo.changed` with the change kind "Scanned". Refs and worktrees are known, so history can show.
+   */
+  scanning: boolean;
+  /** Why the scan after opening failed, in plain English. A refresh tries again. */
+  scanProblem: string | null;
   snapshot: SnapshotSummary;
   summary: LeftoverSummary;
   leftovers: Leftover[];

@@ -267,3 +267,25 @@ test("finds a commit by a tag or branch on it", async ({ page }) => {
   await expect(selected(page)).toContainText("v1.0");
   await expect(selected(page)).toBeInViewport();
 });
+
+test("opens on History and shows it before the leftover scan has finished", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Open a repo" })).toBeVisible();
+  await page.evaluate((path) => {
+    window.diffractTest.nextFolder = path;
+    window.diffractTest.sidecar.scanOnOpen = true;
+    window.diffractTest.sidecar.useGeneratedHistory(500);
+  }, repoRoot);
+  await page.getByRole("button", { name: "Open repo…" }).first().click();
+
+  await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
+  await expect(list(page).getByRole("option").first()).toBeVisible();
+  await page.getByRole("tab", { name: "Worktrees and agents" }).click();
+  await expect(page.getByText("Looking for leftovers. History is ready to use meanwhile.")).toBeVisible();
+
+  await page.evaluate(() => window.diffractTest.sidecar.finishScan("1"));
+
+  await expect(page.getByRole("list", { name: "Leftovers" }).getByRole("listitem")).toHaveCount(3);
+  await page.getByRole("tab", { name: "History" }).click();
+  await expect(list(page).getByRole("option").first()).toBeVisible();
+});

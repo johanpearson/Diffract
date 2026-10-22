@@ -1,6 +1,6 @@
 # Milestone 3: history graph
 
-**Status:** in progress. Phases 0 to 4 are done; phase 5, history as the start view, is next.
+**Status:** in progress. Phases 0 to 5 are done; phase 6, live history and the toggles, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** opening Johan's busiest repo shows its history within a second or two, scrolling stays smooth on a repo with 50,000 commits, and the graph keeps up while agents add commits.
 
@@ -86,6 +86,8 @@ Also at Johan's request: the sidebar, the commit details and the diff can be res
 - `repo.open` answers with what history needs as soon as it has it. The leftover scan, `fsck` included, keeps running and its result arrives later as `repo.changed`. This changes milestone 2's protocol, and the contract samples change with it.
 - The tabs: History first, Worktrees and agents second.
 - Tests: opening a repo shows history before the leftover scan has finished. A call budget for what opening waits for.
+
+**Done** 2026-10-22. `repo.open` now answers after 4 git calls: git's version, the worktree list, the refs and the default branch. That is all history needs. The full scan, `fsck` included, starts right after it, and its result arrives as `repo.changed` with the new change kind `Scanned`. Until then the state says `scanning`, has no leftovers, and `unreachableCountedAt` is null. The Worktrees and agents tab says it is still looking, and Refresh waits. A failed scan arrives the same way, with `scanProblem` saying why, and a refresh tries again. The repo is watched from the scan on, because live refreshes build on its full snapshot. Opening a repo that is open and scanned answers in full and scans no more. Closing a repo stops its scan. The UI keeps a scan result that arrives before the answer to `repo.open`, which a fast scan could in principle do. History is the first tab and the one a repo opens on.
 
 ## Phase 6: live history and the toggles
 

@@ -32,14 +32,8 @@ public sealed partial class RepoSnapshotBuilder
     {
         var call = new CallContext(_runnerOptions, _options.MaxParallelGitCalls, ct);
         var takenAt = _runnerOptions.TimeProvider.GetUtcNow();
-        repoPath = Path.GetFullPath(repoPath);
-        if (!Directory.Exists(repoPath))
-            throw new NotAGitRepositoryException(repoPath);
-
-        var repo = new RepoCalls(call, repoPath);
-        var version = GitVersion.Parse((await repo.RunAsync(["version"]).ConfigureAwait(false)).StandardOutput);
-        if (!version.IsSupported)
-            throw new GitVersionTooOldException(version);
+        var (repo, version) = await StartAsync(call, repoPath).ConfigureAwait(false);
+        repoPath = repo.Path;
 
         // Repo-wide reads that do not depend on each other.
         var worktreesTask = ListWorktreesAsync(repo);
@@ -82,6 +76,20 @@ public sealed partial class RepoSnapshotBuilder
             TakenAt: takenAt);
 
         return new SnapshotResult(snapshot, call.Timings.ToList());
+    }
+
+    /// <summary>Checks the folder exists and git is new enough. Every build starts here.</summary>
+    private static async Task<(RepoCalls Repo, GitVersion Version)> StartAsync(CallContext call, string repoPath)
+    {
+        repoPath = Path.GetFullPath(repoPath);
+        if (!Directory.Exists(repoPath))
+            throw new NotAGitRepositoryException(repoPath);
+
+        var repo = new RepoCalls(call, repoPath);
+        var version = GitVersion.Parse((await repo.RunAsync(["version"]).ConfigureAwait(false)).StandardOutput);
+        if (!version.IsSupported)
+            throw new GitVersionTooOldException(version);
+        return (repo, version);
     }
 
     private static async Task<IReadOnlyList<WorktreeEntry>> ListWorktreesAsync(RepoCalls repo)

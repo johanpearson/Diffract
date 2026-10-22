@@ -18,6 +18,8 @@
       "mainBranch": "main",
       "takenAt": "2026-10-21T09:30:00+02:00",
       "unreachableCountedAt": "2026-10-21T09:20:00+02:00",
+      "scanning": false,
+      "scanProblem": null,
       "snapshot": {
         "worktrees": [
           {

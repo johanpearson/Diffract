@@ -4,11 +4,15 @@ import type {} from "../src/e2eHost";
 // The repo in the repo.open contract sample, which the fake sidecar serves.
 const repoRoot = "C:\\src\\shop";
 
+/** Opens the repo, then its "Worktrees and agents" tab, unless the folder is not a repo. */
 async function openRepo(page: Page, folder = repoRoot) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Open a repo" })).toBeVisible();
   await page.evaluate((path) => (window.diffractTest.nextFolder = path), folder);
   await page.getByRole("button", { name: "Open repo…" }).first().click();
+  const tab = page.getByRole("tab", { name: "Worktrees and agents" });
+  await expect(tab.or(page.getByRole("alert"))).toBeVisible();
+  if (await tab.isVisible()) await tab.click();
 }
 
 const leftovers = (page: Page) => page.getByRole("list", { name: "Leftovers" });

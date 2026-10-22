@@ -45,12 +45,20 @@ public sealed class RepoMethodsTests : IDisposable
 
     private static string Id(JsonElement state) => state.GetProperty("repoId").GetString()!;
 
+    /// <summary>Opens the repo and waits for the scan after opening. Opening it again then answers with the full state.</summary>
+    private static async Task<JsonElement> OpenAsync(SidecarMethods methods, string path)
+    {
+        var quick = await CallAsync(methods, "repo.open", new { path });
+        await methods.Repos.ScannedAsync(Id(quick));
+        return await CallAsync(methods, "repo.open", new { path });
+    }
+
     [Fact]
     public async Task Open_returns_the_worktrees_and_leftovers_with_counts_that_add_up()
     {
         var repo = await ScenarioAsync("StaleAgentWorktree");
 
-        var state = await CallAsync(Methods(), "repo.open", new { path = repo });
+        var state = await OpenAsync(Methods(), repo);
 
         Assert.Equal(Path.GetFullPath(repo), state.GetProperty("repoRoot").GetString(), ignoreCase: true);
         Assert.Equal("main", state.GetProperty("mainBranch").GetString());
@@ -68,8 +76,8 @@ public sealed class RepoMethodsTests : IDisposable
         var repo = await ScenarioAsync("StaleAgentWorktree");
         var methods = Methods();
 
-        var first = await CallAsync(methods, "repo.open", new { path = repo });
-        var again = await CallAsync(methods, "repo.open", new { path = Path.Combine(repo, ".claude", "worktrees", "refactor-cart") });
+        var first = await OpenAsync(methods, repo);
+        var again = await OpenAsync(methods, Path.Combine(repo, ".claude", "worktrees", "refactor-cart"));
 
         Assert.Equal(Id(first), Id(again));
         Assert.Equal(first.GetProperty("repoRoot").GetString(), again.GetProperty("repoRoot").GetString());
@@ -81,8 +89,8 @@ public sealed class RepoMethodsTests : IDisposable
     {
         var methods = Methods();
 
-        var a = await CallAsync(methods, "repo.open", new { path = await ScenarioAsync("Clean") });
-        var b = await CallAsync(methods, "repo.open", new { path = await ScenarioAsync("MasterAsMain") });
+        var a = await OpenAsync(methods, await ScenarioAsync("Clean"));
+        var b = await OpenAsync(methods, await ScenarioAsync("MasterAsMain"));
 
         Assert.NotEqual(Id(a), Id(b));
     }
@@ -92,7 +100,7 @@ public sealed class RepoMethodsTests : IDisposable
     {
         var repo = await ScenarioAsync("OrphanedCommit");
         var methods = Methods();
-        var opened = await CallAsync(methods, "repo.open", new { path = repo });
+        var opened = await OpenAsync(methods, repo);
         var countedAt = opened.GetProperty("unreachableCountedAt").GetDateTimeOffset();
         await IsolatedGit.WritableRunner(_temp, repo).RunAsync(["commit-tree", "HEAD^{tree}", "-m", "Another experiment"], Ct);
         _time.Advance(TimeSpan.FromMinutes(5));
@@ -112,7 +120,7 @@ public sealed class RepoMethodsTests : IDisposable
     {
         var repo = await ScenarioAsync("OrphanedCommit");
         var methods = Methods();
-        var opened = await CallAsync(methods, "repo.open", new { path = repo });
+        var opened = await OpenAsync(methods, repo);
         await IsolatedGit.WritableRunner(_temp, repo).RunAsync(["commit-tree", "HEAD^{tree}", "-m", "Another experiment"], Ct);
         _time.Advance(TimeSpan.FromMinutes(5));
 
@@ -126,7 +134,7 @@ public sealed class RepoMethodsTests : IDisposable
     public async Task A_closed_repo_can_no_longer_be_refreshed()
     {
         var methods = Methods();
-        var opened = await CallAsync(methods, "repo.open", new { path = await ScenarioAsync("Clean") });
+        var opened = await OpenAsync(methods, await ScenarioAsync("Clean"));
 
         var closed = await CallAsync(methods, "repo.close", new { repoId = Id(opened) });
         var error = await Assert.ThrowsAsync<RpcException>(() => CallAsync(methods, "repo.refresh", new { repoId = Id(opened) }));
@@ -167,7 +175,7 @@ public sealed class RepoMethodsTests : IDisposable
     {
         Directory.CreateDirectory(_temp.Combine("plain"));
 
-        var error = await Assert.ThrowsAsync<RpcException>(() => CallAsync(Methods(), "repo.open", new { path = _temp.Combine(folder) }));
+        var error = await Assert.ThrowsAsync<RpcException>(() => OpenAsync(Methods(), _temp.Combine(folder)));
 
         Assert.Equal((-32001, ErrorKind.NotARepo), (error.Code, error.Kind));
         Assert.StartsWith("Not a git repository:", error.Message);
@@ -223,6 +231,7 @@ public sealed class RepoMethodsTests : IDisposable
 
         var response = await host.NextJsonAsync();
         Assert.Equal("1", response.GetProperty("result").GetProperty("repoId").GetString());
+        Assert.True(response.GetProperty("result").GetProperty("scanning").GetBoolean());
         Assert.Equal(0, response.GetProperty("result").GetProperty("summary").GetProperty("total").GetInt32());
     }
 

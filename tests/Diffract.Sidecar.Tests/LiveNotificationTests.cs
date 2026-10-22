@@ -41,6 +41,9 @@ public sealed class LiveNotificationTests : IAsyncDisposable
         _host.Send($$$"""{"jsonrpc":"2.0","id":1,"method":"repo.open","params":{"path":{{{JsonSerializer.Serialize(repo)}}}}}""");
         var opened = await _host.NextJsonAsync();
         Assert.True(opened.TryGetProperty("result", out _), opened.ToString());
+        // The repo is watched once the scan after opening is done, which it says with its own repo.changed.
+        var scanned = await _host.NextJsonAsync();
+        Assert.Equal("Scanned", scanned.GetProperty("params").GetProperty("changes")[0].GetProperty("kind").GetString());
         return (repo, Path.GetFullPath(Path.Combine(repo, ".claude", "worktrees", "refactor-cart")));
     }
 

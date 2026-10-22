@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from "react";
 
-export const views = ["leftovers", "history"] as const;
+export const views = ["history", "leftovers"] as const;
 export type View = (typeof views)[number];
 
 const labels: Record<View, string> = { leftovers: "Worktrees and agents", history: "History" };

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App, LastRepoKey, TerminalKey } from "./App";
+import type { View } from "./components/Tabs";
 import type { AppHost, SidecarEvent } from "./host";
 import { RpcClient } from "./rpc";
 import { GitUpdateCheckKey, OneDayMs } from "./model/useGitUpdate";
@@ -19,6 +20,7 @@ function setup({
   folder = repoRoot as string | null,
   terminal = null as string | null,
   remembered = {} as Record<string, string>,
+  view = "leftovers" as View,
 } = {}) {
   const stored = new Map<string, string>([...(last ? [[LastRepoKey, last] as const] : []), ...Object.entries(remembered)]);
   if (terminal) stored.set(TerminalKey, terminal);
@@ -30,7 +32,7 @@ function setup({
     restartSidecar: vi.fn(async () => {}),
     storage: { get: (key) => stored.get(key) ?? null, set: (key, value) => void stored.set(key, value) },
   };
-  render(<App host={host} client={new RpcClient(sidecar.transport)} clock={() => new Date("2026-10-21T09:30:00+02:00")} />);
+  render(<App host={host} client={new RpcClient(sidecar.transport)} clock={() => new Date("2026-10-21T09:30:00+02:00")} initialView={view} />);
   const sidecarEvent = (event: SidecarEvent) => act(() => handlers.forEach((handler) => handler(event)));
   return { sidecar, host, stored, sidecarEvent };
 }
@@ -305,6 +307,75 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Open in Windows Terminal" }));
 
     expect((await screen.findByRole("status")).textContent).toContain("Could not open a terminal: The folder does not exist");
+  });
+
+  describe("opening on History while the scan runs", () => {
+    function scanningSidecar() {
+      const sidecar = new FakeSidecar();
+      sidecar.scanOnOpen = true;
+      return sidecar;
+    }
+    const nav = () => screen.getByRole("navigation", { name: "Repository" });
+
+    it("opens on History, first among the tabs", async () => {
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+      setup({ last: repoRoot, view: "history", sidecar: scanningSidecar() });
+
+      expect(await screen.findByRole("listbox", { name: "Commits" })).toBeTruthy();
+      expect(screen.getAllByRole("tab").map((t) => [t.textContent, t.getAttribute("aria-selected")])).toEqual([
+        ["History", "true"],
+        ["Worktrees and agents", "false"],
+      ]);
+      vi.restoreAllMocks();
+    });
+
+    it("says it is still looking for leftovers, and blocks Refresh until the scan is done", async () => {
+      setup({ last: repoRoot, sidecar: scanningSidecar() });
+
+      expect(await screen.findByText(/Looking for leftovers/)).toBeTruthy();
+      expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(true);
+      expect(within(nav()).getByLabelText("still looking").textContent).toBe("…");
+      expect(screen.getByText(/Unreachable commits not counted yet/)).toBeTruthy();
+    });
+
+    it("shows the leftovers when the scan finishes, without highlighting them as news", async () => {
+      const sidecar = scanningSidecar();
+      setup({ last: repoRoot, sidecar });
+      await screen.findByText(/Looking for leftovers/);
+
+      act(() => sidecar.finishScan("1"));
+
+      expect(await screen.findByRole("list", { name: "Leftovers" })).toBeTruthy();
+      expect(rowNames()).toEqual(["old-task", "copilot/fix-login", "räksmörgås fix"]);
+      expect(within(leftoverList()).getAllByRole("listitem").map((li) => li.getAttribute("data-flash"))).toEqual([null, null, null]);
+      expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(false);
+      expect(within(nav()).getByLabelText("2 not in use")).toBeTruthy();
+    });
+
+    it("says why when the scan fails, and lets Refresh try again", async () => {
+      const sidecar = scanningSidecar();
+      setup({ last: repoRoot, sidecar });
+      await screen.findByText(/Looking for leftovers/);
+
+      act(() => sidecar.failScan("1", "git fsck failed: bad object in pack."));
+
+      expect((await screen.findByRole("alert")).textContent).toContain("git fsck failed: bad object in pack. Refresh to try again.");
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      expect(await screen.findByRole("list", { name: "Leftovers" })).toBeTruthy();
+    });
+
+    it("uses the scan's result when it arrives before the answer to repo.open", async () => {
+      const sidecar = scanningSidecar();
+      sidecar.held.add("repo.open");
+      setup({ last: repoRoot, sidecar });
+      await waitFor(() => expect(sent(sidecar, "repo.open")).toHaveLength(1));
+
+      act(() => sidecar.finishScan("1"));
+      act(() => sidecar.release());
+
+      expect(await screen.findByRole("list", { name: "Leftovers" })).toBeTruthy();
+      expect(screen.queryByText(/Looking for leftovers/)).toBeNull();
+    });
   });
 
   it("refreshes with a new count of unreachable commits", async () => {
