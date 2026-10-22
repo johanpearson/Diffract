@@ -1,6 +1,6 @@
 # Milestone 3: history graph
 
-**Status:** in progress. Phases 0 to 6 are done; phase 7, the real-world check, is next.
+**Status:** done (2026-10-22)
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** opening Johan's busiest repo shows its history within a second or two, scrolling stays smooth on a repo with 50,000 commits, and the graph keeps up while agents add commits.
 
@@ -35,7 +35,7 @@ From the visual plan:
 
 **Checkpoint:** Johan decides the open questions below. Decided on 2026-10-21.
 
-**Done** 2026-10-21. The measurements are in `docs/findings/history.md`. Repo A has only 115 commits, so a generated 50,000-commit repo is the performance test: git reads all of it in under a second. Without a commit-graph, which Diffract cannot write, `--topo-order` reads every commit before printing the first, so history is read with one streamed call instead of one call per page. The budgets: the first rows on screen within a second for 50,000 commits, and lane layout under 300 ms on a CI runner. Starting git through its `cmd\git.exe` launcher costs about twice as much as starting the real git; Johan decided that Diffract starts the real git directly, which is done in #31, and that keeping a commit-graph becomes a setting in milestone 6.
+**Done** 2026-10-21, in #30 and #31. The measurements are in `docs/findings/history.md`. Repo A has only 115 commits, so a generated 50,000-commit repo is the performance test: git reads all of it in under a second. Without a commit-graph, which Diffract cannot write, `--topo-order` reads every commit before printing the first, so history is read with one streamed call instead of one call per page. The budgets: the first rows on screen within a second for 50,000 commits, and lane layout under 300 ms on a CI runner. Starting git through its `cmd\git.exe` launcher costs about twice as much as starting the real git; Johan decided that Diffract starts the real git directly, which is done in #31, and that keeping a commit-graph becomes a setting in milestone 6.
 
 ### Decisions
 
@@ -54,14 +54,14 @@ Johan decided these on 2026-10-21, in #30.
 - A file's two sides for the diff, one call each (`git show <commit>^:<path>` and `git show <commit>:<path>`), with added, deleted, renamed and binary files handled. Large files are refused with a plain message instead of being sent whole.
 - Tests: parsers against captured real output in `Samples/`, including merges, octopus merges, root commits, non-ASCII names and subjects, and empty subjects. Call budget tests per page and per details request.
 
-**Done** 2026-10-21. The sidecar answers `history.read` (pages as `history.page` notifications, then the totals), `history.refs`, `history.details` and `history.file`. Through the published sidecar, the first page of the 50,000-commit repo arrives in about 0.35 seconds and all of it in about 0.8 seconds. A merge's files are its changes against its first parent. File sides are read with `git cat-file blob`, which hands over the stored bytes without running filters, and files over 5 MB are refused. Measurements are in `docs/findings/history.md`. Johan confirmed both choices on 2026-10-21: the 5 MB limit, and a merge's files compared with its first parent.
+**Done** 2026-10-21, in #33, with a Code Health follow-up in #35. The sidecar answers `history.read` (pages as `history.page` notifications, then the totals), `history.refs`, `history.details` and `history.file`. Through the published sidecar, the first page of the 50,000-commit repo arrives in about 0.35 seconds and all of it in about 0.8 seconds. A merge's files are its changes against its first parent. File sides are read with `git cat-file blob`, which hands over the stored bytes without running filters, and files over 5 MB are refused. Measurements are in `docs/findings/history.md`. Johan confirmed both choices on 2026-10-21: the 5 MB limit, and a merge's files compared with its first parent.
 
 ## Phase 2: lane layout
 
 - A pure function in TypeScript from the commits to lanes: for each row, its lane, its colour and the lines to its parents. It runs in the UI, next to the renderer that uses it, and grows page by page.
 - Tests: small hand-made graphs with known layouts (linear, branch and merge, criss-cross merges, octopus, many parallel branches, a branch whose parent is not loaded yet). A performance test: lanes for 50,000 commits stay under a time budget set in phase 0.
 
-**Done** 2026-10-21. A lane keeps its column for as long as its branch lives, so every branch is a straight line, and a free column is reused by the next branch. Only the lines joining or leaving a commit bend. Each row lists the lines inside its own band, so the renderer can draw any visible row on its own. Page by page gives exactly the same rows as all at once. 50,000 commits take 45 to 80 ms locally, against the 300 ms budget.
+**Done** 2026-10-21, in #34. A lane keeps its column for as long as its branch lives, so every branch is a straight line, and a free column is reused by the next branch. Only the lines joining or leaving a commit bend. Each row lists the lines inside its own band, so the renderer can draw any visible row on its own. Page by page gives exactly the same rows as all at once. 50,000 commits take 45 to 80 ms locally, against the 300 ms budget.
 
 ## Phase 3: the Canvas renderer
 
@@ -69,7 +69,7 @@ Johan decided these on 2026-10-21, in #30.
 - Selection, keyboard and the details panel.
 - Tests: Vitest for the details panel and selection. Playwright for scrolling, selecting and the keyboard, against a fake sidecar with a large generated history.
 
-**Done** 2026-10-22. History is a second tab next to "Worktrees and agents"; phase 5 makes it the first. The graph is drawn on a canvas that covers only the rows in view, so a 50,000-commit history keeps fewer than 100 rows in the page. The canvas sits above the rows, so a selected row never hides its dot. Lanes past the 24th are cut off, to leave room for the subjects. The details of the selected commit are asked for once the selection rests for 120 ms, so holding an arrow key starts no git process per row. Enter moves to the details. In Playwright, 95% of frames while scrolling 50,000 commits take under 50 ms, the budget the test sets for a slow CI runner.
+**Done** 2026-10-22, in #38. History is a second tab next to "Worktrees and agents"; phase 5 makes it the first. The graph is drawn on a canvas that covers only the rows in view, so a 50,000-commit history keeps fewer than 100 rows in the page. The canvas sits above the rows, so a selected row never hides its dot. Lanes past the 24th are cut off, to leave room for the subjects. The details of the selected commit are asked for once the selection rests for 120 ms, so holding an arrow key starts no git process per row. Enter moves to the details. In Playwright, 95% of frames while scrolling 50,000 commits take under 50 ms, the budget the test sets for a slow CI runner.
 
 ## Phase 4: the diff and the find box
 
@@ -77,7 +77,7 @@ Johan decided these on 2026-10-21, in #30.
 - The find box from decision 4.
 - Tests: Vitest for find. Playwright for selecting a commit, then a file, and seeing its diff. Monaco's own rendering is not tested.
 
-**Done** 2026-10-22. Clicking a changed file opens its diff below the list, and Escape or Close shuts it. Johan asked on 2026-10-22 for a choice between side by side and inline: side by side is the default, and the choice is remembered. An added or deleted file shows on its own, without a diff. The diff opens scrolled to its first change, and Previous and Next move between changes. Selecting another commit closes it too, since a diff belongs to its commit. Monaco loads from its own 2.7 MB file the first time a diff opens; the start bundle grew by 3 kB. Only Monaco's editor and syntax colouring are loaded, without its language services, so the only worker is the editor's own. Revert arrows and the gutter menu are off, as there is nothing to change in a commit. Binary files and submodules say so without asking the sidecar. The find box matches the start of a hash, or text in the subject, author name or email, or a branch, tag or worktree name on the commit, ignoring case. Enter goes to the next match and Shift+Enter to the one before, wrapping round, and Ctrl+F reaches the box from anywhere in the history.
+**Done** 2026-10-22, in #40. Clicking a changed file opens its diff below the list, and Escape or Close shuts it. Johan asked on 2026-10-22 for a choice between side by side and inline: side by side is the default, and the choice is remembered. An added or deleted file shows on its own, without a diff. The diff opens scrolled to its first change, and Previous and Next move between changes. Selecting another commit closes it too, since a diff belongs to its commit. Monaco loads from its own 2.7 MB file the first time a diff opens; the start bundle grew by 3 kB. Only Monaco's editor and syntax colouring are loaded, without its language services, so the only worker is the editor's own. Revert arrows and the gutter menu are off, as there is nothing to change in a commit. Binary files and submodules say so without asking the sidecar. The find box matches the start of a hash, or text in the subject, author name or email, or a branch, tag or worktree name on the commit, ignoring case. Enter goes to the next match and Shift+Enter to the one before, wrapping round, and Ctrl+F reaches the box from anywhere in the history.
 
 Also at Johan's request: the sidebar, the commit details and the diff can be resized by dragging the line between them, or by focusing it and using the arrow keys. A double-click restores the size, and sizes are remembered between runs.
 
@@ -87,7 +87,7 @@ Also at Johan's request: the sidebar, the commit details and the diff can be res
 - The tabs: History first, Worktrees and agents second.
 - Tests: opening a repo shows history before the leftover scan has finished. A call budget for what opening waits for.
 
-**Done** 2026-10-22. `repo.open` now answers after 4 git calls: git's version, the worktree list, the refs and the default branch. That is all history needs. The full scan, `fsck` included, starts right after it, and its result arrives as `repo.changed` with the new change kind `Scanned`. Until then the state says `scanning`, has no leftovers, and `unreachableCountedAt` is null. The Worktrees and agents tab says it is still looking, and Refresh waits. A failed scan arrives the same way, with `scanProblem` saying why, and a refresh tries again. The repo is watched from the scan on, because live refreshes build on its full snapshot. Opening a repo that is open and scanned answers in full and scans no more. Closing a repo stops its scan. The UI keeps a scan result that arrives before the answer to `repo.open`, which a fast scan could in principle do. History is the first tab and the one a repo opens on.
+**Done** 2026-10-22, in #41. `repo.open` now answers after 4 git calls: git's version, the worktree list, the refs and the default branch. That is all history needs. The full scan, `fsck` included, starts right after it, and its result arrives as `repo.changed` with the new change kind `Scanned`. Until then the state says `scanning`, has no leftovers, and `unreachableCountedAt` is null. The Worktrees and agents tab says it is still looking, and Refresh waits. A failed scan arrives the same way, with `scanProblem` saying why, and a refresh tries again. The repo is watched from the scan on, because live refreshes build on its full snapshot. Opening a repo that is open and scanned answers in full and scans no more. Closing a repo stops its scan. The UI keeps a scan result that arrives before the answer to `repo.open`, which a fast scan could in principle do. History is the first tab and the one a repo opens on.
 
 ## Phase 6: live history and the toggles
 
@@ -95,7 +95,7 @@ Also at Johan's request: the sidebar, the commit details and the diff can be res
 - "Fade merged branches", "Agent work only", and the toggles for checkpoint refs and the stash.
 - Tests: fixture repos where a branch gets a commit, a branch is added, and a branch is force-moved. Each updates the graph, with a call budget.
 
-**Done** 2026-10-22. History now remembers the commits it was read from. When the repo changes, it asks only for what changed. Nothing changed costs no git call. New commits cost one call, and a branch moved back, rewritten or deleted costs one more, to find the commits that are no longer reachable so they leave the list. If one change adds or removes more than 1,000 commits, history is read again in the background and swapped in when it is done. The commits git reads from are passed on its standard input, so a repo with thousands of tags never hits the Windows command-line limit. New commits go on top. If the list is scrolled to the top, they come into view. If not, the commits on screen stay where they are. The selected commit stays selected either way. "Fade merged branches" is on by default, as in the visual plan. It fades commits that reached main through a merge. "Agent work only" fades everything that does not look like an agent's. Agent work means commits on an agent's branch, checkpoint or worktree, followed back to main's own line, plus commits whose subject starts with an agent's prefix from `diffract.json`. "Checkpoints" shows refs that match a checkpoint or agent ref pattern. Other refs, such as notes, stay hidden. "Stashes" shows every stash once the background scan has listed them. Git also shows a stash's "index on" commit, since it is one of its parents. The toggles are remembered between runs.
+**Done** 2026-10-22, in #42. History now remembers the commits it was read from. When the repo changes, it asks only for what changed. Nothing changed costs no git call. New commits cost one call, and a branch moved back, rewritten or deleted costs one more, to find the commits that are no longer reachable so they leave the list. If one change adds or removes more than 1,000 commits, history is read again in the background and swapped in when it is done. The commits git reads from are passed on its standard input, so a repo with thousands of tags never hits the Windows command-line limit. New commits go on top. If the list is scrolled to the top, they come into view. If not, the commits on screen stay where they are. The selected commit stays selected either way. "Fade merged branches" is on by default, as in the visual plan. It fades commits that reached main through a merge. "Agent work only" fades everything that does not look like an agent's. Agent work means commits on an agent's branch, checkpoint or worktree, followed back to main's own line, plus commits whose subject starts with an agent's prefix from `diffract.json`. "Checkpoints" shows refs that match a checkpoint or agent ref pattern. Other refs, such as notes, stay hidden. "Stashes" shows every stash once the background scan has listed them. Git also shows a stash's "index on" commit, since it is one of its parents. The toggles are remembered between runs.
 
 ## Phase 7: real-world check
 
@@ -105,16 +105,18 @@ Also at Johan's request: the sidebar, the commit details and the diff can be res
 
 **Checkpoint:** Johan signs off.
 
+**Done** 2026-10-22. Johan used the installed build from #42 and signed off: the app works as he wants with what is there. Nothing wrong or slow came up, so this phase needed no code.
+
 ## Acceptance criteria
 
-- [ ] All tests pass locally and in CI, and the installer is built on every run.
-- [ ] Every parser has tests against captured real git output.
-- [ ] Lane layout has tests for every graph shape listed in phase 2, and stays within its time budget for 50,000 commits.
-- [ ] Scrolling a 50,000-commit history in the built UI keeps up, measured in Playwright.
-- [ ] Opening a repo never waits for `git fsck`.
-- [ ] New commits appear without losing the scroll position or the selection.
-- [ ] Selecting a file in a commit shows its diff, and Monaco is not loaded until then.
-- [ ] Johan has used it on his busiest repos and signs off.
+- [x] All tests pass locally and in CI, and the installer is built on every run.
+- [x] Every parser has tests against captured real git output.
+- [x] Lane layout has tests for every graph shape listed in phase 2, and stays within its time budget for 50,000 commits.
+- [x] Scrolling a 50,000-commit history in the built UI keeps up, measured in Playwright.
+- [x] Opening a repo never waits for `git fsck`.
+- [x] New commits appear without losing the scroll position or the selection.
+- [x] Selecting a file in a commit shows its diff, and Monaco is not loaded until then.
+- [x] Johan has used it on his busiest repos and signs off.
 
 ## Dependencies
 
