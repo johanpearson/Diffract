@@ -59,6 +59,18 @@ Johan decided these on 2026-10-21, in #28.
 6. **A worktree's branch is removed with it**, as in the visual plan, listed as its own step in the dialog with its own checkbox, ticked by default.
 7. **Cleanup moved from milestone 3 to milestone 5**, after history and changes, so Diffract becomes usable for daily work sooner. See the brief.
 
+### Open question: backup tags for gone branches
+
+Johan asked on 2026-10-22 for a way to remove all merged local branches at once, like a local prune. His Diffract repo had 29 local branches, and 27 of them had an upstream that was deleted after a squash merge. `git branch --merged` finds only one of them, because a squash merge leaves the branch's own commits off main.
+
+Those commits exist nowhere else, so the rule above gives each such branch its own backup tag. Pruning 27 branches would create 27 `archive/` tags, and 30 days later they all come back as "old backup tag" leftovers. Johan picks one before phase 1:
+
+- **A. One tag per branch,** as planned. Simple and exact, but noisy.
+- **B. One tag per cleanup** for all gone branches in it, `archive/prune-<yyyy-mm-dd>`. A tag points at one commit, so Diffract first makes a commit that has every branch tip as a parent, with `git commit-tree`, and tags that. One row to remove later, but `commit-tree` joins the allowlist.
+- **C. No tag when the upstream is gone,** since the work most likely landed through a squash merge. Undo still works from the log for as long as git keeps the commits. Matches what decision 4 does for checkpoint sessions.
+
+Branches merged the normal way have nothing at risk and get no tag in any option.
+
 ### Hiding rows
 
 Any row can be hidden with "Hide", and the summary counts leave it out. A hidden row comes back by itself when it changes: a branch that moves, a session with new checkpoints, more orphaned commits than when it was hidden. "Show hidden" lists them again. Hidden rows are remembered in Diffract's own folder, next to the operation log. Hiding is not a cleanup: it changes nothing in the repo.
@@ -92,6 +104,7 @@ A plan is kept by the sidecar and applied by id, so the UI can never apply somet
 From the visual plan:
 
 - A checkbox on every row that is not "In use", and "Clean up N selected".
+- "Select all merged branches": one click ticks every local branch that is merged or whose upstream is gone, and nothing else. The dialog then lists them all, as for any selection. This is the local prune Johan asked for on 2026-10-22.
 - The confirm dialog lists every step in plain English: "Remove worktree johanpearson-curly-waddle", "Delete branch …", "Keep a backup tag archive/branch/… for 3 commits that exist nowhere else". Steps that cannot be undone say so.
 - The result says what was removed, what was kept as a backup, and what was skipped and why. It offers "Undo".
 - An operation log view lists past cleanups with "Undo" on each.
@@ -126,6 +139,6 @@ As described under "Hiding rows" in phase 0. Tests: a hidden row stays hidden ac
 - [ ] No test or agent ever writes to a repo outside a temp folder.
 - [ ] Johan has cleaned up his real repos with it and signs off.
 
-## Out of scope for milestone 3
+## Out of scope for milestone 5
 
-Cleaning up on the remote (deleting branches on GitHub), automatic cleanup without confirmation, removing orphaned commits with `git gc`, and settings.
+Cleaning up on the remote (deleting branches on GitHub), automatic cleanup without confirmation, removing orphaned commits with `git gc`, and settings. Deleting branches that are not leftovers, for example several unmerged branches picked from the history view, is also out: it reuses this milestone's planner and runner, but needs its own place in a later milestone.
