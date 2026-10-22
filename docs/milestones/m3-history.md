@@ -1,6 +1,6 @@
 # Milestone 3: history graph
 
-**Status:** in progress. Phases 0 to 3 are done; phase 4, the diff and the find box, is next.
+**Status:** in progress. Phases 0 to 4 are done; phase 5, history as the start view, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** opening Johan's busiest repo shows its history within a second or two, scrolling stays smooth on a repo with 50,000 commits, and the graph keeps up while agents add commits.
 
@@ -76,6 +76,8 @@ Johan decided these on 2026-10-21, in #30.
 - The read-only Monaco diff editor, both sides next to each other, following the Windows theme. Monaco is loaded only when a diff is first opened, so it never slows the start.
 - The find box from decision 4.
 - Tests: Vitest for find. Playwright for selecting a commit, then a file, and seeing its diff. Monaco's own rendering is not tested.
+
+**Done** 2026-10-22. Clicking a changed file opens its diff below the list, both sides next to each other, and Escape or Close shuts it. Selecting another commit closes it too, since a diff belongs to its commit. Monaco loads from its own 2.7 MB file the first time a diff opens; the start bundle grew by 3 kB. Only Monaco's editor and syntax colouring are loaded, without its language services, so the only worker is the editor's own. Revert arrows and the gutter menu are off, as there is nothing to change in a commit. Binary files and submodules say so without asking the sidecar. The find box matches the start of a hash, or text in the subject, author name or email, ignoring case. Enter goes to the next match and Shift+Enter to the one before, wrapping round, and Ctrl+F reaches the box from anywhere in the history.
 
 ## Phase 5: history as the start view
 
