@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Splitter, useStoredSize, type SizeSpec } from "../components/Splitter";
 import type { AppHost } from "../host";
-import type { FileChange, RepoState } from "../protocol";
+import type { FileChange, HistoryRef, RepoState } from "../protocol";
 import type { RpcClient } from "../rpc";
 import { CommitPanel } from "./CommitPanel";
 import { DiffPane } from "./DiffPane";
+import { fadedCommits } from "./emphasis";
 import { FindBox } from "./FindBox";
 import { HistoryList } from "./HistoryList";
+import { HistoryToggles, useHistoryToggles, type Toggles } from "./HistoryToggles";
 import { markersByCommit } from "./markers";
 import { useCommitDetails } from "./useCommitDetails";
 import { useHistory, type History } from "./useHistory";
@@ -24,8 +26,15 @@ export const DiffHeight: SizeSpec = { key: "diffract.size.diff", initial: 380, m
 
 /** The repo's history as a graph, with the selected commit's details beside it and a file's diff below. */
 export function HistoryView({ client, state, now, storage }: Props) {
-  const history = useHistory(client, state.repoId);
-  const markers = useMemo(() => markersByCommit(history.refs, state.snapshot.worktrees), [history.refs, state.snapshot.worktrees]);
+  const [toggles, setToggle] = useHistoryToggles(storage);
+  const show = { checkpoints: toggles.checkpoints, stashes: toggles.stashes };
+  const history = useHistory(client, state.repoId, state.takenAt, show);
+  const refs = useMemo(() => shownRefs(history.refs.refs, toggles), [history.refs.refs, toggles]);
+  const markers = useMemo(() => markersByCommit(refs, state.snapshot.worktrees), [refs, state.snapshot.worktrees]);
+  const faded = useMemo(
+    () => fadedCommits(history.commits, history.refs, state.mainBranch, toggles),
+    [history.commits, history.refs, state.mainBranch, toggles],
+  );
   const selection = useSelection(history);
   const details = useCommitDetails(client, state.repoId, selection.id);
   const diff = useOpenFile(selection.id);
@@ -40,6 +49,7 @@ export function HistoryView({ client, state, now, storage }: Props) {
       <div className="bar">
         <h1 id="history-title">History</h1>
         <FindBox ref={find} commits={history.commits} names={markers} selected={selection.index} onSelect={selection.select} />
+        <HistoryToggles values={toggles} onChange={setToggle} />
         <span className="grow" />
         <span className="history-count" role="status">
           {countText(history)}
@@ -48,7 +58,7 @@ export function HistoryView({ client, state, now, storage }: Props) {
       <ReadError error={history.error} />
       <div className="history-body" style={{ gridTemplateColumns: `minmax(0, 1fr) auto ${detailsWidth}px` }}>
         <div className="history-main">
-          <HistoryList history={history} markers={markers} selected={selection.index} onSelect={selection.select} onOpen={() => panel.current?.focus()} now={now} />
+          <HistoryList history={history} markers={markers} faded={faded} selected={selection.index} onSelect={selection.select} onOpen={() => panel.current?.focus()} now={now} />
           {diff.file && <DiffArea client={client} repoId={state.repoId} file={diff.file} storage={storage} onClose={diff.close} />}
         </div>
         <Splitter label="Resize commit details" orientation="vertical" spec={DetailsWidth} size={detailsWidth} onSize={setDetailsWidth} growsForward={false} />
@@ -115,11 +125,21 @@ function useHistoryKeys({ onFind, onEscape }: { onFind(): void; onEscape: (() =>
   }, [onFind, onEscape]);
 }
 
-/** The selected commit: the first one until the user picks one. Kept by id, so it stays put as pages arrive. */
+/** Checkpoints and stashes are marked only while their toggle is on. */
+function shownRefs(refs: HistoryRef[], toggles: Toggles): HistoryRef[] {
+  return refs.filter((r) => (r.kind !== "Checkpoint" || toggles.checkpoints) && (r.kind !== "Stash" || toggles.stashes));
+}
+
+/**
+ * The selected commit: the first one read until the user picks one. Kept by id, so it stays put as pages arrive and
+ * as new commits come in above it.
+ */
 function useSelection({ commits }: History) {
   const [chosen, setChosen] = useState<string | null>(null);
+  const first = useRef<string | null>(null);
+  first.current ??= commits[0]?.id ?? null;
   const indexById = useMemo(() => new Map(commits.map((c, i) => [c.id, i])), [commits]);
-  const id = chosen ?? commits[0]?.id ?? null;
+  const id = chosen ?? first.current;
   return {
     id,
     index: id === null ? -1 : (indexById.get(id) ?? -1),

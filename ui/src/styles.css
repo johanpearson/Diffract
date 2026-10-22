@@ -719,6 +719,27 @@ body {
   font-size: 12px;
 }
 
+.history-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle input {
+  margin: 0;
+  accent-color: var(--ok);
+}
+
 .history-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
@@ -774,6 +795,11 @@ body {
   box-shadow: inset 2px 0 0 var(--ok);
 }
 
+/* A toggle fades the row's text, not its background, so a faded row still shows it is selected. */
+.commit-row.faded > * {
+  opacity: 0.4;
+}
+
 .commit-row .subject {
   flex: 1;
   min-width: 0;
@@ -816,6 +842,12 @@ body {
 
 .marker.remote {
   opacity: 0.75;
+}
+
+.marker.checkpoint,
+.marker.stash {
+  border-style: dotted;
+  font-weight: 500;
 }
 
 .marker.current {

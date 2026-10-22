@@ -169,6 +169,41 @@ public class GitRunnerTests
     }
 
     [Fact]
+    public async Task Input_lines_reach_git_on_standard_input()
+    {
+        using var temp = new TempDirectory();
+        await IsolatedGit.WritableRunner(temp, temp.Path).RunAsync(["init", "-q", "-b", "main"], Ct);
+        var runner = IsolatedGit.ReadOnlyRunner(temp, temp.Path);
+        var (a, b) = (new string('a', 40), new string('b', 40));
+        var output = new MemoryStream();
+
+        await runner.StreamAsync(new GitCommandLine(["cat-file", "--batch-check"], [a, b]), async (stdout, ct) =>
+        {
+            await stdout.CopyToAsync(output, ct);
+            return true;
+        }, Ct);
+
+        Assert.Equal($"{a} missing\n{b} missing\n", System.Text.Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [Fact]
+    public async Task Input_git_never_reads_is_no_error()
+    {
+        using var temp = new TempDirectory();
+        var runner = IsolatedGit.ReadOnlyRunner(temp, temp.Path);
+        // Far more than a pipe holds, so writing it blocks until git ends without reading it.
+        var lines = Enumerable.Repeat(new string('a', 40), 50_000).ToList();
+
+        var result = await runner.StreamAsync(new GitCommandLine(["version"], lines), async (stdout, ct) =>
+        {
+            await stdout.CopyToAsync(Stream.Null, ct);
+            return true;
+        }, Ct);
+
+        Assert.Equal(0, result.ExitCode);
+    }
+
+    [Fact]
     public async Task A_reader_that_fails_stops_the_process_and_its_error_is_passed_on()
     {
         using var temp = new TempDirectory();

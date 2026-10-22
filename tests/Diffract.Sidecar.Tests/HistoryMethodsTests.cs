@@ -120,15 +120,15 @@ public sealed class HistoryMethodsTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Refs_are_branches_remote_branches_and_tags_from_the_snapshot_without_git()
+    public async Task Refs_are_branches_remote_branches_tags_and_checkpoints_from_the_snapshot_without_git()
     {
         await OpenAsync();
 
-        var refs = Result(await RequestAsync("history.refs", new { repoId = "1" })).EnumerateArray()
+        var refs = Result(await RequestAsync("history.refs", new { repoId = "1" })).GetProperty("refs").EnumerateArray()
             .Select(r => (r.GetProperty("name").GetString(), r.GetProperty("kind").GetString())).ToList();
 
         Assert.Equal(
-            [("feature/åäö", "Branch"), ("main", "Branch"), ("origin/feature/åäö", "RemoteBranch"), ("v1.0", "Tag")],
+            [("copilot/checkpoints/session/1", "Checkpoint"), ("feature/åäö", "Branch"), ("main", "Branch"), ("origin/feature/åäö", "RemoteBranch"), ("v1.0", "Tag")],
             refs.Order());
         Assert.Empty(_calls);
     }
@@ -139,7 +139,7 @@ public sealed class HistoryMethodsTests : IAsyncDisposable
         await OpenAsync();
         var head = (await ReadHistoryAsync())[0].GetProperty("id").GetString();
 
-        var tag = Result(await RequestAsync("history.refs", new { repoId = "1" })).EnumerateArray().Single(r => r.GetProperty("kind").GetString() == "Tag");
+        var tag = Result(await RequestAsync("history.refs", new { repoId = "1" })).GetProperty("refs").EnumerateArray().Single(r => r.GetProperty("kind").GetString() == "Tag");
 
         Assert.Equal(head, tag.GetProperty("targetId").GetString());
     }

@@ -45,10 +45,10 @@ class HistoryBuilder {
 
   refs(present: Set<string>): HistoryRef[] {
     const refs: HistoryRef[] = [
-      { name: "main", kind: "Branch", targetId: this.main! },
-      { name: "origin/main", kind: "RemoteBranch", targetId: this.main! },
-      ...this.tips.flatMap((tip, i): HistoryRef[] => (tip ? [{ name: `feature/${i + 1}`, kind: "Branch", targetId: tip }] : [])),
-      { name: "v1.0", kind: "Tag", targetId: this.commits[0]!.id },
+      { name: "main", kind: "Branch", targetId: this.main!, agent: null },
+      { name: "origin/main", kind: "RemoteBranch", targetId: this.main!, agent: null },
+      ...this.tips.flatMap((tip, i): HistoryRef[] => (tip ? [{ name: `feature/${i + 1}`, kind: "Branch", targetId: tip, agent: null }] : [])),
+      { name: "v1.0", kind: "Tag", targetId: this.commits[0]!.id, agent: null },
     ];
     return refs.filter((r) => present.has(r.targetId));
   }

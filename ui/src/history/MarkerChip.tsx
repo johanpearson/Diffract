@@ -1,6 +1,6 @@
 import type { Marker } from "./markers";
 
-const kindClass: Record<Marker["kind"], string> = { Head: "head", Branch: "branch", RemoteBranch: "remote", Tag: "tag" };
+const kindClass: Record<Marker["kind"], string> = { Head: "head", Branch: "branch", RemoteBranch: "remote", Tag: "tag", Checkpoint: "checkpoint", Stash: "stash" };
 
 /** A branch, tag or HEAD label. The current one is filled; one checked out in a worktree gets ⌂. */
 export function MarkerChip({ marker: m, color }: { marker: Marker; color?: string }) {

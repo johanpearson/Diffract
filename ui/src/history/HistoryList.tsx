@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type RefObject } from "react";
 import type { CommitEntry } from "../protocol";
 import { formatAge } from "../model/format";
 import { graphMetrics, graphWidth, type GraphRow } from "./drawGraph";
@@ -8,11 +8,13 @@ import { MarkerChip } from "./MarkerChip";
 import { laneColor, useGraphColors } from "./useGraphColors";
 import type { History } from "./useHistory";
 import { useViewport } from "./useViewport";
-import { moveSelection, scrollToShow, visibleRange } from "./viewport";
+import { anchoredScrollTop, anchorAt, moveSelection, scrollToShow, visibleRange, type ScrollAnchor } from "./viewport";
 
 interface Props {
   history: History;
   markers: ReadonlyMap<string, Marker[]>;
+  /** The commits a toggle fades. */
+  faded: ReadonlySet<string>;
   /** The selected row, or -1. */
   selected: number;
   onSelect(index: number): void;
@@ -24,23 +26,20 @@ interface Props {
 const { rowHeight } = graphMetrics;
 
 /** Every commit, one row each, with the graph on the left. Only the rows in view are drawn. */
-export function HistoryList({ history, markers, selected, onSelect, onOpen, now }: Props) {
+export function HistoryList({ history, markers, faded, selected, onSelect, onOpen, now }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { scrollTop, height, onScroll } = useViewport(scrollRef);
+  const viewport = useViewport(scrollRef);
+  const { scrollTop, height } = viewport;
   const colors = useGraphColors(scrollRef);
   const { commits, rows } = history;
   const range = useMemo(() => visibleRange({ scrollTop, height }, rowHeight, commits.length), [scrollTop, height, commits.length]);
   const width = graphWidth(history.width);
-  const row = useCallback((i: number): GraphRow => ({ layout: rows[i]!, isMerge: commits[i]!.parentIds.length > 1 }), [rows, commits]);
-
-  // Keep the selection in view, however it moved.
-  useEffect(() => {
-    const element = scrollRef.current;
-    if (!element || selected < 0) return;
-    element.scrollTop = scrollToShow(selected, element.scrollTop, element.clientHeight || height, rowHeight);
-    // The scroll event comes a frame later; the rows around the selection are needed now.
-    onScroll();
-  }, [selected, height, onScroll]);
+  const row = useCallback(
+    (i: number): GraphRow => ({ layout: rows[i]!, isMerge: commits[i]!.parentIds.length > 1, faded: faded.has(commits[i]!.id) }),
+    [rows, commits, faded],
+  );
+  const onScroll = useScrollAnchor(scrollRef, history, viewport.onScroll);
+  useSelectionInView(scrollRef, { index: selected, id: commits[selected]?.id }, height, onScroll);
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Enter") return onOpen();
@@ -63,7 +62,7 @@ export function HistoryList({ history, markers, selected, onSelect, onOpen, now 
       onKeyDown={onKeyDown}
     >
       <div className="history-rows" role="presentation" style={{ height: commits.length * rowHeight }}>
-        <GraphCanvas row={row} range={range} width={width} colors={colors} version={commits.length} />
+        <GraphCanvas row={row} range={range} width={width} colors={colors} version={history.version} />
         {shown.map((commit, offset) => {
           const index = range.first + offset;
           return (
@@ -74,6 +73,7 @@ export function HistoryList({ history, markers, selected, onSelect, onOpen, now 
               count={commits.length}
               color={laneColor(rows[index]!.color)}
               markers={markers.get(commit.id)}
+              faded={faded.has(commit.id)}
               selected={index === selected}
               indent={width}
               onSelect={onSelect}
@@ -86,19 +86,62 @@ export function HistoryList({ history, markers, selected, onSelect, onOpen, now 
   );
 }
 
+/**
+ * Keeps the commits in view where they are when commits are added or removed above them. At the very top, new
+ * commits come into view instead. Returns the scroll handler, which also remembers where the view is.
+ */
+function useScrollAnchor(scrollRef: RefObject<HTMLElement | null>, { commits, version }: History, onScroll: () => void): () => void {
+  const anchor = useRef<ScrollAnchor | null>(null);
+  const latest = useRef(commits);
+  latest.current = commits;
+  const remember = useCallback(() => {
+    anchor.current = anchorAt(scrollRef.current?.scrollTop ?? 0, rowHeight, (i) => latest.current[i]?.id);
+    onScroll();
+  }, [scrollRef, onScroll]);
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const indexById = new Map(latest.current.map((c, i) => [c.id, i]));
+    const top = anchoredScrollTop(anchor.current, (id) => indexById.get(id) ?? -1, rowHeight);
+    if (top !== null) element.scrollTop = top;
+    remember();
+  }, [version, scrollRef, remember]);
+
+  return remember;
+}
+
+/**
+ * Scrolls the selection into view when it moves to another commit, however it moved. Commits added above it move
+ * its row, not the selection, so they leave the view where it is.
+ */
+function useSelectionInView(scrollRef: RefObject<HTMLElement | null>, selected: { index: number; id: string | undefined }, height: number, onScroll: () => void) {
+  const index = useRef(selected.index);
+  index.current = selected.index;
+  const selectedId = selected.id;
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element || index.current < 0) return;
+    element.scrollTop = scrollToShow(index.current, element.scrollTop, element.clientHeight || height, rowHeight);
+    // The scroll event comes a frame later; the rows around the selection are needed now.
+    onScroll();
+  }, [scrollRef, selectedId, height, onScroll]);
+}
+
 interface RowProps {
   commit: CommitEntry;
   index: number;
   count: number;
   color: string;
   markers: Marker[] | undefined;
+  faded: boolean;
   selected: boolean;
   indent: number;
   onSelect(index: number): void;
   now: Date;
 }
 
-function CommitRow({ commit: c, index, count, color, markers = [], selected, indent, onSelect, now }: RowProps) {
+function CommitRow({ commit: c, index, count, color, markers = [], faded, selected, indent, onSelect, now }: RowProps) {
   return (
     <div
       id={optionId(index)}
@@ -106,7 +149,7 @@ function CommitRow({ commit: c, index, count, color, markers = [], selected, ind
       aria-selected={selected}
       aria-setsize={count}
       aria-posinset={index + 1}
-      className={`commit-row${selected ? " selected" : ""}`}
+      className={`commit-row${selected ? " selected" : ""}${faded ? " faded" : ""}`}
       style={{ top: index * rowHeight, paddingLeft: indent }}
       onClick={() => onSelect(index)}
     >

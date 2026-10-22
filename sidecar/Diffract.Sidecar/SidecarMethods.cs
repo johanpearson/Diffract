@@ -44,7 +44,7 @@ internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, Cance
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.refs", "history.details", "history.file"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file"];
 
     /// <summary>
     /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only violation,
@@ -68,6 +68,8 @@ internal sealed class SidecarMethods : IDisposable
     private readonly GitUpdateChecker _updates;
     private readonly GitUpdater _updater;
     private readonly HistoryReader _history;
+    private readonly HistoryUpdater _historyUpdates;
+    private readonly DiffractConfig _config;
     private readonly Func<string, JsonElement, Task> _notify;
     private readonly Dictionary<string, MethodHandler> _handlers;
 
@@ -77,6 +79,8 @@ internal sealed class SidecarMethods : IDisposable
         RunnerOptions = runnerOptions with { ReadOnly = true };
         _notify = d.Notify;
         _history = new HistoryReader(RunnerOptions);
+        _historyUpdates = new HistoryUpdater(RunnerOptions);
+        _config = d.Config;
         _processes = d.Processes;
         _terminal = new TerminalLauncher(_processes, d.Machine);
         var commands = d.Commands ?? new CommandRunner(RunnerOptions.TimeProvider);
@@ -96,7 +100,8 @@ internal sealed class SidecarMethods : IDisposable
             ["repo.refresh"] = RefreshRepoAsync,
             ["repo.close"] = CloseRepo,
             ["history.read"] = ReadHistoryAsync,
-            ["history.refs"] = HistoryRefs,
+            ["history.update"] = UpdateHistoryAsync,
+            ["history.refs"] = ReadHistoryRefs,
             ["history.details"] = HistoryDetailsAsync,
             ["history.file"] = HistoryFileAsync,
             ["system.openFolder"] = OpenFolder,
@@ -154,22 +159,36 @@ internal sealed class SidecarMethods : IDisposable
     }
 
     /// <summary>
-    /// Streams the whole history as <c>history.page</c> notifications, then answers with the totals. One git call,
-    /// whatever the size. Cancelling the request stops git.
+    /// Streams the whole history as <c>history.page</c> notifications, then answers with the totals and the tips it
+    /// was read from. One git call, whatever the size. Cancelling the request stops git.
     /// </summary>
     private async Task<JsonElement> ReadHistoryAsync(JsonElement? parameters, CancellationToken ct)
     {
         var read = Params<HistoryReadParams>(parameters);
         var snapshot = _repos.SnapshotOf(Required(read.RepoId, "repoId"));
         var token = Required(read.Token, "token");
+        var tips = new HistoryScope(snapshot, _config).Tips(new HistoryShow(read.Checkpoints, read.Stashes));
         var pages = 0;
-        var commits = await _history.ReadAsync(snapshot.RepoRoot, HistoryReader.HeadsOf(snapshot),
+        var commits = await _history.ReadAsync(snapshot.RepoRoot, tips,
             page => _notify("history.page", Result(new HistoryPage(token, pages++, page))), ct).ConfigureAwait(false);
-        return Result(new HistoryReadResult(commits, pages));
+        return Result(new HistoryReadResult(commits, pages, tips));
     }
 
-    private Task<JsonElement> HistoryRefs(JsonElement? parameters, CancellationToken ct) =>
-        Task.FromResult(Result(HistoryRef.From(_repos.SnapshotOf(Required(Params<HistoryRefsParams>(parameters).RepoId, "repoId")))));
+    /// <summary>What changed since the UI's history was read from its tips: none, one or two git calls.</summary>
+    private async Task<JsonElement> UpdateHistoryAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var update = Params<HistoryUpdateParams>(parameters);
+        var snapshot = _repos.SnapshotOf(Required(update.RepoId, "repoId"));
+        var oldTips = update.Tips is { } given && given.All(ObjectId.IsValid)
+            ? given
+            : throw new RpcException(RpcErrorCodes.InvalidParams, "'tips' must be a list of full commit ids");
+        var tips = new HistoryScope(snapshot, _config).Tips(new HistoryShow(update.Checkpoints, update.Stashes));
+        var change = await _historyUpdates.UpdateAsync(snapshot.RepoRoot, oldTips, tips, ct).ConfigureAwait(false);
+        return Result(new HistoryUpdateResult(change.Added, change.Removed, tips, change.TooMany));
+    }
+
+    private Task<JsonElement> ReadHistoryRefs(JsonElement? parameters, CancellationToken ct) =>
+        Task.FromResult(Result(new HistoryScope(_repos.SnapshotOf(Required(Params<HistoryRefsParams>(parameters).RepoId, "repoId")), _config).Refs()));
 
     private async Task<JsonElement> HistoryDetailsAsync(JsonElement? parameters, CancellationToken ct)
     {

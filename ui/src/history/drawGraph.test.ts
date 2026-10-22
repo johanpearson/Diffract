@@ -13,15 +13,17 @@ function recorder() {
     strokeStyle: "",
     fillStyle: "",
     lineWidth: 1,
+    globalAlpha: 1,
     clearRect: () => {},
     beginPath: () => void (path = []),
     moveTo: (x, y) => void path.push(`M${x},${y}`),
     lineTo: (x, y) => void path.push(`L${x},${y}`),
     bezierCurveTo: (_a, _b, _c, _d, x, y) => void path.push(`C${x},${y}`),
     arc: (x, y, r) => void path.push(`O${x},${y},${r}`),
-    stroke: () => void drawn.push(`stroke ${String(ctx.strokeStyle)} ${path.join(" ")}`),
-    fill: () => void drawn.push(`fill ${String(ctx.fillStyle)} ${path.join(" ")}`),
+    stroke: () => void drawn.push(`stroke ${String(ctx.strokeStyle)} ${path.join(" ")}${alpha()}`),
+    fill: () => void drawn.push(`fill ${String(ctx.fillStyle)} ${path.join(" ")}${alpha()}`),
   };
+  const alpha = () => (ctx.globalAlpha === 1 ? "" : ` @${ctx.globalAlpha}`);
   return { ctx, drawn };
 }
 
@@ -31,6 +33,22 @@ function rowsOf(commits: LaneCommit[]): (i: number) => GraphRow {
 }
 
 describe("drawGraph", () => {
+  it("draws a faded row's dot and its own lines see-through, but not the lines passing it", () => {
+    const { ctx, drawn } = recorder();
+    // b on the left passes the row of c, a side commit that is faded.
+    const commits = [
+      { id: "b", parentIds: ["a"] },
+      { id: "c", parentIds: ["a"] },
+      { id: "a", parentIds: [] },
+    ];
+    const { rows } = layoutLanes(commits);
+
+    drawGraph(ctx, (i) => ({ layout: rows[i]!, isMerge: false, faded: i === 1 }), { first: 1, end: 2 }, { colors, metrics });
+
+    expect(drawn).toEqual(["stroke red M10,0 L10,20", "stroke blue M20,10 L20,20 @0.35", "fill blue O20,10,3 @0.35", "stroke blue O20,10,3 @0.35"]);
+    expect(ctx.globalAlpha).toBe(1);
+  });
+
   it("draws a straight line between commits on one lane and a dot for each", () => {
     const { ctx, drawn } = recorder();
 

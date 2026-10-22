@@ -3,8 +3,11 @@ using Diffract.Git.Snapshot;
 
 namespace Diffract.Leftovers.Rules;
 
-/// <summary>Fills in the <see cref="Leftover.Agent"/> hint from the agent patterns. Never decides anything.</summary>
-internal static class Attribution
+/// <summary>
+/// Which agent something looks like it belongs to, from the agent patterns: the <see cref="Leftover.Agent"/> hint,
+/// and history's "Agent work only". Never decides anything.
+/// </summary>
+public static class Attribution
 {
     public static string? ForBranch(DiffractConfig config, string branch) =>
         config.Agents.FirstOrDefault(a => GlobMatcher.IsMatchAny(a.BranchPatterns, branch, ignoreCase: false))?.Name;
@@ -15,8 +18,10 @@ internal static class Attribution
     public static string? ForRef(DiffractConfig config, string fullName) =>
         config.Agents.FirstOrDefault(a => GlobMatcher.IsMatchAny(a.RefPatterns, fullName, ignoreCase: false))?.Name;
 
-    public static string? ForCommit(DiffractConfig config, UnreachableCommit commit) =>
-        config.Agents.FirstOrDefault(a => a.CommitSubjectPrefixes.Any(p => commit.Subject.StartsWith(p, StringComparison.Ordinal)))?.Name;
+    public static string? ForCommit(DiffractConfig config, UnreachableCommit commit) => ForSubject(config, commit.Subject);
+
+    public static string? ForSubject(DiffractConfig config, string subject) =>
+        config.Agents.FirstOrDefault(a => a.CommitSubjectPrefixes.Any(p => subject.StartsWith(p, StringComparison.Ordinal)))?.Name;
 
     /// <summary>The folder is the more reliable sign, since agents' branches get renamed.</summary>
     public static string? ForWorktree(DiffractConfig config, WorktreeInfo worktree) =>

@@ -180,7 +180,7 @@ export interface RepoChanged {
   state: RepoState;
 }
 
-export const historyRefKinds = ["Branch", "RemoteBranch", "Tag"] as const;
+export const historyRefKinds = ["Branch", "RemoteBranch", "Tag", "Checkpoint", "Stash"] as const;
 export type HistoryRefKind = (typeof historyRefKinds)[number];
 
 export const fileChangeKinds = ["Added", "Deleted", "Modified", "Renamed", "Copied", "TypeChanged", "Unknown"] as const;
@@ -216,15 +216,49 @@ export interface HistoryPage {
 export interface HistoryReadResult {
   commits: number;
   pages: number;
+  /** The commits the history was read from. Pass them to `history.update` to learn what changed since. */
+  tips: string[];
 }
 
-/** A ref history shows by default. Worktree HEADs are in the repo state. */
+/** Which refs history starts from besides branches, tags and worktree HEADs. */
+export interface HistoryShow {
+  /** Agents' checkpoint refs. */
+  checkpoints: boolean;
+  /** Every stash. The scan after opening lists them, so before it there are none. */
+  stashes: boolean;
+}
+
+/** Result of `history.update`: how the history changes to match the repo's current refs and the toggles. */
+export interface HistoryUpdateResult {
+  /** New commits in topological order. They all go above the commits the UI has. */
+  added: CommitEntry[];
+  /** Commits no ref shown reaches any more, such as those a force-move left behind. */
+  removed: string[];
+  /** The commits the updated history starts from, for the next `history.update`. */
+  tips: string[];
+  /** Too much changed to send as an update: read the whole history again. `added` and `removed` are then empty. */
+  reread: boolean;
+}
+
+/** A ref history can show. Worktree HEADs are in the repo state. */
 export interface HistoryRef {
-  /** Short name: "feature/x", "origin/feature/x" or "v1.0". */
+  /** Short name: "feature/x", "origin/feature/x", "v1.0", "copilot/checkpoints/abc/1" or "stash@{0}". */
   name: string;
+  /** Checkpoints and stashes are shown only when their toggle is on. */
   kind: HistoryRefKind;
   /** The commit it points at, after peeling annotated tags. */
   targetId: string;
+  /** The agent it looks like it belongs to, from the patterns in diffract.json. A hint only. */
+  agent: string | null;
+}
+
+/** Result of `history.refs`: the refs, and what tells agent work apart. */
+export interface HistoryRefs {
+  refs: HistoryRef[];
+  /** The HEAD of every worktree that looks like it belongs to an agent, by its folder or branch. */
+  agentHeads: string[];
+  /** A commit whose subject starts with one of these looks like an agent made it. */
+  agentSubjectPrefixes: string[];
 }
 
 /** One changed file in a commit, compared with its first parent. */
@@ -299,12 +333,17 @@ export interface Methods {
   /** Opens gitforwindows.org in the browser. */
   "git.openDownloadPage": { params: undefined; result: null };
   /**
-   * Streams the whole history as `history.page` notifications carrying `token`, then answers with the totals.
-   * One git call. Cancel the request to stop it.
+   * Streams the whole history as `history.page` notifications carrying `token`, then answers with the totals and
+   * the tips it was read from. One git call. Cancel the request to stop it.
    */
-  "history.read": { params: { repoId: string; token: string }; result: HistoryReadResult };
-  /** Branches, remote branches and tags, from the repo's snapshot. Starts no git. */
-  "history.refs": { params: { repoId: string }; result: HistoryRef[] };
+  "history.read": { params: { repoId: string; token: string } & HistoryShow; result: HistoryReadResult };
+  /**
+   * What changed since the history was read from `tips`, after the refs moved or a toggle changed. No git when
+   * nothing did, one call for new commits, and one more when a branch was moved back or removed.
+   */
+  "history.update": { params: { repoId: string; tips: string[] } & HistoryShow; result: HistoryUpdateResult };
+  /** Branches, remote branches, tags, checkpoints and stashes, from the repo's snapshot. Starts no git. */
+  "history.refs": { params: { repoId: string }; result: HistoryRefs };
   /** One commit's message, committer and changed files. */
   "history.details": { params: { repoId: string; commitId: string }; result: CommitDetails };
   /** One side of a file's diff, by the `oldId` or `newId` from `history.details`. Binary and large files come without text. */

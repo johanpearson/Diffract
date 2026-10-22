@@ -26,10 +26,10 @@ public sealed class HistoryReaderTests : IDisposable
 
     private HistoryReader ReaderWithPages(int pageSize) => new(Options, pageSize);
 
-    private async Task<(int Total, List<IReadOnlyList<CommitEntry>> Pages)> ReadAllAsync(string repo, IEnumerable<string> heads, int pageSize = HistoryReader.PageSize)
+    private async Task<(int Total, List<IReadOnlyList<CommitEntry>> Pages)> ReadAllAsync(string repo, IReadOnlyCollection<string> tips, int pageSize = HistoryReader.PageSize)
     {
         List<IReadOnlyList<CommitEntry>> pages = [];
-        var total = await ReaderWithPages(pageSize).ReadAsync(repo, heads, page =>
+        var total = await ReaderWithPages(pageSize).ReadAsync(repo, tips, page =>
         {
             pages.Add(page);
             return Task.CompletedTask;
@@ -51,7 +51,7 @@ public sealed class HistoryReaderTests : IDisposable
             await repo.CommitAsync("file.txt", $"{i}", $"Commit {i}");
         _calls.Clear();
 
-        var (total, pages) = await ReadAllAsync(repo.Path, [], pageSize: 5);
+        var (total, pages) = await ReadAllAsync(repo.Path, await TipsAsync(repo.Path), pageSize: 5);
 
         Assert.Equal(12, total);
         Assert.Equal([5, 5, 2], pages.Select(p => p.Count));
@@ -63,12 +63,13 @@ public sealed class HistoryReaderTests : IDisposable
     public async Task Reads_50000_commits_with_one_git_call_and_the_first_page_comes_quickly()
     {
         var large = await LargeHistory.BuildAsync(_temp, "large", commits: 50_000);
+        var tips = await TipsAsync(large.Path);
         _calls.Clear();
         var clock = Stopwatch.StartNew();
         TimeSpan? firstPage = null;
         var pages = 0;
 
-        var total = await Reader.ReadAsync(large.Path, [], page =>
+        var total = await Reader.ReadAsync(large.Path, tips, page =>
         {
             firstPage ??= clock.Elapsed;
             pages++;
@@ -108,7 +109,7 @@ public sealed class HistoryReaderTests : IDisposable
         await repo.At(_temp.Combine("detached")).CommitAsync("other.txt", "6", "Only on a detached worktree");
         var snapshot = await SnapshotAsync(repo.Path);
 
-        var (_, pages) = await ReadAllAsync(repo.Path, HistoryReader.HeadsOf(snapshot));
+        var (_, pages) = await ReadAllAsync(repo.Path, HistoryReader.TipsOf(snapshot));
 
         Assert.Equal(
             new[] { "On main", "On a branch", "Only on a remote branch", "Only on a tag", "Only on a detached worktree" }.Order(),
@@ -116,26 +117,58 @@ public sealed class HistoryReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task An_empty_repo_has_no_history_and_no_error()
+    public async Task An_empty_repo_has_no_history_no_error_and_needs_no_git()
     {
         var repo = await FixtureRepo.InitAsync(_temp, "empty");
+        var tips = await TipsAsync(repo.Path);
         _calls.Clear();
 
-        var (total, pages) = await ReadAllAsync(repo.Path, HistoryReader.HeadsOf(await SnapshotAsync(repo.Path)));
+        var (total, pages) = await ReadAllAsync(repo.Path, tips);
 
         Assert.Equal(0, total);
         Assert.Empty(pages);
+        Assert.Empty(_calls);
+    }
+
+    [Fact]
+    public async Task A_tag_on_a_file_instead_of_a_commit_is_left_out_without_an_error()
+    {
+        var repo = await FixtureRepo.InitAsync(_temp, "repo");
+        await repo.CommitAsync("file.txt", "1", "On main");
+        var blob = await repo.RevParseAsync("HEAD:file.txt");
+        await repo.GitAsync("tag", "file-tag", blob);
+
+        var (total, _) = await ReadAllAsync(repo.Path, await TipsAsync(repo.Path));
+
+        Assert.Equal(1, total);
+    }
+
+    [Fact]
+    public async Task Hundreds_of_tips_do_not_hit_the_command_line_limit()
+    {
+        var large = await LargeHistory.BuildAsync(_temp, "large", commits: 3000);
+        // Every commit as a tip: 3,000 ids hold over 120,000 characters, far past the 32,767 of a Windows command line.
+        var all = await IsolatedGit.ReadOnlyRunner(_temp, large.Path).RunAsync(["rev-list", "--all"], Ct);
+        var tips = all.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        _calls.Clear();
+
+        var (total, _) = await ReadAllAsync(large.Path, tips);
+
+        Assert.Equal(3000, tips.Length);
+        Assert.Equal(3000, total);
+        Assert.Single(_calls);
     }
 
     [Fact]
     public async Task Cancelling_while_pages_arrive_stops_git()
     {
         var large = await LargeHistory.BuildAsync(_temp, "large", commits: 3000);
+        var tips = await TipsAsync(large.Path);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(Ct);
         _calls.Clear();
         var pages = 0;
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ReaderWithPages(100).ReadAsync(large.Path, [], async _ =>
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ReaderWithPages(100).ReadAsync(large.Path, tips, async _ =>
         {
             if (++pages == 2)
                 await cancel.CancelAsync();
@@ -250,6 +283,8 @@ public sealed class HistoryReaderTests : IDisposable
         await Assert.ThrowsAsync<ArgumentException>(() => Reader.ReadFileAsync(repo.Path, blob, Ct));
         Assert.Empty(_calls);
     }
+
+    private async Task<IReadOnlyList<string>> TipsAsync(string repo) => HistoryReader.TipsOf(await SnapshotAsync(repo));
 
     private async Task<RepoSnapshot> SnapshotAsync(string repo) =>
         (await new RepoSnapshotBuilder(new GitRunnerOptions { Environment = IsolatedGit.Environment(_temp) }, new SnapshotOptions()).BuildAsync(repo, Ct)).Snapshot;
