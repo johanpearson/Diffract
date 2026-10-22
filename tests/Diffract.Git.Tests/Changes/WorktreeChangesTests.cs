@@ -18,7 +18,7 @@ public class WorktreeChangesTests
         var changes = Read("changes-status.bin");
 
         Assert.Equal((Worktree, "main", "origin/main", 1, 2), (changes.Worktree, changes.Branch, changes.Upstream, changes.Ahead, changes.Behind));
-        Assert.Equal("6726bf1bd92176f0b5358a2e1b6410be623fa2bf", changes.HeadCommit);
+        Assert.Equal("75e7dc3272e433a830147d7849f763f9061c20fd", changes.HeadCommit);
     }
 
     [Theory]

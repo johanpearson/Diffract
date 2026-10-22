@@ -6,8 +6,9 @@ using Diffract.Sidecar.Rpc;
 namespace Diffract.Sidecar;
 
 /// <summary>
-/// <c>changes.status</c> and <c>changes.file</c>: what the Changes view shows of one worktree. They only read. The
-/// worktree must be one in the repo's snapshot, so git only ever runs where the repo lives.
+/// The Changes view's methods for one worktree. <c>changes.status</c> and <c>changes.file</c> only read.
+/// <c>changes.stage</c> and <c>changes.unstage</c> write through a changes runner, which allows nothing but
+/// <see cref="ChangesPolicy"/>. The worktree must be one in the repo's snapshot, so git only ever runs where the repo lives.
 /// </summary>
 internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runnerOptions)
 {
@@ -21,22 +22,71 @@ internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runner
         return SidecarMethods.Result(await _reader.ReadStatusAsync(worktree, ct).ConfigureAwait(false));
     }
 
-    /// <summary>The two sides of one file's diff, staged or not. At most one git call per side, run side by side.</summary>
+    /// <summary>The two sides of one file's diff, staged or not, and its hunks. At most three git calls, run side by side.</summary>
     public async Task<JsonElement> FileAsync(JsonElement? parameters, CancellationToken ct)
     {
         var file = SidecarMethods.Params<ChangesFileParams>(parameters);
         var worktree = WorktreeOf(file.RepoId, file.Worktree);
-        var request = new FileDiffRequest(SidecarMethods.Required(file.Path, "path"), file.Staged, file.HeadId, file.IndexId);
+        var request = new FileDiffRequest
+        {
+            Path = SidecarMethods.Required(file.Path, "path"),
+            OldPath = file.OldPath,
+            Staged = file.Staged,
+            HeadId = file.HeadId,
+            IndexId = file.IndexId,
+        };
+        var diff = await Checked(() => _reader.ReadFileAsync(worktree, request, ct)).ConfigureAwait(false);
+        return SidecarMethods.Result(ChangesFile.From(diff));
+    }
+
+    /// <summary>Stages files, or one hunk of the unstaged diff, then answers with the new status.</summary>
+    public Task<JsonElement> StageAsync(JsonElement? parameters, CancellationToken ct) =>
+        ChangeAsync(parameters, new Change((w, paths, t) => w.StageAsync(paths, t), (w, hunk, t) => w.StageHunkAsync(hunk, t)), ct);
+
+    /// <summary>Unstages files, or one hunk of the staged diff, then answers with the new status.</summary>
+    public Task<JsonElement> UnstageAsync(JsonElement? parameters, CancellationToken ct) =>
+        ChangeAsync(parameters, new Change((w, paths, t) => w.UnstageAsync(paths, t), (w, hunk, t) => w.UnstageHunkAsync(hunk, t)), ct);
+
+    private async Task<JsonElement> ChangeAsync(JsonElement? parameters, Change change, CancellationToken ct)
+    {
+        var stage = SidecarMethods.Params<ChangesStageParams>(parameters);
+        var worktree = WorktreeOf(stage.RepoId, stage.Worktree);
+        var writer = new ChangesWriter(worktree, runnerOptions);
+        await Checked(() => (stage.Paths, stage.Hunk) switch
+        {
+            ({ } paths, null) => change.Files(writer, paths, ct),
+            (null, { } hunk) => change.Hunk(writer, HunkOf(hunk), ct),
+            _ => throw new RpcException(RpcErrorCodes.InvalidParams, "Give either 'paths' or 'hunk'."),
+        }).ConfigureAwait(false);
+        return SidecarMethods.Result(await _reader.ReadStatusAsync(worktree, ct).ConfigureAwait(false));
+    }
+
+    private static HunkRequest HunkOf(ChangesHunkParams hunk) =>
+        new(SidecarMethods.Required(hunk.Path, "hunk.path"), hunk.OldPath, SidecarMethods.Required(hunk.Id, "hunk.id"));
+
+    /// <summary>A path outside the worktree, a folder, or an id that is not one, is the caller's mistake.</summary>
+    private static async Task<T> Checked<T>(Func<Task<T>> run)
+    {
         try
         {
-            return SidecarMethods.Result(ChangesFile.From(await _reader.ReadFileAsync(worktree, request, ct).ConfigureAwait(false)));
+            return await run().ConfigureAwait(false);
         }
         catch (ArgumentException e)
         {
-            // A path outside the worktree, or an id that is not one.
             throw new RpcException(RpcErrorCodes.InvalidParams, e.Message);
         }
     }
+
+    private static Task<bool> Checked(Func<Task> run) => Checked(async () =>
+    {
+        await run().ConfigureAwait(false);
+        return true;
+    });
+
+    /// <summary>The two halves of staging or of unstaging.</summary>
+    private sealed record Change(
+        Func<ChangesWriter, IReadOnlyList<string>, CancellationToken, Task> Files,
+        Func<ChangesWriter, HunkRequest, CancellationToken, Task> Hunk);
 
     /// <summary>
     /// The worktree's path as the snapshot has it. A bare repo has no files, and neither has a worktree whose folder is

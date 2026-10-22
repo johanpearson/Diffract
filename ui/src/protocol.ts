@@ -19,7 +19,11 @@ export const leftoverKinds = [
 export type LeftoverKind = (typeof leftoverKinds)[number];
 
 /** What went wrong, on Diffract's own errors. */
-export const errorKinds = ["NotARepo", "GitTooOld", "GitFailed", "TimedOut", "ConfigInvalid"] as const;
+/**
+ * IndexLocked: another git process, probably an agent, held the index for 2 seconds; try again later.
+ * ChangedSinceShown: the file changed since its diff was read, so nothing was staged; read it again.
+ */
+export const errorKinds = ["NotARepo", "GitTooOld", "GitFailed", "TimedOut", "ConfigInvalid", "IndexLocked", "ChangedSinceShown"] as const;
 export type ErrorKind = (typeof errorKinds)[number];
 
 /** What a live change refreshed. */
@@ -348,24 +352,45 @@ export interface WorktreeChanges {
   files: ChangedFile[];
 }
 
-/** Params of `changes.file`: the file's `path`, `headId` and `indexId` from `changes.status`. */
+/** Params of `changes.file`: the file's `path`, `oldPath`, `headId` and `indexId` from `changes.status`. */
 export interface ChangesFileParams {
   repoId: string;
   worktree: string;
   path: string;
+  /** For a staged rename, so its hunks are read as one diff. */
+  oldPath?: string | null;
   /** HEAD against the index when true, the index against the worktree when false. */
   staged: boolean;
   headId: string | null;
   indexId: string | null;
 }
 
-/** Result of `changes.file`: both sides of a file's diff. A side is null when the file is not there. */
+/** One hunk of a diff, as git makes it with no context lines. Lines are 1-based. */
+export interface Hunk {
+  /** Pass back to stage or unstage it. It changes whenever the file does. */
+  id: string;
+  /** The first line it removes, or the line it adds after when it removes none. */
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+}
+
+/** Result of `changes.file`: both sides of a file's diff, and its hunks. A side is null when the file is not there. */
 export interface ChangesFile {
   /** HEAD for a staged diff, the index for an unstaged one. */
   old: HistoryFile | null;
   /** The index for a staged diff, the file on disk for an unstaged one. */
   new: HistoryFile | null;
+  /** Empty when a side is missing: a new or deleted file is staged as a whole. Empty for binary files too. */
+  hunks: Hunk[];
 }
+
+/** Params of `changes.stage` and `changes.unstage`: files, or one hunk, never both. */
+export type ChangesStageParams = { repoId: string; worktree: string } & (
+  | { paths: string[]; hunk?: undefined }
+  | { hunk: { path: string; oldPath?: string | null; id: string }; paths?: undefined }
+);
 
 /** Every method the sidecar answers, with its params and result. */
 export interface Methods {
@@ -415,6 +440,13 @@ export interface Methods {
    * real changes show. At most one git call per side.
    */
   "changes.file": { params: ChangesFileParams; result: ChangesFile };
+  /**
+   * Stages files (one git call for any number; give both paths of a rename), or one hunk of the unstaged diff, if it
+   * is still as shown. Answers with the new status. Never stages a NestedRepo.
+   */
+  "changes.stage": { params: ChangesStageParams; result: WorktreeChanges };
+  /** Unstages files, or one hunk of the staged diff, leaving them as they are on disk. Answers with the new status. */
+  "changes.unstage": { params: ChangesStageParams; result: WorktreeChanges };
 }
 
 /** Every notification the sidecar sends, with its params. */

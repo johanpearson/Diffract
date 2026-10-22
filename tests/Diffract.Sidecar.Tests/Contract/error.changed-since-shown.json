@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32007,
+    "message": "src/räksmörgås.cs changed since it was shown, so nothing was staged or unstaged. Look at it again.",
+    "data": {
+      "kind": "ChangedSinceShown"
+    }
+  }
+}

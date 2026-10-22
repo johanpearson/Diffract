@@ -11,7 +11,8 @@ Current milestone: [docs/milestones/m4-changes.md](docs/milestones/m4-changes.md
 ## Docs
 
 - [docs/brief.md](docs/brief.md): what Diffract is, locked decisions, architecture
-- [docs/milestones/m3-history.md](docs/milestones/m3-history.md): current milestone, scope and acceptance criteria
+- [docs/milestones/m4-changes.md](docs/milestones/m4-changes.md): current milestone, scope and acceptance criteria
+- [docs/milestones/m3-history.md](docs/milestones/m3-history.md): milestone 3 (done), scope and acceptance criteria
 - [docs/milestones/m5-cleanup.md](docs/milestones/m5-cleanup.md): milestone 5, safe cleanup, planned
 - [docs/milestones/m2-shell.md](docs/milestones/m2-shell.md): milestone 2 (done), scope and acceptance criteria
 - [docs/milestones/m1-spike.md](docs/milestones/m1-spike.md): milestone 1 (done), scope and acceptance criteria

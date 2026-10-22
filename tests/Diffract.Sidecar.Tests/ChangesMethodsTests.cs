@@ -142,7 +142,9 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
 
         Assert.Equal(("hello\n", "staged\n"), (staged.GetProperty("old").GetProperty("text").GetString(), staged.GetProperty("new").GetProperty("text").GetString()));
         Assert.Equal(("staged\n", "unstaged\n"), (unstaged.GetProperty("old").GetProperty("text").GetString(), unstaged.GetProperty("new").GetProperty("text").GetString()));
-        Assert.Equal(3, _calls.Count);
+        Assert.Equal(1, staged.GetProperty("hunks").GetArrayLength());
+        Assert.Equal(1, unstaged.GetProperty("hunks").GetArrayLength());
+        Assert.Equal(5, _calls.Count);
     }
 
     [Fact]
@@ -213,11 +215,117 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
         Assert.Equal(("Added", JsonValueKind.Null), (file.GetProperty("staged").GetString(), file.GetProperty("unstaged").ValueKind));
     }
 
+    // --- staging -------------------------------------------------------------------------
+    // Staging changes the index, which the watcher sees, so these tests count no git calls. ChangesWriterTests do.
+
+    [Fact]
+    public async Task Stage_and_unstage_files_answer_with_the_new_status()
+    {
+        var (repo, _) = await OpenAsync((repo, _) =>
+        {
+            repo.WriteFile("readme.md", "changed\n");
+            repo.WriteFile("new folder/ny fil.txt", "new\n");
+            return Task.CompletedTask;
+        });
+
+        var staged = Result(await RequestAsync("changes.stage", new { repoId = "1", worktree = repo.Path, paths = new[] { "readme.md", "new folder/ny fil.txt" } }));
+        Assert.All(staged.GetProperty("files").EnumerateArray(), f => Assert.Equal(JsonValueKind.Null, f.GetProperty("unstaged").ValueKind));
+
+        var unstaged = Result(await RequestAsync("changes.unstage", new { repoId = "1", worktree = repo.Path, paths = new[] { "readme.md" } }));
+        Assert.Equal(("Modified", JsonValueKind.Null), (FileIn(unstaged, "readme.md").GetProperty("unstaged").GetString(), FileIn(unstaged, "readme.md").GetProperty("staged").ValueKind));
+        Assert.Equal("Added", FileIn(unstaged, "new folder/ny fil.txt").GetProperty("staged").GetString());
+    }
+
+    [Fact]
+    public async Task Stage_a_hunk_from_the_diff_the_ui_was_shown()
+    {
+        var (repo, _) = await OpenAsync((repo, _) =>
+        {
+            repo.WriteFile("readme.md", "HELLO\n");
+            return Task.CompletedTask;
+        });
+        var file = FileIn(await StatusAsync(repo.Path), "readme.md");
+        var hunk = Result(await RequestAsync("changes.file", Params(repo.Path, file, staged: false))).GetProperty("hunks")[0];
+
+        var status = Result(await RequestAsync("changes.stage", new
+        {
+            repoId = "1",
+            worktree = repo.Path,
+            hunk = new { path = "readme.md", id = hunk.GetProperty("id").GetString() },
+        }));
+
+        Assert.Equal(("Modified", JsonValueKind.Null), (FileIn(status, "readme.md").GetProperty("staged").GetString(), FileIn(status, "readme.md").GetProperty("unstaged").ValueKind));
+    }
+
+    [Fact]
+    public async Task Every_git_call_is_a_read_or_on_the_changes_list_and_writes_are_never_reads()
+    {
+        var (repo, _) = await OpenAsync((repo, _) =>
+        {
+            repo.WriteFile("readme.md", "HELLO\n");
+            return Task.CompletedTask;
+        });
+
+        await RequestAsync("changes.stage", new { repoId = "1", worktree = repo.Path, paths = new[] { "readme.md" } });
+        await RequestAsync("changes.unstage", new { repoId = "1", worktree = repo.Path, paths = new[] { "readme.md" } });
+
+        Assert.All(_calls, c => Assert.True(ReadOnlyPolicy.IsAllowed(c.Arguments, out _) || ChangesPolicy.IsAllowed(c.Arguments, out _), string.Join(' ', c.Arguments)));
+        Assert.Equal(["add", "restore"], _calls.Where(c => ChangesPolicy.IsAllowed(c.Arguments, out _)).Select(c => c.Arguments[0]));
+    }
+
+    [Fact]
+    public async Task A_hunk_that_changed_since_it_was_shown_is_a_changed_since_shown_error()
+    {
+        var (repo, _) = await OpenAsync((repo, _) =>
+        {
+            repo.WriteFile("readme.md", "HELLO\n");
+            return Task.CompletedTask;
+        });
+
+        var response = await RequestAsync("changes.stage", new { repoId = "1", worktree = repo.Path, hunk = new { path = "readme.md", id = "0123456789abcdef0123456789abcdef" } });
+
+        Assert.Equal("ChangedSinceShown", response.GetProperty("error").GetProperty("data").GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public async Task A_locked_index_is_an_index_locked_error_and_the_lock_stays()
+    {
+        string lockFile = null!;
+        var (repo, _) = await OpenAsync(async (repo, _) =>
+        {
+            repo.WriteFile("readme.md", "HELLO\n");
+            lockFile = Path.Combine(repo.Path, ".git", "index.lock");
+            await File.WriteAllTextAsync(lockFile, "", Ct);
+        });
+
+        var response = await RequestAsync("changes.stage", new { repoId = "1", worktree = repo.Path, paths = new[] { "readme.md" } });
+
+        var error = response.GetProperty("error");
+        Assert.Equal("IndexLocked", error.GetProperty("data").GetProperty("kind").GetString());
+        Assert.Equal("Another git process is using this repo, probably an agent. Try again in a moment.", error.GetProperty("message").GetString());
+        Assert.True(File.Exists(lockFile));
+    }
+
+    [Fact]
+    public async Task Paths_and_a_hunk_together_neither_or_a_nested_repo_are_refused()
+    {
+        var (repo, linked) = await OpenAsync(async (repo, _) =>
+            await repo.GitAsync("worktree", "add", "-q", "-b", "claude/task", Path.Combine(repo.Path, ".claude", "worktrees", "task")));
+        var hunk = new { path = "readme.md", id = "0123" };
+
+        Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.stage", new { repoId = "1", worktree = repo.Path, paths = new[] { "readme.md" }, hunk })));
+        Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.stage", new { repoId = "1", worktree = repo.Path })));
+        Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.stage", new { repoId = "1", worktree = repo.Path, paths = new[] { ".claude/worktrees/task" } })));
+        Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.unstage", new { repoId = "1", worktree = repo.Path, hunk = new { path = "readme.md" } })));
+        Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.stage", new { repoId = "1", worktree = linked, paths = Array.Empty<string>() })));
+    }
+
     private static object Params(string worktree, JsonElement file, bool staged) => new
     {
         repoId = "1",
         worktree,
         path = file.GetProperty("path").GetString(),
+        oldPath = file.GetProperty("oldPath").GetString(),
         staged,
         headId = file.GetProperty("headId").GetString(),
         indexId = file.GetProperty("indexId").GetString(),

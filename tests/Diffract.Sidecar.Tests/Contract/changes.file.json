@@ -2,11 +2,31 @@
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "old": null,
+    "old": {
+      "kind": "Text",
+      "text": "one\r\ntwo\r\n",
+      "message": null
+    },
     "new": {
       "kind": "Text",
-      "text": "# Notes\r\n",
+      "text": "one\r\nTWO\r\nthree\r\n",
       "message": null
-    }
+    },
+    "hunks": [
+      {
+        "id": "5d41402abc4b2a76b9719d911017c592",
+        "oldStart": 2,
+        "oldLines": 1,
+        "newStart": 2,
+        "newLines": 1
+      },
+      {
+        "id": "7d793037a0760186574b0282f2f435e7",
+        "oldStart": 2,
+        "oldLines": 0,
+        "newStart": 3,
+        "newLines": 1
+      }
+    ]
   }
 }

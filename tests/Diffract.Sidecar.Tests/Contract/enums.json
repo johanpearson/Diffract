@@ -20,7 +20,9 @@
     "GitTooOld",
     "GitFailed",
     "TimedOut",
-    "ConfigInvalid"
+    "ConfigInvalid",
+    "IndexLocked",
+    "ChangedSinceShown"
   ],
   "changeKind": [
     "WorktreeFiles",

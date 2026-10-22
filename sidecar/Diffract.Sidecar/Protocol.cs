@@ -37,11 +37,55 @@ internal sealed record HistoryFileParams(string? RepoId, string? BlobId);
 /// <param name="Worktree">The full path of one of the repo's worktrees, as the repo state lists them.</param>
 internal sealed record ChangesStatusParams(string? RepoId, string? Worktree);
 
-/// <param name="Path">The file's <c>path</c> from <c>changes.status</c>.</param>
-/// <param name="Staged">HEAD against the index when true, the index against the worktree when false.</param>
-/// <param name="HeadId">The file's <c>headId</c> from <c>changes.status</c>.</param>
-/// <param name="IndexId">The file's <c>indexId</c> from <c>changes.status</c>.</param>
-internal sealed record ChangesFileParams(string? RepoId, string? Worktree, string? Path, bool Staged, string? HeadId, string? IndexId);
+/// <summary>The params of <c>changes.file</c>: the file as <c>changes.status</c> listed it.</summary>
+internal sealed record ChangesFileParams
+{
+    public string? RepoId { get; init; }
+
+    public string? Worktree { get; init; }
+
+    /// <summary>The file's <c>path</c> from <c>changes.status</c>.</summary>
+    public string? Path { get; init; }
+
+    /// <summary>The file's <c>oldPath</c>, so a staged rename's hunks are read as one diff.</summary>
+    public string? OldPath { get; init; }
+
+    /// <summary>HEAD against the index when true, the index against the worktree when false.</summary>
+    public bool Staged { get; init; }
+
+    /// <summary>The file's <c>headId</c> from <c>changes.status</c>.</summary>
+    public string? HeadId { get; init; }
+
+    /// <summary>The file's <c>indexId</c> from <c>changes.status</c>.</summary>
+    public string? IndexId { get; init; }
+}
+
+/// <summary>The params of <c>changes.stage</c> and <c>changes.unstage</c>: whole files, or one hunk. Never both.</summary>
+internal sealed record ChangesStageParams
+{
+    public string? RepoId { get; init; }
+
+    public string? Worktree { get; init; }
+
+    /// <summary>Files to stage or unstage, with one git call. For a staged rename, both paths.</summary>
+    public IReadOnlyList<string>? Paths { get; init; }
+
+    /// <summary>One hunk of the unstaged diff to stage, or of the staged diff to unstage.</summary>
+    public ChangesHunkParams? Hunk { get; init; }
+}
+
+/// <summary>One hunk, as <c>changes.file</c> showed it.</summary>
+internal sealed record ChangesHunkParams
+{
+    /// <summary>The file's <c>path</c>.</summary>
+    public string? Path { get; init; }
+
+    /// <summary>The file's <c>oldPath</c>, for a hunk of a staged rename.</summary>
+    public string? OldPath { get; init; }
+
+    /// <summary>The hunk's <c>id</c> from <c>changes.file</c>.</summary>
+    public string? Id { get; init; }
+}
 
 /// <param name="Terminal">Null for the default: Windows Terminal when installed, otherwise Windows PowerShell.</param>
 internal sealed record OpenTerminalParams(string? Path, TerminalKind? Terminal);
@@ -200,12 +244,19 @@ internal sealed record HistoryFile(FileContentKind Kind, string? Text, string? M
     });
 }
 
-/// <summary>The result of <c>changes.file</c>: the two sides of a file's diff, each as <c>history.file</c> answers.</summary>
-/// <param name="Old">HEAD for a staged diff, the index for an unstaged one. Null when the file is not there, as for a new file.</param>
-/// <param name="New">The index for a staged diff, the file on disk for an unstaged one. Null when the file is not there, as for a deleted file.</param>
-internal sealed record ChangesFile(HistoryFile? Old, HistoryFile? New)
+/// <summary>The result of <c>changes.file</c>: the two sides of a file's diff, each as <c>history.file</c> answers, and its hunks.</summary>
+internal sealed record ChangesFile
 {
-    public static ChangesFile From(FileDiff diff) => new(Side(diff.Old), Side(diff.New));
+    /// <summary>HEAD for a staged diff, the index for an unstaged one. Null when the file is not there, as for a new file.</summary>
+    public HistoryFile? Old { get; init; }
+
+    /// <summary>The index for a staged diff, the file on disk for an unstaged one. Null when the file is not there, as for a deleted file.</summary>
+    public HistoryFile? New { get; init; }
+
+    /// <summary>What Stage hunk or Unstage hunk can act on. Empty when a side is missing, as the whole file is one hunk then.</summary>
+    public required IReadOnlyList<Hunk> Hunks { get; init; }
+
+    public static ChangesFile From(FileDiff diff) => new() { Old = Side(diff.Old), New = Side(diff.New), Hunks = diff.Hunks };
 
     private static HistoryFile? Side(FileContent? content) => content is null ? null : HistoryFile.From(content);
 }

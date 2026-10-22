@@ -5,6 +5,12 @@ public sealed record GitRunnerOptions
     /// <summary>When true (the default), only read-only commands are allowed. See <see cref="ReadOnlyPolicy"/>.</summary>
     public bool ReadOnly { get; init; } = true;
 
+    /// <summary>
+    /// When true, only the commands in <see cref="ChangesPolicy"/> run, whatever <see cref="ReadOnly"/> says: the
+    /// changes Diffract makes to a repo on the user's behalf, and nothing else. Paths are always taken literally.
+    /// </summary>
+    public bool ChangesOnly { get; init; }
+
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>Extra environment variables for every git process. Tests use this to isolate git config.</summary>

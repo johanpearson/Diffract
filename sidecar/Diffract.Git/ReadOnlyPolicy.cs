@@ -9,7 +9,7 @@ public static class ReadOnlyPolicy
     private static readonly HashSet<string> AnyArguments =
     [
         "version", "rev-parse", "status", "for-each-ref", "rev-list",
-        "merge-base", "log", "fsck", "cat-file", "show-ref", "diff-tree",
+        "merge-base", "log", "fsck", "cat-file", "show-ref", "diff-tree", "diff",
     ];
 
     private static readonly HashSet<string> ConfigReadOptions =

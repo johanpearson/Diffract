@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** in progress. Phase 0 is done; phase 1, status and working tree diffs, is next.
+**Status:** in progress. Phases 0 and 1 are done; phase 2, the changes runner and staging, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -32,10 +32,10 @@ A first proposal, to settle in phase 0.
 
 | Action | Command |
 |---|---|
-| Stage files | `git add -- <paths>`, paths passed on standard input with `--pathspec-from-file=- --pathspec-file-nul` |
+| Stage files | `git add --pathspec-from-file=- --pathspec-file-nul`, the paths on standard input |
 | Prepare a new file for hunk staging | `git add --intent-to-add -- <path>` |
-| Unstage files | `git restore --staged`, paths as above |
-| Stage or unstage a hunk | `git apply --cached` (with `--reverse` to unstage), the patch on standard input |
+| Unstage files | `git restore --staged`, paths as above. Before the first commit, when there is no HEAD to restore from: `git rm --cached -q`, which keeps the files on disk |
+| Stage or unstage a hunk | `git apply --cached --unidiff-zero` (with `--reverse` to unstage), the patch on standard input |
 | Commit | `git commit -F -`, the message on standard input; `--amend` only as in decision 5 |
 | Fetch | `git fetch <remote>`, never `--prune` from here (that is a setting in milestone 6) |
 | Pull | `git fetch <remote>`, then `git merge --ff-only <upstream>` only when the branch is behind and not ahead, see decision 6 |
@@ -44,6 +44,8 @@ A first proposal, to settle in phase 0.
 | Switch | `git switch <branch>`, `git switch -c <name> <commit>`, `git switch --track <remote>/<branch>`, `git switch --detach <commit>`, never `--discard-changes` or `--force` |
 | Create a tag | `git tag -a <name> <commit> -F -` |
 | Reset the current branch | `git reset --soft <commit>` and `git reset --mixed <commit>`, never `--hard`, `--merge` or `--keep` |
+
+Every path is taken literally, never as a pattern: the changes runner always sets `GIT_LITERAL_PATHSPECS=1`, so a file named `*.txt` stages only itself.
 
 Never: `--force` or `--force-with-lease` (milestone 8), `reset --hard`, `checkout`, `clean`, `stash`, `restore` without `--staged`, `rebase`, `merge` other than through `pull --ff-only`.
 
@@ -99,6 +101,8 @@ Johan accepted all these proposals on 2026-10-22, in #43. Decision 11 came from 
 - Live: a change in a worktree refreshes its status, debounced as in milestone 2.
 - Tests: parsers against captured real output in `Samples/`, including renames, untracked folders, non-ASCII paths, and a conflicted file. Fixture tests for each kind of change. A call budget per refresh.
 
+**Done** 2026-10-22, in #45. A folder with a repo of its own, such as an agent's worktree inside the repo, is listed by git as one untracked folder. Johan decided on 2026-10-22 that the Changes view hides folders that are this repo's own worktrees (phase 4), and that a nested repo is never staged (phase 2).
+
 ## Phase 2: the changes runner and staging
 
 - `ChangesPolicy`: the allowlist above. A test per command proves it is allowed, and that everything else is rejected before a process starts.
@@ -120,6 +124,7 @@ From the visual plan:
 - Unstaged and Staged lists with Stage, Unstage and "Stage all". Selecting a file shows its diff, with Stage hunk or Unstage hunk on each change.
 - The commit box under the lists: Commit is enabled when something is staged and the message has a subject.
 - Keyboard: up and down move through the files, Space stages or unstages the selected file, Ctrl+Enter commits.
+- Folders that are this repo's own worktrees, such as an agent's worktree under `.claude/worktrees`, are not listed. Any other nested repo is listed without Stage.
 - After a commit, History shows it at the top, as for any new commit.
 - Tests: Vitest for the lists and the commit box. Playwright against a fake sidecar: stage a file, stage a hunk, commit, see the lists empty.
 
