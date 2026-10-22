@@ -1,9 +1,35 @@
+import detailsSample from "../../../tests/Diffract.Sidecar.Tests/Contract/history.details.json";
+import pageSample from "../../../tests/Diffract.Sidecar.Tests/Contract/history.page.json";
+import refsSample from "../../../tests/Diffract.Sidecar.Tests/Contract/history.refs.json";
 import openSample from "../../../tests/Diffract.Sidecar.Tests/Contract/repo.open.json";
-import type { AppInfo, GitInUse, GitUpdateCheck, GitUpdateResult, Methods, RepoChange, RepoState, TerminalInfo, TerminalKind } from "../protocol";
+import type {
+  AppInfo,
+  CommitDetails,
+  CommitEntry,
+  GitInUse,
+  GitUpdateCheck,
+  GitUpdateResult,
+  HistoryPage,
+  HistoryRef,
+  Methods,
+  RepoChange,
+  RepoState,
+  TerminalInfo,
+  TerminalKind,
+} from "../protocol";
+import { detailsOf, generateHistory } from "./fakeHistory";
 import { FakeTransport } from "./fakeTransport";
 
 /** The repo in the repo.open contract sample, which the sidecar's own tests write. */
 export const sampleState = (openSample as { result: RepoState }).result;
+
+/** The history in the contract samples: a merge whose second parent is not in it, and a root commit. */
+export const sampleCommits = (pageSample as { params: HistoryPage }).params.commits;
+export const sampleRefs = (refsSample as { result: HistoryRef[] }).result;
+export const sampleDetails = (detailsSample as { result: CommitDetails }).result;
+
+/** Commits per history.page, as the sidecar sends them. */
+export const HistoryPageSize = 500;
 
 export const supportedGit: AppInfo = { sidecarVersion: "0.1.0", gitVersion: "2.47.1", gitSupported: true, gitProblem: null };
 
@@ -44,6 +70,12 @@ export class FakeSidecar {
   readonly held = new Set<keyof Methods>();
   /** Set to make the next request to that method fail. */
   readonly failures = new Map<keyof Methods, Answer>();
+  /** What history.read streams, newest first. */
+  history: CommitEntry[] = sampleCommits;
+  /** What history.refs answers. */
+  refs: HistoryRef[] = sampleRefs;
+  /** Every commit history.details was asked for. */
+  readonly detailsAsked: string[] = [];
 
   private readonly waiting: (() => void)[] = [];
 
@@ -65,6 +97,11 @@ export class FakeSidecar {
     this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "repo.changed", params: { changes, state } }));
   }
 
+  /** Replaces the history with a generated one of `count` commits, with its branches and a tag. */
+  useGeneratedHistory(count: number): void {
+    ({ commits: this.history, refs: this.refs } = generateHistory(count));
+  }
+
   release(): void {
     this.held.clear();
     for (const answer of this.waiting.splice(0)) answer();
@@ -78,17 +115,56 @@ export class FakeSidecar {
       return failure.result;
     }
     if (this.held.has(method)) {
-      // The transport records a request before asking for its answer, so the last one sent is this one.
-      const id = this.transport.sent.at(-1)?.id;
+      const id = this.lastRequestId();
       this.waiting.push(() => this.transport.emit(JSON.stringify({ jsonrpc: "2.0", id, result: this.respond(method, params) })));
       return undefined;
     }
+    if (method === "history.read") return this.streamHistory((params as { token: string }).token);
     return this.respond(method, params);
   }
 
+  // The transport records a request before asking for its answer, so the last one sent is this one.
+  private lastRequestId(): number | undefined {
+    return this.transport.sent.at(-1)?.id;
+  }
+
+  /** Sends the history page by page, each in its own task as from a real pipe, then the totals. */
+  private streamHistory(token: string): undefined {
+    const id = this.lastRequestId();
+    const commits = this.history;
+    const pages = Math.ceil(commits.length / HistoryPageSize);
+    const send = (index: number) => {
+      if (index === pages) {
+        this.transport.emit(JSON.stringify({ jsonrpc: "2.0", id, result: { commits: commits.length, pages } }));
+        return;
+      }
+      const page: HistoryPage = { token, index, commits: commits.slice(index * HistoryPageSize, (index + 1) * HistoryPageSize) };
+      this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "history.page", params: page }));
+      setTimeout(() => send(index + 1));
+    };
+    setTimeout(() => send(0));
+    return undefined;
+  }
+
+  private details(commitId: string): CommitDetails {
+    this.detailsAsked.push(commitId);
+    if (commitId === sampleDetails.id) return sampleDetails;
+    const commit = this.history.find((c) => c.id === commitId);
+    if (!commit) throw { code: -32002, message: `No commit ${commitId}`, data: { kind: "GitFailed" } };
+    return detailsOf(commit);
+  }
+
   private respond(method: keyof Methods, params: unknown): unknown {
-    const p = (params ?? {}) as { path?: string; repoId?: string; terminal?: TerminalKind; version?: string };
+    const p = (params ?? {}) as { path?: string; repoId?: string; terminal?: TerminalKind; version?: string; commitId?: string };
     switch (method) {
+      case "history.read":
+        return undefined; // streamed by answer()
+      case "history.refs":
+        return this.refs;
+      case "history.details":
+        return this.details(p.commitId ?? "");
+      case "history.file":
+        return { kind: "Text", text: "", message: null };
       case "app.info":
         return this.info;
       case "repo.open": {

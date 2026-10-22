@@ -103,6 +103,23 @@ describe("App", () => {
     expect(within(row("räksmörgås fix")).getByText("C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix")).toBeTruthy();
   });
 
+  it("switches to the history and back with the tabs, from the mouse or the arrow keys", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const { sidecar } = setup({ last: repoRoot });
+    await screen.findByRole("list", { name: "Leftovers" });
+    expect(sent(sidecar, "history.read")).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("tab", { name: "History" }));
+
+    expect(await screen.findByRole("listbox", { name: "Commits" })).toBeTruthy();
+    expect(screen.getByRole("tabpanel", { name: "History" })).toBeTruthy();
+    expect(sent(sidecar, "history.read")[0]?.params).toMatchObject({ repoId: sampleState.repoId });
+    fireEvent.keyDown(screen.getByRole("tab", { name: "History" }), { key: "ArrowRight" });
+    expect(await screen.findByRole("list", { name: "Leftovers" })).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Worktrees and agents" }));
+    vi.restoreAllMocks();
+  });
+
   it("filters by verdict", async () => {
     setup({ last: repoRoot });
     await screen.findByRole("list", { name: "Leftovers" });

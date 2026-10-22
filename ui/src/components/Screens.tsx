@@ -5,6 +5,8 @@ import type { Screen } from "../model/session";
 import { ErrorPanel } from "./ErrorPanel";
 import { LeftoversView, type Filter } from "./LeftoversView";
 import { Sidebar } from "./Sidebar";
+import { tabId, Tabs, type View } from "./Tabs";
+import { HistoryView } from "../history/HistoryView";
 
 /** What the screens need besides the screen itself. */
 export interface ScreenProps {
@@ -15,6 +17,8 @@ export interface ScreenProps {
   offered: string | null;
   filter: Filter;
   onFilter(filter: Filter): void;
+  view: View;
+  onView(view: View): void;
   onOpenFolder(path: string): void;
   onDownloadPage(): void;
   now: Date;
@@ -88,7 +92,21 @@ function Failed({ screen, repo }: { screen: Extract<Screen, { kind: "failed" }>;
   );
 }
 
-function Ready({ repo, git, terminals, filter, onFilter, onOpenFolder, now }: ScreenProps) {
+function Ready(props: ScreenProps) {
+  const { repo, view, onView } = props;
+  if (repo.screen.kind !== "ready") return null;
+  const state = repo.screen.state;
+  return (
+    <>
+      <Tabs view={view} onView={onView} />
+      <div className={`tab-panel ${view}`} role="tabpanel" aria-labelledby={tabId(view)}>
+        {view === "history" ? <HistoryView key={state.repoId} client={repo.session.client} state={state} now={props.now} /> : <Leftovers {...props} />}
+      </div>
+    </>
+  );
+}
+
+function Leftovers({ repo, git, terminals, filter, onFilter, onOpenFolder, now }: ScreenProps) {
   if (repo.screen.kind !== "ready") return null;
   return (
     <LeftoversView

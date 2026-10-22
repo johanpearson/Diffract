@@ -19,6 +19,12 @@
   --red: #a2332a;
   --red-soft: #f6dcd8;
   --focus: #1f5fa8;
+  /* History lanes: the visual plan's hues, darker so they stand out on a light base. */
+  --lane-0: #3d7a58;
+  --lane-1: #1f5fa8;
+  --lane-2: #a8650a;
+  --lane-3: #7a4fc2;
+  --lane-4: #1d877b;
   --sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --mono: "Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace;
   font-family: var(--sans);
@@ -46,6 +52,11 @@
     --red: #ef7a6e;
     --red-soft: #3a211e;
     --focus: #6aa6f0;
+    --lane-0: #8fb8a0;
+    --lane-1: #6aa6f0;
+    --lane-2: #e8a33d;
+    --lane-3: #b48cf2;
+    --lane-4: #4fc6b8;
   }
 }
 
@@ -113,7 +124,10 @@ body {
 }
 
 .main {
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-width: 0;
   overflow: auto;
   padding: 16px 20px;
 }
@@ -660,4 +674,261 @@ body {
   .item.flash-removed {
     transform: none;
   }
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs button {
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.tabs button[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--ok);
+}
+
+/* History: the list fills the space left, and only its rows scroll. */
+.tab-panel.history,
+.view.history {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.history-count {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.history-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.history-scroll {
+  position: relative;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.history-scroll:focus-visible {
+  outline-offset: -2px;
+}
+
+.history-rows {
+  position: relative;
+}
+
+/* Above the rows, so a selected or hovered row's background never hides the graph. Clicks go through to the row. */
+.graph {
+  position: absolute;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.commit-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.commit-row:hover {
+  background: var(--panel-2);
+}
+
+.commit-row.selected {
+  background: var(--sel);
+  box-shadow: inset 2px 0 0 var(--ok);
+}
+
+.commit-row .subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.commit-row .author,
+.commit-row .age {
+  flex: none;
+  color: var(--ink-3);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.commit-row .author {
+  width: 130px;
+}
+
+.commit-row .age {
+  width: 84px;
+  text-align: right;
+}
+
+.marker {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.marker.tag {
+  border-style: dashed;
+}
+
+.marker.remote {
+  opacity: 0.75;
+}
+
+.marker.current {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.commit-panel {
+  overflow: auto;
+  padding: 14px 16px;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 13px;
+}
+
+.commit-subject {
+  font-size: 15px;
+  line-height: 1.35;
+  margin: 0 0 6px;
+}
+
+.commit-body {
+  font: inherit;
+  white-space: pre-wrap;
+  color: var(--ink-2);
+  margin: 0 0 10px;
+}
+
+.commit-panel .markers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+  color: var(--ink-2);
+}
+
+.facts {
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--ink-3);
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.facts dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.parents {
+  display: flex;
+  gap: 8px;
+}
+
+.link {
+  color: var(--blue);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.link:disabled {
+  color: var(--ink-3);
+  cursor: default;
+  text-decoration: none;
+}
+
+.files-title {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-3);
+  margin: 14px 0 4px;
+}
+
+.files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.files li {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.files .file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.files .file-stat {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.files .add {
+  color: var(--ok);
+}
+
+.files .mod {
+  color: var(--amber);
+}
+
+.files .del {
+  color: var(--red);
 }

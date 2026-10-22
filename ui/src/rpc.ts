@@ -131,6 +131,11 @@ export class RpcClient {
   }
 }
 
+/** The request was cancelled, which is never worth telling the user about. */
+export function isCancelled(error: unknown): boolean {
+  return error instanceof RpcError && error.code === ErrorCodes.RequestCancelled;
+}
+
 function cancelled(): RpcError {
   return new RpcError(ErrorCodes.RequestCancelled, "The request was cancelled");
 }

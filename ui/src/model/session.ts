@@ -1,7 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { AppHost, SidecarEvent } from "../host";
 import type { RepoState } from "../protocol";
-import { ErrorCodes, RpcError, type RpcClient } from "../rpc";
+import { isCancelled, type RpcClient } from "../rpc";
 import { folderName, messageOf } from "./format";
 import { initialRows, updateRows, type Row } from "./rows";
 
@@ -97,10 +97,6 @@ export function showIfCurrent(session: Session, state: RepoState): void {
   if (state.repoId !== session.repo.current?.id) return;
   session.setRows((previous) => updateRows(previous, state.leftovers));
   session.setScreen({ kind: "ready", state });
-}
-
-function isCancelled(error: unknown): boolean {
-  return error instanceof RpcError && error.code === ErrorCodes.RequestCancelled;
 }
 
 /** The sidecar lost its state when it stopped: open the repo again, or start over. */

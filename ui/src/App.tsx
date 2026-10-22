@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { GitUpdateConfirmDialog, GitUpdateOffer, GitUpdateOutcome } from "./components/GitUpdatePrompts";
 import type { Filter } from "./components/LeftoversView";
+import type { View } from "./components/Tabs";
 import { Notice } from "./components/Notice";
 import { MainScreen, RepoSidebar, type ScreenProps } from "./components/Screens";
 import { TopBar } from "./components/TopBar";
@@ -27,6 +28,7 @@ const systemClock = () => new Date();
 
 export function App({ host, client, clock = systemClock }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [view, setView] = useState<View>("leftovers");
   const [notice, setNotice] = useState<string | null>(null);
   const git = useGitUpdate(client, host, clock);
   const terminals = useTerminals(client, host, setNotice);
@@ -47,7 +49,7 @@ export function App({ host, client, clock = systemClock }: Props) {
   );
 
   const offered = offeredVersion(git.check);
-  const screens: ScreenProps = { repo, git, terminals, offered, filter, onFilter: setFilter, onOpenFolder: openFolder, onDownloadPage: openDownloadPage, now };
+  const screens: ScreenProps = { repo, git, terminals, offered, filter, onFilter: setFilter, view, onView: setView, onOpenFolder: openFolder, onDownloadPage: openDownloadPage, now };
 
   return (
     <div className="app">
