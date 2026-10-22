@@ -1,6 +1,6 @@
 # Milestone 3: history graph
 
-**Status:** in progress. Phases 0 to 5 are done; phase 6, live history and the toggles, is next.
+**Status:** in progress. Phases 0 to 6 are done; phase 7, the real-world check, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** opening Johan's busiest repo shows its history within a second or two, scrolling stays smooth on a repo with 50,000 commits, and the graph keeps up while agents add commits.
 
@@ -94,6 +94,8 @@ Also at Johan's request: the sidebar, the commit details and the diff can be res
 - When refs change, only the new commits are read (`git log <new tips> --not <old tips>`) and added at the top. The scroll position and the selection stay.
 - "Fade merged branches", "Agent work only", and the toggles for checkpoint refs and the stash.
 - Tests: fixture repos where a branch gets a commit, a branch is added, and a branch is force-moved. Each updates the graph, with a call budget.
+
+**Done** 2026-10-22. History now remembers the commits it was read from. When the repo changes, it asks only for what changed. Nothing changed costs no git call. New commits cost one call, and a branch moved back, rewritten or deleted costs one more, to find the commits that are no longer reachable so they leave the list. If one change adds or removes more than 1,000 commits, history is read again in the background and swapped in when it is done. The commits git reads from are passed on its standard input, so a repo with thousands of tags never hits the Windows command-line limit. New commits go on top. If the list is scrolled to the top, they come into view. If not, the commits on screen stay where they are. The selected commit stays selected either way. "Fade merged branches" is on by default, as in the visual plan. It fades commits that reached main through a merge. "Agent work only" fades everything that does not look like an agent's. Agent work means commits on an agent's branch, checkpoint or worktree, followed back to main's own line, plus commits whose subject starts with an agent's prefix from `diffract.json`. "Checkpoints" shows refs that match a checkpoint or agent ref pattern. Other refs, such as notes, stay hidden. "Stashes" shows every stash once the background scan has listed them. Git also shows a stash's "index on" commit, since it is one of its parents. The toggles are remembered between runs.
 
 ## Phase 7: real-world check
 
