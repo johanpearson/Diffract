@@ -8,8 +8,9 @@ using Diffract.Sidecar.Rpc;
 namespace Diffract.Sidecar.Tests;
 
 /// <summary>
-/// changes.status and changes.file over the real host, against a fixture repo with a linked worktree. Every test also
-/// checks how many git processes it took. The live tests use real file events and real time.
+/// changes.status and changes.file over the real host, against a fixture repo with a linked worktree. Tests that count
+/// git processes make their changes before the repo is opened, so no live refresh mixes in. The live tests change
+/// the repo while it is open, with real file events and real time, and count nothing.
 /// </summary>
 public sealed class ChangesMethodsTests : IAsyncDisposable
 {
@@ -28,13 +29,18 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
         _temp.Dispose();
     }
 
-    /// <summary>A repo with one commit and a linked worktree, opened through the host, its scan done.</summary>
-    private async Task<(FixtureRepo Repo, string Linked)> OpenAsync()
+    /// <summary>
+    /// A repo with one commit and a linked worktree, changed by <paramref name="prepare"/>, then opened through the
+    /// host, its scan done.
+    /// </summary>
+    private async Task<(FixtureRepo Repo, string Linked)> OpenAsync(Func<FixtureRepo, string, Task>? prepare = null)
     {
         var repo = await FixtureRepo.InitAsync(_temp, "repo");
         await repo.CommitAsync("readme.md", "hello\n", "Initial commit");
         var linked = _temp.Combine("linked wt åäö");
         await repo.GitAsync("worktree", "add", "-q", "-b", "feature/åäö", linked);
+        if (prepare is not null)
+            await prepare(repo, linked);
 
         _methods = new SidecarMethods(
             new GitRunnerOptions { Environment = IsolatedGit.Environment(_temp), OnCall = _calls.Enqueue },
@@ -91,9 +97,12 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
     [Fact]
     public async Task Status_lists_the_worktrees_files_and_branch_with_one_git_call()
     {
-        var (repo, _) = await OpenAsync();
-        repo.WriteFile("new folder/räka.txt", "new\n");
-        repo.WriteFile("readme.md", "changed\n");
+        var (repo, _) = await OpenAsync((repo, _) =>
+        {
+            repo.WriteFile("new folder/räka.txt", "new\n");
+            repo.WriteFile("readme.md", "changed\n");
+            return Task.CompletedTask;
+        });
 
         var status = await StatusAsync(repo.Path);
 
@@ -107,8 +116,7 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
     [Fact]
     public async Task Status_of_a_linked_worktree_is_read_there()
     {
-        var (_, linked) = await OpenAsync();
-        await File.WriteAllTextAsync(Path.Combine(linked, "only here.txt"), "x", Ct);
+        var (_, linked) = await OpenAsync((_, linked) => File.WriteAllTextAsync(Path.Combine(linked, "only here.txt"), "x", Ct));
 
         var status = await StatusAsync(linked + Path.DirectorySeparatorChar);
 
@@ -120,10 +128,12 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
     [Fact]
     public async Task File_answers_both_sides_of_a_staged_and_an_unstaged_diff()
     {
-        var (repo, _) = await OpenAsync();
-        repo.WriteFile("readme.md", "staged\n");
-        await repo.GitAsync("add", "readme.md");
-        repo.WriteFile("readme.md", "unstaged\n");
+        var (repo, _) = await OpenAsync(async (repo, _) =>
+        {
+            repo.WriteFile("readme.md", "staged\n");
+            await repo.GitAsync("add", "readme.md");
+            repo.WriteFile("readme.md", "unstaged\n");
+        });
         var file = FileIn(await StatusAsync(repo.Path), "readme.md");
         _calls.Clear();
 
@@ -138,8 +148,11 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
     [Fact]
     public async Task A_new_file_has_no_old_side()
     {
-        var (repo, _) = await OpenAsync();
-        repo.WriteFile("new.txt", "new\n");
+        var (repo, _) = await OpenAsync((repo, _) =>
+        {
+            repo.WriteFile("new.txt", "new\n");
+            return Task.CompletedTask;
+        });
         var file = FileIn(await StatusAsync(repo.Path), "new.txt");
 
         var diff = Result(await RequestAsync("changes.file", Params(repo.Path, file, staged: false)));
@@ -151,8 +164,8 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
     [Fact]
     public async Task A_folder_that_is_not_one_of_the_repos_worktrees_is_refused_without_running_git()
     {
-        var (repo, _) = await OpenAsync();
-        var other = await FixtureRepo.InitAsync(_temp, "other");
+        FixtureRepo other = null!;
+        var (repo, _) = await OpenAsync(async (_, _) => other = await FixtureRepo.InitAsync(_temp, "other"));
 
         Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.status", new { repoId = "1", worktree = other.Path })));
         Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.status", new { repoId = "1", worktree = "repo" })));
