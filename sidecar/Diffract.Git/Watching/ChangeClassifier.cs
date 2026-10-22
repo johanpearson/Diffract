@@ -17,12 +17,17 @@ public static class ChangeClassifier
             return ChangeSet.None;
 
         if (PathUtil.IsSameOrInside(path, layout.CommonDir))
-            return InCommonDir(PathUtil.Relative(path, layout.CommonDir), layout);
+            return InCommonDir(PathUtil.Relative(path, layout.CommonDir)?.Split('/'), layout);
 
         // A folder appearing or disappearing in a container may be a new worktree or a leftover.
         if (Path.GetDirectoryName(path) is { } parent && layout.Containers.Any(c => c.Equals(parent, StringComparison.OrdinalIgnoreCase)))
             return ChangeSet.WorktreeListChanged;
 
+        return InWorktree(path, layout);
+    }
+
+    private static ChangeSet InWorktree(string path, WatchLayout layout)
+    {
         var worktree = layout.Worktrees
             .Where(w => w.HasFiles && PathUtil.IsSameOrInside(path, w.Path))
             .MaxBy(w => w.Path.Length);
@@ -37,36 +42,21 @@ public static class ChangeClassifier
         return ChangeSet.FilesChanged(worktree.Path);
     }
 
-    private static ChangeSet InCommonDir(string? relative, WatchLayout layout)
+    private static ChangeSet InCommonDir(string[]? parts, WatchLayout layout) => parts switch
     {
-        if (relative is null)
-            return ChangeSet.None;
+        null => ChangeSet.None,
+        ["HEAD" or "index"] => HeadChanged(WithGitDir(layout, layout.CommonDir), otherwise: ChangeSet.None),
+        ["packed-refs"] or ["refs", ..] => ChangeSet.RefsChanged,
+        ["worktrees"] or ["worktrees", _] or ["worktrees", _, "locked" or "gitdir"] => ChangeSet.WorktreeListChanged,
+        ["worktrees", var name, "HEAD" or "index"] =>
+            HeadChanged(WithGitDir(layout, Path.Combine(layout.CommonDir, "worktrees", name)), otherwise: ChangeSet.WorktreeListChanged),
+        // objects, logs, FETCH_HEAD, ORIG_HEAD, config and the like.
+        _ => ChangeSet.None,
+    };
 
-        var parts = relative.Split('/');
-        switch (parts)
-        {
-            case ["HEAD" or "index"]:
-                return layout.Worktrees.FirstOrDefault(w => SameDir(w.GitDir, layout.CommonDir)) is { } main
-                    ? ChangeSet.HeadChanged(main.Path)
-                    : ChangeSet.None;
-            case ["packed-refs"]:
-            case ["refs", ..]:
-                return ChangeSet.RefsChanged;
-            case ["worktrees"]:
-            case ["worktrees", _]:
-            case ["worktrees", _, "locked" or "gitdir"]:
-                return ChangeSet.WorktreeListChanged;
-            case ["worktrees", var name, "HEAD" or "index"]:
-                var record = Path.Combine(layout.CommonDir, "worktrees", name);
-                return layout.Worktrees.FirstOrDefault(w => SameDir(w.GitDir, record)) is { } linked
-                    ? ChangeSet.HeadChanged(linked.Path)
-                    : ChangeSet.WorktreeListChanged;
-            default:
-                // objects, logs, FETCH_HEAD, ORIG_HEAD, config and the like.
-                return ChangeSet.None;
-        }
-    }
+    private static ChangeSet HeadChanged(WatchedWorktree? worktree, ChangeSet otherwise) =>
+        worktree is null ? otherwise : ChangeSet.HeadChanged(worktree.Path);
 
-    private static bool SameDir(string? a, string b) =>
-        a is not null && PathUtil.Normalize(a).Equals(PathUtil.Normalize(b), StringComparison.OrdinalIgnoreCase);
+    private static WatchedWorktree? WithGitDir(WatchLayout layout, string gitDir) =>
+        layout.Worktrees.FirstOrDefault(w => w.GitDir is { } own && PathUtil.Normalize(own).Equals(PathUtil.Normalize(gitDir), StringComparison.OrdinalIgnoreCase));
 }

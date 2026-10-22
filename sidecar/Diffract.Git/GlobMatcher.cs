@@ -7,7 +7,7 @@ namespace Diffract.Git;
 public static class GlobMatcher
 {
     public static bool IsMatch(string pattern, string path, bool ignoreCase) =>
-        MatchSegments(Split(pattern), 0, Split(path), 0, ignoreCase);
+        MatchSegments(Split(pattern), Split(path), ignoreCase);
 
     public static bool IsMatchAny(IEnumerable<string> patterns, string path, bool ignoreCase) =>
         patterns.Any(p => IsMatch(p, path, ignoreCase));
@@ -15,24 +15,24 @@ public static class GlobMatcher
     private static string[] Split(string value) =>
         value.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
 
-    private static bool MatchSegments(string[] pattern, int p, string[] path, int s, bool ignoreCase)
+    private static bool MatchSegments(ReadOnlySpan<string> pattern, ReadOnlySpan<string> path, bool ignoreCase)
     {
-        if (p == pattern.Length)
-            return s == path.Length;
+        if (pattern.IsEmpty)
+            return path.IsEmpty;
 
-        if (pattern[p] == "**")
+        if (pattern[0] == "**")
         {
-            for (var skip = s; skip <= path.Length; skip++)
+            for (var skip = 0; skip <= path.Length; skip++)
             {
-                if (MatchSegments(pattern, p + 1, path, skip, ignoreCase))
+                if (MatchSegments(pattern[1..], path[skip..], ignoreCase))
                     return true;
             }
             return false;
         }
 
-        return s < path.Length
-            && MatchSegment(pattern[p], path[s], ignoreCase)
-            && MatchSegments(pattern, p + 1, path, s + 1, ignoreCase);
+        return !path.IsEmpty
+            && MatchSegment(pattern[0], path[0], ignoreCase)
+            && MatchSegments(pattern[1..], path[1..], ignoreCase);
     }
 
     // Classic wildcard match with backtracking to the last '*'.
@@ -41,7 +41,7 @@ public static class GlobMatcher
         int p = 0, t = 0, star = -1, starText = 0;
         while (t < text.Length)
         {
-            if (p < pattern.Length && (pattern[p] == '?' || CharEquals(pattern[p], text[t], ignoreCase)))
+            if (p < pattern.Length && CharMatches(pattern[p], text[t], ignoreCase))
             {
                 p++;
                 t++;
@@ -62,11 +62,10 @@ public static class GlobMatcher
             }
         }
 
-        while (p < pattern.Length && pattern[p] == '*')
-            p++;
-        return p == pattern.Length;
+        // Whatever is left of the pattern must be stars.
+        return pattern.AsSpan(p).TrimStart('*').IsEmpty;
     }
 
-    private static bool CharEquals(char a, char b, bool ignoreCase) =>
-        a == b || (ignoreCase && char.ToUpperInvariant(a) == char.ToUpperInvariant(b));
+    private static bool CharMatches(char pattern, char text, bool ignoreCase) =>
+        pattern == '?' || pattern == text || (ignoreCase && char.ToUpperInvariant(pattern) == char.ToUpperInvariant(text));
 }

@@ -4,19 +4,24 @@ namespace Diffract.Git.Snapshot;
 /// What changed in a repo since its last snapshot, so a refresh can update only that part.
 /// Changes that arrive together are merged with <see cref="Merge"/>. Worktree paths are full paths.
 /// </summary>
-/// <param name="Everything">The watcher lost track of changes. Rebuild everything except unreachable commits.</param>
-/// <param name="WorktreeList">Worktrees were added, removed, locked or unlocked, or a worktree container changed.</param>
-/// <param name="Refs">Refs or packed-refs changed.</param>
-/// <param name="WorktreeHeads">Worktrees whose HEAD or index changed.</param>
-/// <param name="WorktreeFiles">Worktrees with changed files.</param>
-public sealed record ChangeSet(
-    bool Everything,
-    bool WorktreeList,
-    bool Refs,
-    IReadOnlySet<string> WorktreeHeads,
-    IReadOnlySet<string> WorktreeFiles)
+public sealed record ChangeSet
 {
-    public static ChangeSet None { get; } = new(false, false, false, Paths(), Paths());
+    /// <summary>The watcher lost track of changes. Rebuild everything except unreachable commits.</summary>
+    public bool Everything { get; init; }
+
+    /// <summary>Worktrees were added, removed, locked or unlocked, or a worktree container changed.</summary>
+    public bool WorktreeList { get; init; }
+
+    /// <summary>Refs or packed-refs changed.</summary>
+    public bool Refs { get; init; }
+
+    /// <summary>Worktrees whose HEAD or index changed.</summary>
+    public IReadOnlySet<string> WorktreeHeads { get; init; } = Paths();
+
+    /// <summary>Worktrees with changed files.</summary>
+    public IReadOnlySet<string> WorktreeFiles { get; init; } = Paths();
+
+    public static ChangeSet None { get; } = new();
 
     public static ChangeSet All { get; } = None with { Everything = true };
 
@@ -30,12 +35,14 @@ public sealed record ChangeSet(
 
     public bool IsEmpty => !Everything && !WorktreeList && !Refs && WorktreeHeads.Count == 0 && WorktreeFiles.Count == 0;
 
-    public ChangeSet Merge(ChangeSet other) => new(
-        Everything || other.Everything,
-        WorktreeList || other.WorktreeList,
-        Refs || other.Refs,
-        Paths([.. WorktreeHeads, .. other.WorktreeHeads]),
-        Paths([.. WorktreeFiles, .. other.WorktreeFiles]));
+    public ChangeSet Merge(ChangeSet other) => new()
+    {
+        Everything = Everything || other.Everything,
+        WorktreeList = WorktreeList || other.WorktreeList,
+        Refs = Refs || other.Refs,
+        WorktreeHeads = Paths([.. WorktreeHeads, .. other.WorktreeHeads]),
+        WorktreeFiles = Paths([.. WorktreeFiles, .. other.WorktreeFiles]),
+    };
 
     public override string ToString()
     {

@@ -64,6 +64,9 @@ public sealed class RefreshScheduler : IDisposable
 
     private DateTimeOffset Due => Min(_lastAt + Quiet, _firstAt + MaxWait);
 
+    /// <summary>Whether a refresh may start now. Read under the lock.</summary>
+    private bool CanStart => !_disposed && !_running && !_pending.IsEmpty;
+
     private void Arm(DateTimeOffset now)
     {
         var wait = Due - now;
@@ -75,7 +78,7 @@ public sealed class RefreshScheduler : IDisposable
         ChangeSet batch;
         lock (_lock)
         {
-            if (_disposed || _running || _pending.IsEmpty)
+            if (!CanStart)
                 return;
 
             // A change arrived after this timer was set, which pushed the quiet deadline back.
