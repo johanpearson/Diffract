@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import type { AppHost } from "../host";
 import type { GitInUse, GitUpdateCheck, GitUpdateResult } from "../protocol";
 import type { RpcClient } from "../rpc";
+import { messageOf } from "./format";
 
 /** The storage key for the last answer from winget, so it is asked at most once a day. */
 export const GitUpdateCheckKey = "diffract.gitUpdateCheck";
@@ -30,19 +31,9 @@ export function useGitUpdate(client: RpcClient, host: AppHost, clock: () => Date
   const checkForUpdate = useCallback(
     async (gitVersion: string | null, force: boolean): Promise<GitUpdateCheck | null> => {
       const remembered = force ? null : rememberedCheck(host, gitVersion, clock());
-      if (remembered) {
-        setCheck(remembered);
-        return remembered;
-      }
-      try {
-        const answer = await client.call("git.checkUpdate", undefined);
-        setCheck(answer);
-        // "Unknown" is often a passing problem, such as no network, so it is asked again next time.
-        if (answer.status !== "Unknown") host.storage.set(GitUpdateCheckKey, JSON.stringify({ checkedAt: clock().getTime(), check: answer }));
-        return answer;
-      } catch {
-        return null;
-      }
+      if (!remembered) return askWinget({ client, host, clock, setCheck });
+      setCheck(remembered);
+      return remembered;
     },
     [client, host, clock],
   );
@@ -70,12 +61,7 @@ export function useGitUpdate(client: RpcClient, host: AppHost, clock: () => Date
       setConfirm(null);
       setResult(null);
       setRunning(true);
-      let answer: GitUpdateResult;
-      try {
-        answer = await client.call("git.update", { version });
-      } catch (error) {
-        answer = { outcome: "Failed", message: error instanceof Error ? error.message : String(error), inUse: [] };
-      }
+      const answer = await runUpdate(client, version);
       setRunning(false);
       if (answer.outcome !== "Updated") setResult(answer);
       then();
@@ -95,6 +81,39 @@ export function useGitUpdate(client: RpcClient, host: AppHost, clock: () => Date
     update,
     dismissResult: () => setResult(null),
   };
+}
+
+export type GitUpdate = ReturnType<typeof useGitUpdate>;
+
+/** The newer Git for Windows that winget can install, or null. */
+export function offeredVersion(check: GitUpdateCheck | null): string | null {
+  return check?.status === "UpdateAvailable" ? check.availableVersion : null;
+}
+
+/** Asks winget, and remembers the answer. Null when winget could not be asked. */
+async function askWinget({ client, host, clock, setCheck }: {
+  client: RpcClient;
+  host: AppHost;
+  clock: () => Date;
+  setCheck(check: GitUpdateCheck): void;
+}): Promise<GitUpdateCheck | null> {
+  try {
+    const answer = await client.call("git.checkUpdate", undefined);
+    setCheck(answer);
+    // "Unknown" is often a passing problem, such as no network, so it is asked again next time.
+    if (answer.status !== "Unknown") host.storage.set(GitUpdateCheckKey, JSON.stringify({ checkedAt: clock().getTime(), check: answer }));
+    return answer;
+  } catch {
+    return null;
+  }
+}
+
+async function runUpdate(client: RpcClient, version: string): Promise<GitUpdateResult> {
+  try {
+    return await client.call("git.update", { version });
+  } catch (error) {
+    return { outcome: "Failed", message: messageOf(error), inUse: [] };
+  }
 }
 
 /** The remembered answer, when it is less than a day old and about the git Diffract uses now. */

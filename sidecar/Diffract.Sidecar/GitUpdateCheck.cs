@@ -64,20 +64,27 @@ internal sealed class GitUpdateChecker(ICommandRunner commands, MachineLayout ma
     /// <summary>What winget's answer means. Anything unexpected is Unknown with a reason, never a guess.</summary>
     internal static GitUpdateCheck Decide(GitVersion? installed, CommandResult result)
     {
-        switch (result.ExitCode)
-        {
-            case WingetList.NoPackageFound:
-                return Unknown(installed, null,
-                    "winget does not manage the Git for Windows on this machine, so Diffract cannot update it. It may have been installed another way.");
-            case WingetList.SourceAgreementsNotAccepted:
-                return Unknown(installed, null, "winget needs its source agreement accepted first. Run 'winget list' once in a terminal and answer yes.");
-            case not 0:
-                return Unknown(installed, null, $"winget failed with exit code 0x{result.ExitCode:X8}.");
-        }
+        if (ExitProblem(result.ExitCode) is { } problem)
+            return Unknown(installed, null, problem);
 
         if (WingetList.Find(result.StandardOutput, PackageId) is not { } row)
             return Unknown(installed, null, "winget's answer could not be read.");
 
+        return Decide(installed, row);
+    }
+
+    private static string? ExitProblem(int exitCode) => exitCode switch
+    {
+        0 => null,
+        WingetList.NoPackageFound =>
+            "winget does not manage the Git for Windows on this machine, so Diffract cannot update it. It may have been installed another way.",
+        WingetList.SourceAgreementsNotAccepted =>
+            "winget needs its source agreement accepted first. Run 'winget list' once in a terminal and answer yes.",
+        _ => $"winget failed with exit code 0x{exitCode:X8}.",
+    };
+
+    private static GitUpdateCheck Decide(GitVersion? installed, WingetListRow row)
+    {
         var available = row.Available is null ? null : PackageVersion.Parse(row.Available);
         if (PackageVersion.TryParse(row.Version) is not { } managed)
             return Unknown(installed, row.Available, "winget does not know which version of Git for Windows is installed.");

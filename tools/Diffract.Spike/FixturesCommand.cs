@@ -11,40 +11,46 @@ internal static class FixturesCommand
 {
     public static async Task<int> RunAsync(string outputDir, ReadOnlyMemory<string> options)
     {
-        string? scenario = null;
-        int? largeHistory = null;
-        var rest = options.Span;
-        if (rest is ["--scenario", var requested])
-            scenario = requested;
-        else if (rest is ["--large-history", var count] && int.TryParse(count, out var commits) && commits > 0)
-            largeHistory = commits;
-        else if (!rest.IsEmpty)
+        if (FixturesOptions.Parse(options.Span) is not { } parsed)
             return Program.Usage();
 
-        if (scenario is not null && !FixtureRepoBuilder.ScenarioNames.Contains(scenario, StringComparer.OrdinalIgnoreCase))
+        if (parsed.IsUnknownScenario)
         {
-            Console.Error.WriteLine($"Unknown scenario '{scenario}'. Known: {string.Join(", ", FixtureRepoBuilder.ScenarioNames)}");
+            Console.Error.WriteLine($"Unknown scenario '{parsed.Scenario}'. Known: {string.Join(", ", FixtureRepoBuilder.ScenarioNames)}");
             return 1;
         }
 
-        TempDirectory root;
+        if (OutputRoot(outputDir) is not { } root)
+            return 1;
+
+        return parsed.LargeHistory is { } size
+            ? await BuildLargeHistoryAsync(root, size)
+            : await BuildScenariosAsync(root, parsed.Scenario);
+    }
+
+    private static TempDirectory? OutputRoot(string outputDir)
+    {
         try
         {
-            root = TempDirectory.ForFixtureOutput(outputDir);
+            return TempDirectory.ForFixtureOutput(outputDir);
         }
         catch (InvalidOperationException e)
         {
             Console.Error.WriteLine(e.Message);
-            return 1;
+            return null;
         }
+    }
 
-        if (largeHistory is { } size)
-        {
-            var large = await LargeHistory.BuildAsync(root, "large-history", size);
-            Console.WriteLine($"{large.Commits} commits, {large.Merges} merges, {large.Branches} branches, {large.Tags} tags: {large.Path}");
-            return 0;
-        }
+    private static async Task<int> BuildLargeHistoryAsync(TempDirectory root, int commits)
+    {
+        var large = await LargeHistory.BuildAsync(root, "large-history", commits);
+        Console.WriteLine($"{large.Commits} commits, {large.Merges} merges, {large.Branches} branches, {large.Tags} tags: {large.Path}");
+        return 0;
+    }
 
+    /// <param name="scenario">One scenario, or null for all of them.</param>
+    private static async Task<int> BuildScenariosAsync(TempDirectory root, string? scenario)
+    {
         var builder = new FixtureRepoBuilder(root, TimeProvider.System.GetUtcNow());
         try
         {
@@ -61,5 +67,20 @@ internal static class FixturesCommand
         }
 
         return 0;
+    }
+
+    private sealed record FixturesOptions(string? Scenario, int? LargeHistory)
+    {
+        public bool IsUnknownScenario =>
+            Scenario is not null && !FixtureRepoBuilder.ScenarioNames.Contains(Scenario, StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Null when the options are not valid.</summary>
+        public static FixturesOptions? Parse(ReadOnlySpan<string> options) => options switch
+        {
+            [] => new(null, null),
+            ["--scenario", var requested] => new(requested, null),
+            ["--large-history", var count] when int.TryParse(count, out var commits) && commits > 0 => new(null, commits),
+            _ => null,
+        };
     }
 }

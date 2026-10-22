@@ -1,0 +1,19 @@
+{
+  "usage": "Test code passes strings, paths and numbers to theories and fixture builders by nature, so the two rules about primitive arguments are off for tests only. Every other rule still applies to tests, and production code keeps all rules.",
+  "rule_sets": [
+    {
+      "matching_content_path": "tests/**",
+      "rules": [
+        { "name": "Primitive Obsession", "weight": 0.0 },
+        { "name": "String Heavy Function Arguments", "weight": 0.0 }
+      ]
+    },
+    {
+      "matching_content_path": "ui/src/testing/**",
+      "rules": [
+        { "name": "Primitive Obsession", "weight": 0.0 },
+        { "name": "String Heavy Function Arguments", "weight": 0.0 }
+      ]
+    }
+  ]
+}

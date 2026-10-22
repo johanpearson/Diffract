@@ -18,6 +18,12 @@ interface Props {
   onClose(): void;
 }
 
+/** How far each arrow key moves the focus. */
+const arrowSteps = new Map([
+  ["ArrowDown", 1],
+  ["ArrowUp", -1],
+]);
+
 /**
  * A small context menu, following the WAI-ARIA menu pattern: focus moves into it, arrow keys move between items,
  * Enter runs one, Escape or Tab closes it, and so does a click anywhere else.
@@ -29,15 +35,13 @@ export function ContextMenu({ x, y, label, items, onClose }: Props) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  const buttons = () => [...(menu.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
-
   const close = () => {
     onCloseRef.current();
     if (opener.current instanceof HTMLElement) opener.current.focus();
   };
 
   useEffect(() => {
-    buttons()[0]?.focus();
+    enabledButtons(menu.current)[0]?.focus();
     const outside = (event: MouseEvent) => {
       if (!menu.current?.contains(event.target as Node)) onCloseRef.current();
     };
@@ -45,37 +49,55 @@ export function ContextMenu({ x, y, label, items, onClose }: Props) {
     return () => document.removeEventListener("mousedown", outside);
   }, []);
 
-  const onKeyDown = (event: KeyboardEvent) => {
-    const list = buttons();
-    const index = list.indexOf(document.activeElement as HTMLButtonElement);
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      const step = event.key === "ArrowDown" ? 1 : -1;
-      list[(index + step + list.length) % list.length]?.focus();
-    } else if (event.key === "Escape" || event.key === "Tab") {
-      event.preventDefault();
-      close();
-    }
-  };
-
   return (
-    <ul ref={menu} className="context-menu" role="menu" aria-label={label} style={{ left: x, top: y }} onKeyDown={onKeyDown}>
+    <ul
+      ref={menu}
+      className="context-menu"
+      role="menu"
+      aria-label={label}
+      style={{ left: x, top: y }}
+      onKeyDown={(event) => onMenuKey(event, enabledButtons(menu.current), close)}
+    >
       {items.map((item) => (
-        <li key={item.label} role="none">
-          <button
-            role={item.checked === undefined ? "menuitem" : "menuitemradio"}
-            aria-checked={item.checked}
-            disabled={item.disabled}
-            onClick={() => {
-              close();
-              item.run();
-            }}
-          >
-            {item.checked !== undefined && <span className="check" aria-hidden="true">{item.checked ? "✓" : ""}</span>}
-            {item.label}
-          </button>
-        </li>
+        <MenuEntry key={item.label} item={item} onChosen={close} />
       ))}
     </ul>
   );
+}
+
+function MenuEntry({ item, onChosen }: { item: MenuItem; onChosen(): void }) {
+  const isRadio = item.checked !== undefined;
+  return (
+    <li role="none">
+      <button
+        role={isRadio ? "menuitemradio" : "menuitem"}
+        aria-checked={item.checked}
+        disabled={item.disabled}
+        onClick={() => {
+          onChosen();
+          item.run();
+        }}
+      >
+        {isRadio && <span className="check" aria-hidden="true">{item.checked ? "✓" : ""}</span>}
+        {item.label}
+      </button>
+    </li>
+  );
+}
+
+function enabledButtons(menu: HTMLUListElement | null): HTMLButtonElement[] {
+  return [...(menu?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
+}
+
+/** Arrow keys move between the items, round the end. Escape or Tab closes the menu. */
+function onMenuKey(event: KeyboardEvent, list: HTMLButtonElement[], close: () => void): void {
+  const step = arrowSteps.get(event.key);
+  if (step !== undefined) {
+    event.preventDefault();
+    const index = list.indexOf(document.activeElement as HTMLButtonElement);
+    list[(index + step + list.length) % list.length]?.focus();
+  } else if (event.key === "Escape" || event.key === "Tab") {
+    event.preventDefault();
+    close();
+  }
 }

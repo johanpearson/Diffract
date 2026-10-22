@@ -39,19 +39,18 @@ public sealed class ScanCommandTests : IDisposable
 
         var run = await ScanAsync(repo);
 
-        Assert.Equal(ExitCodes.Success, run.ExitCode);
-        Assert.Equal("", run.Error);
-        Assert.Equal($"Diffract spike  {repo}", run.Lines[0]);
+        Assert.Equal((ExitCodes.Success, ""), (run.ExitCode, run.Error));
         Assert.Matches(@"^main: main   git: \d+\.\d+\.\d+   snapshot: \d+ ms$", run.Lines[1]);
         Assert.Equal(
             [
+                $"Diffract spike  {repo}",
                 "",
                 "Verdict       Kind      Name                  Agent        At risk  Reason",
                 "Needs review  Worktree  claude/refactor-cart  Claude Code  2        No activity for 9 days, 2 commits exist nowhere else",
                 "",
                 "1 leftover: 1 needs review",
             ],
-            run.Lines[2..]);
+            [run.Lines[0], .. run.Lines[2..]]);
     }
 
     [Fact]
@@ -83,19 +82,18 @@ public sealed class ScanCommandTests : IDisposable
         Assert.Equal(ExitCodes.Success, run.ExitCode);
         using var json = JsonDocument.Parse(run.Output);
         var root = json.RootElement;
-        Assert.Equal(repo, root.GetProperty("repoRoot").GetString());
-        Assert.Equal("main", root.GetProperty("mainBranch").GetString());
-        Assert.Equal(2, root.GetProperty("snapshot").GetProperty("worktrees").GetArrayLength());
-        Assert.Equal(2, root.GetProperty("snapshot").GetProperty("localBranches").GetInt32());
-        Assert.Equal(1, root.GetProperty("summary").GetProperty("needsReview").GetInt32());
+        var snapshot = root.GetProperty("snapshot");
+        Assert.Equal(
+            (repo, "main", 2, 2, 1),
+            (root.GetProperty("repoRoot").GetString(), root.GetProperty("mainBranch").GetString(), snapshot.GetProperty("worktrees").GetArrayLength(),
+                snapshot.GetProperty("localBranches").GetInt32(), root.GetProperty("summary").GetProperty("needsReview").GetInt32()));
         Assert.False(root.TryGetProperty("timings", out _));
 
         var leftover = Assert.Single(root.GetProperty("leftovers").EnumerateArray().ToList());
-        Assert.Equal("Worktree", leftover.GetProperty("kind").GetString());
-        Assert.Equal("claude/refactor-cart", leftover.GetProperty("name").GetString());
-        Assert.Equal("Claude Code", leftover.GetProperty("agent").GetString());
-        Assert.Equal("NeedsReview", leftover.GetProperty("verdict").GetString());
-        Assert.Equal(2, leftover.GetProperty("commitsAtRisk").GetInt32());
+        Assert.Equal(
+            ("Worktree", "claude/refactor-cart", "Claude Code", "NeedsReview", 2),
+            (leftover.GetProperty("kind").GetString(), leftover.GetProperty("name").GetString(), leftover.GetProperty("agent").GetString(),
+                leftover.GetProperty("verdict").GetString(), leftover.GetProperty("commitsAtRisk").GetInt32()));
         Assert.EndsWith(@"\.claude\worktrees\refactor-cart", leftover.GetProperty("path").GetString());
     }
 
@@ -116,8 +114,10 @@ public sealed class ScanCommandTests : IDisposable
         Assert.Equal(ExitCodes.Success, run.ExitCode);
         Assert.Contains("Git calls, slowest first:", run.Lines);
         Assert.Contains(run.Lines, l => l.EndsWith("git worktree list --porcelain -z", StringComparison.Ordinal));
-        Assert.Contains(run.Lines, l => l.StartsWith("fsck: ", StringComparison.Ordinal) && l.EndsWith(" ms", StringComparison.Ordinal));
-        Assert.Contains(run.Lines, l => l.StartsWith("Other calls: ", StringComparison.Ordinal));
+
+        var totals = run.Lines.Where(l => l.StartsWith("fsck: ", StringComparison.Ordinal) || l.StartsWith("Other calls: ", StringComparison.Ordinal)).ToList();
+        Assert.Contains(totals, l => l.StartsWith("fsck: ", StringComparison.Ordinal) && l.EndsWith(" ms", StringComparison.Ordinal));
+        Assert.Contains(totals, l => l.StartsWith("Other calls: ", StringComparison.Ordinal));
     }
 
     [Fact]

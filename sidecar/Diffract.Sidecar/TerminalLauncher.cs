@@ -47,14 +47,22 @@ internal sealed class TerminalLauncher(IProcessStarter processes, MachineLayout 
     /// <exception cref="ArgumentException">The terminal is not installed.</exception>
     public void Open(string folder, TerminalKind? terminal = null)
     {
+        var kind = Choose(folder, terminal);
+        var program = Find(kind) ?? throw new ArgumentException($"{Names[kind]} is not installed.");
+        Start(kind, program, folder);
+    }
+
+    private TerminalKind Choose(string folder, TerminalKind? terminal)
+    {
         var kind = terminal ?? (Find(TerminalKind.WindowsTerminal) is null ? TerminalKind.WindowsPowerShell : TerminalKind.WindowsTerminal);
 
         // Windows Terminal reads ";" as "start another command", even inside a quoted path, so such a folder
         // would open the wrong thing. PowerShell takes the folder as its working directory, which has no such rule.
-        if (kind == TerminalKind.WindowsTerminal && folder.Contains(';'))
-            kind = TerminalKind.WindowsPowerShell;
+        return kind == TerminalKind.WindowsTerminal && folder.Contains(';') ? TerminalKind.WindowsPowerShell : kind;
+    }
 
-        var program = Find(kind) ?? throw new ArgumentException($"{Names[kind]} is not installed.");
+    private void Start(TerminalKind kind, string program, string folder)
+    {
         switch (kind)
         {
             case TerminalKind.WindowsTerminal:

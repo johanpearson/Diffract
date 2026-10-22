@@ -35,44 +35,23 @@ internal static class GitForWindows
     /// <param name="selfId">The sidecar's own process id.</param>
     public static IReadOnlyList<GitInUse> Users(IProcessTable table, string gitFolder, int selfId)
     {
-        var processes = table.Snapshot();
-        var byId = new Dictionary<int, ProcessInfo>();
-        foreach (var process in processes)
-            byId.TryAdd(process.Id, process);
-
-        var root = Path.TrimEndingDirectorySeparator(gitFolder) + Path.DirectorySeparatorChar;
-        bool InGit(ProcessInfo p) => p.Path?.StartsWith(root, StringComparison.OrdinalIgnoreCase) == true;
-        ProcessInfo? Parent(ProcessInfo p) => p.ParentId != p.Id && byId.TryGetValue(p.ParentId, out var parent) ? parent : null;
-
+        var tree = new ProcessTree(table.Snapshot(), gitFolder, selfId);
         var users = new Dictionary<(string Program, string? StartedBy), int>();
-        foreach (var process in processes.Where(InGit))
+        foreach (var process in tree.InGitFolder())
         {
-            // Climb past git's own processes to the program that started them. The step limit guards against
-            // a loop, which reused process ids can make.
-            var top = process;
-            var starter = Parent(process);
-            var mine = process.Id == selfId;
-            for (var steps = 0; starter is not null && steps < 64; steps++)
-            {
-                mine |= starter.Id == selfId;
-                if (!InGit(starter))
-                    break;
-                (top, starter) = (starter, Parent(starter));
-            }
-            if (mine || (starter is not null && IsSelfOrBelow(starter, selfId, Parent)))
+            if (tree.Climb(process) is not { } chain)
                 continue;
 
-            // Started from the Start menu or a shortcut, the program is Git for Windows' own, such as a Git Bash window.
-            if (starter?.Path is { } path && IsExplorer(path))
-                starter = null;
-
-            var key = starter?.Path is { } starterPath
-                ? (table.Describe(starterPath), StartedBy(table, Parent(starter), table.Describe(starterPath)))
-                : (OwnName(table, top.Path!), null);
+            var key = UserOf(table, tree, chain);
             users[key] = users.GetValueOrDefault(key) + 1;
         }
         return [.. users.Select(u => new GitInUse(u.Key.Program, u.Key.StartedBy, u.Value)).OrderBy(u => u.Program, StringComparer.OrdinalIgnoreCase)];
     }
+
+    private static (string Program, string? StartedBy) UserOf(IProcessTable table, ProcessTree tree, ProcessChain chain) =>
+        chain.Starter?.Path is { } starterPath
+            ? (table.Describe(starterPath), StartedBy(table, tree.Parent(chain.Starter), table.Describe(starterPath)))
+            : (OwnName(table, chain.Top.Path!), null);
 
     /// <summary>The program one level up, when it says something new: not the same program, and not Explorer.</summary>
     private static string? StartedBy(IProcessTable table, ProcessInfo? parent, string program)
@@ -89,14 +68,67 @@ internal static class GitForWindows
 
     private static bool IsExplorer(string path) => Path.GetFileName(path).Equals("explorer.exe", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsSelfOrBelow(ProcessInfo process, int selfId, Func<ProcessInfo, ProcessInfo?> parent)
+    /// <param name="Top">The last of git's own processes in the chain.</param>
+    /// <param name="Starter">The program that started it, or null when that is Git for Windows itself.</param>
+    private sealed record ProcessChain(ProcessInfo Top, ProcessInfo? Starter);
+
+    /// <summary>The process list, with each process's parent, as seen from Git for Windows' folder.</summary>
+    private sealed class ProcessTree
     {
-        for (var (p, steps) = (process, 0); p is not null && steps < 64; p = parent(p), steps++)
+        // The step limit guards against a loop, which reused process ids can make.
+        private const int MaxSteps = 64;
+
+        private readonly IReadOnlyList<ProcessInfo> _processes;
+        private readonly Dictionary<int, ProcessInfo> _byId = [];
+        private readonly string _root;
+        private readonly int _selfId;
+
+        public ProcessTree(IReadOnlyList<ProcessInfo> processes, string gitFolder, int selfId)
         {
-            if (p.Id == selfId)
-                return true;
+            _processes = processes;
+            foreach (var process in processes)
+                _byId.TryAdd(process.Id, process);
+            _root = Path.TrimEndingDirectorySeparator(gitFolder) + Path.DirectorySeparatorChar;
+            _selfId = selfId;
         }
-        return false;
+
+        public IEnumerable<ProcessInfo> InGitFolder() => _processes.Where(InGit);
+
+        public ProcessInfo? Parent(ProcessInfo p) => p.ParentId != p.Id && _byId.TryGetValue(p.ParentId, out var parent) ? parent : null;
+
+        /// <summary>
+        /// Climbs past git's own processes to the program that started them. Null when the chain is Diffract's own.
+        /// </summary>
+        public ProcessChain? Climb(ProcessInfo process)
+        {
+            var top = process;
+            var starter = Parent(process);
+            var mine = process.Id == _selfId;
+            for (var steps = 0; starter is not null && steps < MaxSteps; steps++)
+            {
+                mine |= starter.Id == _selfId;
+                if (!InGit(starter))
+                    break;
+                (top, starter) = (starter, Parent(starter));
+            }
+            return mine || IsSelfOrBelow(starter) ? null : new ProcessChain(top, NotExplorer(starter));
+        }
+
+        // Started from the Start menu or a shortcut, the program is Git for Windows' own, such as a Git Bash window.
+        private static ProcessInfo? NotExplorer(ProcessInfo? starter) =>
+            starter?.Path is { } path && IsExplorer(path) ? null : starter;
+
+        private bool InGit(ProcessInfo p) => p.Path?.StartsWith(_root, StringComparison.OrdinalIgnoreCase) == true;
+
+        private bool IsSelfOrBelow(ProcessInfo? process)
+        {
+            for (var (p, steps) = (process, 0); p is not null && steps < MaxSteps; p = Parent(p), steps++)
+            {
+                if (p.Id == _selfId)
+                    return true;
+            }
+            return false;
+        }
     }
 }
 

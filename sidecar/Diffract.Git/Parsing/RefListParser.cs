@@ -2,30 +2,6 @@ using System.Globalization;
 
 namespace Diffract.Git.Parsing;
 
-public sealed record UpstreamTracking(bool IsGone, int Ahead, int Behind)
-{
-    public static UpstreamTracking None { get; } = new(false, 0, 0);
-}
-
-/// <param name="ObjectType">"commit" for most refs, "tag" for annotated tags.</param>
-/// <param name="PeeledObjectId">For annotated tags, the object the tag points to.</param>
-/// <param name="Upstream">Full upstream ref name for local branches that track one.</param>
-/// <param name="CreatorDate">Committer date for commits, tagger date for annotated tags.</param>
-/// <param name="SymrefTarget">Target ref for symbolic refs such as refs/remotes/origin/HEAD.</param>
-public sealed record RefEntry(
-    string Name,
-    string ObjectId,
-    string ObjectType,
-    string? PeeledObjectId,
-    string? Upstream,
-    UpstreamTracking Tracking,
-    DateTimeOffset? CreatorDate,
-    string? SymrefTarget)
-{
-    /// <summary>The commit (or other object) the ref finally points at.</summary>
-    public string TargetId => PeeledObjectId ?? ObjectId;
-}
-
 /// <summary>Parses <c>git for-each-ref</c> with <see cref="Format"/>: NUL between fields, one ref per line.</summary>
 public static class RefListParser
 {
@@ -50,15 +26,17 @@ public static class RefListParser
             if (f.Length != FieldCount)
                 throw new FormatException($"Expected {FieldCount} fields in ref line, got {f.Length}: '{line.Replace('\0', '|')}'");
 
-            entries.Add(new RefEntry(
-                Name: f[0],
-                ObjectId: f[1],
-                ObjectType: f[2],
-                PeeledObjectId: NullIfEmpty(f[3]),
-                Upstream: NullIfEmpty(f[4]),
-                Tracking: ParseTracking(f[5]),
-                CreatorDate: f[6].Length == 0 ? null : DateTimeOffset.FromUnixTimeSeconds(long.Parse(f[6], CultureInfo.InvariantCulture)),
-                SymrefTarget: NullIfEmpty(f[7])));
+            entries.Add(new RefEntry
+            {
+                Name = f[0],
+                ObjectId = f[1],
+                ObjectType = f[2],
+                PeeledObjectId = NullIfEmpty(f[3]),
+                Upstream = NullIfEmpty(f[4]),
+                Tracking = ParseTracking(f[5]),
+                CreatorDate = f[6].Length == 0 ? null : DateTimeOffset.FromUnixTimeSeconds(long.Parse(f[6], CultureInfo.InvariantCulture)),
+                SymrefTarget = NullIfEmpty(f[7]),
+            });
         }
         return entries;
     }

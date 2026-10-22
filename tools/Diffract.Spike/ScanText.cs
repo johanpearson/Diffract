@@ -42,17 +42,19 @@ internal static class ScanText
         _ => verdict.ToString(),
     };
 
-    public static string KindLabel(LeftoverKind kind) => kind switch
+    /// <summary>Shorter names where the enum name is long. The others are shown as they are.</summary>
+    private static readonly Dictionary<LeftoverKind, string> KindLabels = new()
     {
-        LeftoverKind.PrunableWorktree => "Prunable",
-        LeftoverKind.LocalBranch => "Branch",
-        LeftoverKind.RemoteBranch => "Remote branch",
-        LeftoverKind.CheckpointSession => "Checkpoint",
-        LeftoverKind.OrphanedCommit => "Orphans",
-        LeftoverKind.BackupTag => "Backup tag",
-        LeftoverKind.LeftoverFolder => "Folder",
-        _ => kind.ToString(),
+        [LeftoverKind.PrunableWorktree] = "Prunable",
+        [LeftoverKind.LocalBranch] = "Branch",
+        [LeftoverKind.RemoteBranch] = "Remote branch",
+        [LeftoverKind.CheckpointSession] = "Checkpoint",
+        [LeftoverKind.OrphanedCommit] = "Orphans",
+        [LeftoverKind.BackupTag] = "Backup tag",
+        [LeftoverKind.LeftoverFolder] = "Folder",
     };
+
+    public static string KindLabel(LeftoverKind kind) => KindLabels.TryGetValue(kind, out var label) ? label : kind.ToString();
 
     /// <summary>
     /// The commit count, or "-" for a folder: git does not know it, so nothing about it can be counted,

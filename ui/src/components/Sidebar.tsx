@@ -1,7 +1,7 @@
 import { useState, type MouseEvent } from "react";
 import type { RepoState, TerminalInfo, TerminalKind, WorktreeInfo } from "../protocol";
 import { folderName } from "../model/format";
-import { ContextMenu } from "./ContextMenu";
+import { ContextMenu, type MenuItem } from "./ContextMenu";
 
 interface Props {
   state: RepoState;
@@ -18,18 +18,8 @@ interface Props {
 export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTerminal }: Props) {
   const [menu, setMenu] = useState<{ worktree: WorktreeInfo; x: number; y: number } | null>(null);
   const [chooser, setChooser] = useState<{ x: number; y: number } | null>(null);
-  // The current terminal first, so the menu's first item does what the button does.
-  const ordered = terminal ? [terminal, ...terminals.filter((t) => t.id !== terminal.id)] : terminals;
   const inUse = new Set(state.leftovers.filter((l) => l.verdict === "InUse" && l.path).map((l) => l.path!.toLowerCase()));
   const notInUse = state.summary.total - state.summary.inUse;
-
-  // The menu key and Shift+F10 also raise contextmenu, but with no pointer position: open it under the entry instead.
-  const openMenu = (event: MouseEvent<HTMLLIElement>, worktree: WorktreeInfo) => {
-    event.preventDefault();
-    const fromKeyboard = event.clientX === 0 && event.clientY === 0;
-    const rect = event.currentTarget.getBoundingClientRect();
-    setMenu({ worktree, x: fromKeyboard ? rect.left + 16 : event.clientX, y: fromKeyboard ? rect.bottom : event.clientY });
-  };
 
   return (
     <nav className="sidebar" aria-label="Repository">
@@ -61,26 +51,7 @@ export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTermin
       <h2 id="worktrees-title">Worktrees</h2>
       <ul className="worktrees" aria-labelledby="worktrees-title">
         {state.snapshot.worktrees.map((w) => (
-          <li
-            key={w.path}
-            title={`${w.path}\nRight-click or press the menu key for actions`}
-            tabIndex={0}
-            aria-haspopup="menu"
-            aria-label={worktreeName(w)}
-            onContextMenu={(event) => openMenu(event, w)}
-          >
-            <span className={`dot${w.isMain ? " is-main" : inUse.has(w.path.toLowerCase()) ? " is-active" : ""}`} aria-hidden="true" />
-            <div className="wt">
-              <span className="wt-name">{worktreeName(w)}</span>
-              <span className="badges">
-                {badges(w, inUse.has(w.path.toLowerCase())).map((badge) => (
-                  <span key={badge} className="badge">
-                    {badge}
-                  </span>
-                ))}
-              </span>
-            </div>
-          </li>
+          <WorktreeEntry key={w.path} worktree={w} inUse={inUse.has(w.path.toLowerCase())} onMenu={(event) => setMenu({ worktree: w, ...menuPosition(event) })} />
         ))}
       </ul>
       <ul className="nav">
@@ -95,13 +66,7 @@ export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTermin
           y={menu.y}
           label={`Actions for ${worktreeName(menu.worktree)}`}
           onClose={() => setMenu(null)}
-          items={[
-            // A prunable worktree's folder is gone, so there is nothing to open.
-            ...(ordered.length === 0
-              ? [{ label: "Open terminal here", run: () => onOpenTerminal(menu.worktree.path), disabled: menu.worktree.isPrunable }]
-              : ordered.map((t) => ({ label: `Open in ${t.name}`, run: () => onOpenTerminal(menu.worktree.path, t.id), disabled: menu.worktree.isPrunable }))),
-            { label: "Open folder", run: () => onOpenFolder(menu.worktree.path), disabled: menu.worktree.isPrunable },
-          ]}
+          items={worktreeActions(menu.worktree, orderTerminals(terminals, terminal), { onOpenFolder, onOpenTerminal })}
         />
       )}
 
@@ -116,6 +81,56 @@ export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTermin
       )}
     </nav>
   );
+}
+
+function WorktreeEntry({ worktree: w, inUse, onMenu }: { worktree: WorktreeInfo; inUse: boolean; onMenu(event: MouseEvent<HTMLLIElement>): void }) {
+  return (
+    <li title={`${w.path}\nRight-click or press the menu key for actions`} tabIndex={0} aria-haspopup="menu" aria-label={worktreeName(w)} onContextMenu={onMenu}>
+      <span className={`dot${dotClass(w, inUse)}`} aria-hidden="true" />
+      <div className="wt">
+        <span className="wt-name">{worktreeName(w)}</span>
+        <span className="badges">
+          {badges(w, inUse).map((badge) => (
+            <span key={badge} className="badge">
+              {badge}
+            </span>
+          ))}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+// The menu key and Shift+F10 also raise contextmenu, but with no pointer position: open it under the entry instead.
+function menuPosition(event: MouseEvent<HTMLLIElement>): { x: number; y: number } {
+  event.preventDefault();
+  const rect = event.currentTarget.getBoundingClientRect();
+  if (event.clientX === 0 && event.clientY === 0) return { x: rect.left + 16, y: rect.bottom };
+  return { x: event.clientX, y: event.clientY };
+}
+
+// The current terminal first, so the menu's first item does what the button does.
+function orderTerminals(terminals: TerminalInfo[], terminal: TerminalInfo | null): TerminalInfo[] {
+  return terminal ? [terminal, ...terminals.filter((t) => t.id !== terminal.id)] : terminals;
+}
+
+function worktreeActions(
+  worktree: WorktreeInfo,
+  terminals: TerminalInfo[],
+  { onOpenFolder, onOpenTerminal }: Pick<Props, "onOpenFolder" | "onOpenTerminal">,
+): MenuItem[] {
+  // A prunable worktree's folder is gone, so there is nothing to open.
+  const disabled = worktree.isPrunable;
+  const open: MenuItem[] =
+    terminals.length === 0
+      ? [{ label: "Open terminal here", run: () => onOpenTerminal(worktree.path), disabled }]
+      : terminals.map((t) => ({ label: `Open in ${t.name}`, run: () => onOpenTerminal(worktree.path, t.id), disabled }));
+  return [...open, { label: "Open folder", run: () => onOpenFolder(worktree.path), disabled }];
+}
+
+function dotClass(w: WorktreeInfo, inUse: boolean): string {
+  if (w.isMain) return " is-main";
+  return inUse ? " is-active" : "";
 }
 
 function worktreeName(w: WorktreeInfo): string {

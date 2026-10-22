@@ -43,3 +43,8 @@ export function formatTime(iso: string): string {
 export function folderName(path: string): string {
   return path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || path;
 }
+
+/** What went wrong, for showing to the user. */
+export function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

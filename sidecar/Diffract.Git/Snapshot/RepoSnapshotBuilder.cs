@@ -30,22 +30,23 @@ public sealed partial class RepoSnapshotBuilder
 
     public async Task<SnapshotResult> BuildAsync(string repoPath, CancellationToken ct)
     {
-        var call = new CallContext(_runnerOptions, _options.MaxParallelGitCalls);
+        var call = new CallContext(_runnerOptions, _options.MaxParallelGitCalls, ct);
         var takenAt = _runnerOptions.TimeProvider.GetUtcNow();
         repoPath = Path.GetFullPath(repoPath);
         if (!Directory.Exists(repoPath))
             throw new NotAGitRepositoryException(repoPath);
 
-        var version = GitVersion.Parse((await call.RunAsync(repoPath, ["version"], ct).ConfigureAwait(false)).StandardOutput);
+        var repo = new RepoCalls(call, repoPath);
+        var version = GitVersion.Parse((await repo.RunAsync(["version"]).ConfigureAwait(false)).StandardOutput);
         if (!version.IsSupported)
             throw new GitVersionTooOldException(version);
 
         // Repo-wide reads that do not depend on each other.
-        var worktreesTask = ListWorktreesAsync(call, repoPath, ct);
-        var refsTask = call.RunAsync(repoPath, RefListParser.Arguments, ct);
-        var stashesTask = ListStashesAsync(call, repoPath, worktreesTask, ct);
-        var defaultBranchTask = call.RunAsync(repoPath, ["config", "--get", "init.defaultBranch"], [1], ct);
-        var fsckTask = _options.IncludeUnreachable ? call.RunAsync(repoPath, UnreachableParser.Arguments, ct) : null;
+        var worktreesTask = ListWorktreesAsync(repo);
+        var refsTask = repo.RunAsync(RefListParser.Arguments);
+        var stashesTask = ListStashesAsync(repo, worktreesTask);
+        var defaultBranchTask = call.RunAsync(repoPath, ["config", "--get", "init.defaultBranch"], [1]);
+        var fsckTask = _options.IncludeUnreachable ? repo.RunAsync(UnreachableParser.Arguments) : null;
 
         var worktreeEntries = await worktreesTask.ConfigureAwait(false);
         var refs = RefListParser.Parse((await refsTask.ConfigureAwait(false)).StandardOutput);
@@ -57,10 +58,10 @@ public sealed partial class RepoSnapshotBuilder
         var mainRefs = new[] { Heads + mainBranch, Remotes + "origin/" + mainBranch }.Where(refNames.Contains).ToList();
 
         // Everything below depends on main.
-        var mergedTask = ListMergedAsync(call, repoPath, mainRefs, ct);
-        var worktreesInfoTask = DescribeWorktreesAsync(call, repoPath, worktreeEntries, mainRefs.FirstOrDefault(), ct);
-        var riskTask = CountCommitsAtRiskAsync(call, repoPath, refs, mergedTask, ct);
-        var unreachableTask = FindUnreachableCommitsAsync(call, repoPath, fsckTask, ct);
+        var mergedTask = ListMergedAsync(repo, mainRefs);
+        var worktreesInfoTask = DescribeWorktreesAsync(repo, worktreeEntries, mainRefs.FirstOrDefault());
+        var riskTask = CountCommitsAtRiskAsync(repo, refs, mergedTask);
+        var unreachableTask = FindUnreachableCommitsAsync(repo, fsckTask);
 
         var merged = await mergedTask.ConfigureAwait(false);
         var risk = await riskTask.ConfigureAwait(false);
@@ -83,19 +84,19 @@ public sealed partial class RepoSnapshotBuilder
         return new SnapshotResult(snapshot, call.Timings.ToList());
     }
 
-    private static async Task<IReadOnlyList<WorktreeEntry>> ListWorktreesAsync(CallContext call, string repoPath, CancellationToken ct)
+    private static async Task<IReadOnlyList<WorktreeEntry>> ListWorktreesAsync(RepoCalls repo)
     {
         try
         {
-            var result = await call.RunAsync(repoPath, WorktreeListParser.Arguments, ct).ConfigureAwait(false);
+            var result = await repo.RunAsync(WorktreeListParser.Arguments).ConfigureAwait(false);
             return WorktreeListParser.Parse(result.StandardOutput);
         }
         // Newer git words a broken .git file differently ("gitfile does not point to a valid repository"),
         // so that case is recognized by the link itself, not by the message.
         catch (GitCommandException ex) when (ex.StandardError.Contains("not a git repository", StringComparison.OrdinalIgnoreCase)
-            || ExplainBrokenLink(repoPath) is not null)
+            || ExplainBrokenLink(repo.Path) is not null)
         {
-            throw new NotAGitRepositoryException(repoPath, ExplainBrokenLink(repoPath));
+            throw new NotAGitRepositoryException(repo.Path, ExplainBrokenLink(repo.Path));
         }
     }
 
@@ -112,24 +113,22 @@ public sealed partial class RepoSnapshotBuilder
     }
 
     // Stashes are shared by all worktrees, but `stash list` refuses to run in a bare repo.
-    private static async Task<IReadOnlyList<StashEntry>> ListStashesAsync(
-        CallContext call, string repoPath, Task<IReadOnlyList<WorktreeEntry>> worktreesTask, CancellationToken ct)
+    private static async Task<IReadOnlyList<StashEntry>> ListStashesAsync(RepoCalls repo, Task<IReadOnlyList<WorktreeEntry>> worktreesTask)
     {
         var worktrees = await worktreesTask.ConfigureAwait(false);
-        return await ListStashesAsync(call, repoPath, worktrees.Select(w => (w.Path, w.IsBare, w.IsPrunable)), ct).ConfigureAwait(false);
+        return await ListStashesAsync(repo, worktrees.Select(w => (w.Path, w.IsBare, w.IsPrunable))).ConfigureAwait(false);
     }
 
-    private static async Task<IReadOnlyList<StashEntry>> ListStashesAsync(
-        CallContext call, string repoPath, IEnumerable<(string Path, bool IsBare, bool IsPrunable)> worktrees, CancellationToken ct)
+    private static async Task<IReadOnlyList<StashEntry>> ListStashesAsync(RepoCalls repo, IEnumerable<(string Path, bool IsBare, bool IsPrunable)> worktrees)
     {
         var bare = worktrees.Where(w => w.IsBare).Select(w => NormalizePath(w.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var workingDirectory = !bare.Contains(repoPath)
-            ? repoPath
+        var workingDirectory = !bare.Contains(repo.Path)
+            ? repo.Path
             : worktrees.Where(w => !w.IsBare && !w.IsPrunable).Select(w => NormalizePath(w.Path)).FirstOrDefault(Directory.Exists);
         if (workingDirectory is null)
             return [];
 
-        var result = await call.RunAsync(workingDirectory, StashListParser.Arguments, ct).ConfigureAwait(false);
+        var result = await repo.Call.RunAsync(workingDirectory, StashListParser.Arguments).ConfigureAwait(false);
         return StashListParser.Parse(result.StandardOutput);
     }
 
@@ -150,7 +149,7 @@ public sealed partial class RepoSnapshotBuilder
     }
 
     // Refs merged into local main or origin's main. Several --merged options are ORed together.
-    private static async Task<HashSet<string>> ListMergedAsync(CallContext call, string repoPath, List<string> mainRefs, CancellationToken ct)
+    private static async Task<HashSet<string>> ListMergedAsync(RepoCalls repo, List<string> mainRefs)
     {
         if (mainRefs.Count == 0)
             return [];
@@ -158,28 +157,31 @@ public sealed partial class RepoSnapshotBuilder
         List<string> args = ["for-each-ref", "--format=%(refname)"];
         args.AddRange(mainRefs.Select(r => "--merged=" + r));
         args.AddRange(["refs/heads", "refs/remotes", "refs/tags"]);
-        var result = await call.RunAsync(repoPath, args, ct).ConfigureAwait(false);
+        var result = await repo.RunAsync(args).ConfigureAwait(false);
         return result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
     }
 
-    private async Task<Dictionary<string, int>> CountCommitsAtRiskAsync(
-        CallContext call, string repoPath, IReadOnlyList<RefEntry> refs, Task<HashSet<string>> mergedTask, CancellationToken ct)
+    private async Task<Dictionary<string, int>> CountCommitsAtRiskAsync(RepoCalls repo, IReadOnlyList<RefEntry> refs, Task<HashSet<string>> mergedTask)
     {
         var merged = await mergedTask.ConfigureAwait(false);
         var candidates = refs
-            .Where(r => r.SymrefTarget is null && (r.Name.StartsWith(Heads, StringComparison.Ordinal)
-                || r.Name.StartsWith(Remotes, StringComparison.Ordinal) || r.Name.StartsWith(Tags, StringComparison.Ordinal)))
+            .Where(r => r.SymrefTarget is null && IsBranchOrTag(r.Name))
             .Where(r => !merged.Contains(r.Name) && _options.AnalyzeRisk(r.Name))
             .ToList();
 
         var counts = await Task.WhenAll(candidates.Select(async r =>
         {
-            var result = await call.RunAsync(repoPath, CommitsAtRiskArguments(r.Name), ct).ConfigureAwait(false);
+            var result = await repo.RunAsync(CommitsAtRiskArguments(r.Name)).ConfigureAwait(false);
             return (r.Name, Count: int.Parse(result.StandardOutput.Trim(), CultureInfo.InvariantCulture));
         })).ConfigureAwait(false);
 
         return counts.ToDictionary(c => c.Name, c => c.Count, StringComparer.Ordinal);
     }
+
+    private static bool IsBranchOrTag(string name) =>
+        name.StartsWith(Heads, StringComparison.Ordinal)
+        || name.StartsWith(Remotes, StringComparison.Ordinal)
+        || name.StartsWith(Tags, StringComparison.Ordinal);
 
     /// <summary>
     /// Commits reachable from <paramref name="fullName"/> and from no other branch, remote-tracking branch or tag.
@@ -198,60 +200,88 @@ public sealed partial class RepoSnapshotBuilder
         return args;
     }
 
-    private async Task<IReadOnlyList<WorktreeInfo>> DescribeWorktreesAsync(
-        CallContext call, string repoPath, IReadOnlyList<WorktreeEntry> entries, string? mainRef, CancellationToken ct)
+    private static async Task<IReadOnlyList<WorktreeInfo>> DescribeWorktreesAsync(RepoCalls repo, IReadOnlyList<WorktreeEntry> entries, string? mainRef)
     {
-        var commitTimesTask = CommitTimesAsync(call, repoPath, entries.Select(e => e.Head).OfType<string>().Distinct().ToList(), ct);
-        var infos = await Task.WhenAll(entries.Select(async (entry, index) =>
-        {
-            var path = NormalizePath(entry.Path);
-            var canRunStatus = !entry.IsBare && !entry.IsPrunable && Directory.Exists(path);
-            var statusTask = canRunStatus ? call.RunAsync(path, StatusParser.Arguments, ct) : null;
-            var aheadBehindTask = mainRef is not null && entry.Head is not null && !entry.IsPrunable
-                ? call.RunAsync(repoPath, ["rev-list", "--left-right", "--count", $"{mainRef}...{entry.Head}"], ct)
-                : null;
-
-            var status = statusTask is null ? null : StatusParser.Parse((await statusTask.ConfigureAwait(false)).StandardOutput);
-            int? ahead = null, behind = null;
-            if (aheadBehindTask is not null)
-            {
-                var counts = (await aheadBehindTask.ConfigureAwait(false)).StandardOutput.Split('\t', StringSplitOptions.TrimEntries);
-                behind = int.Parse(counts[0], CultureInfo.InvariantCulture);
-                ahead = int.Parse(counts[1], CultureInfo.InvariantCulture);
-            }
-
-            var commitTimes = await commitTimesTask.ConfigureAwait(false);
-            DateTimeOffset? lastCommit = entry.Head is not null && commitTimes.TryGetValue(entry.Head, out var t) ? t : null;
-
-            return new WorktreeInfo(
-                Path: path,
-                IsMain: index == 0,
-                Head: entry.Head,
-                Branch: entry.Branch is { } b && b.StartsWith(Heads, StringComparison.Ordinal) ? b[Heads.Length..] : entry.Branch,
-                IsBare: entry.IsBare,
-                IsDetached: entry.IsDetached,
-                IsLocked: entry.IsLocked,
-                LockReason: entry.LockReason,
-                IsPrunable: entry.IsPrunable,
-                PrunableReason: entry.PrunableReason,
-                DirtyFileCount: status?.Entries.Count(e => e.Kind != StatusEntryKind.Ignored),
-                AheadOfMain: ahead,
-                BehindMain: behind,
-                LastCommitAt: lastCommit,
-                LastActivityAt: canRunStatus ? LastActivity(path, status!, lastCommit) : lastCommit);
-        })).ConfigureAwait(false);
-
-        return infos;
+        var commitTimes = CommitTimesAsync(repo, entries.Select(e => e.Head).OfType<string>().Distinct().ToList());
+        var describe = new DescribeContext(repo, mainRef, commitTimes);
+        return await Task.WhenAll(entries.Select((entry, index) => DescribeWorktreeAsync(describe, entry, index))).ConfigureAwait(false);
     }
 
-    private static async Task<Dictionary<string, DateTimeOffset>> CommitTimesAsync(CallContext call, string repoPath, List<string> commits, CancellationToken ct)
+    private static async Task<WorktreeInfo> DescribeWorktreeAsync(DescribeContext describe, WorktreeEntry entry, int index)
+    {
+        var path = NormalizePath(entry.Path);
+        var canRunStatus = !entry.IsBare && !entry.IsPrunable && Directory.Exists(path);
+        var statusTask = canRunStatus ? ReadStatusAsync(describe.Repo.Call, path) : Task.FromResult<StatusReport?>(null);
+        var aheadBehindTask = AheadBehindOfEntryAsync(describe, entry);
+
+        var status = await statusTask.ConfigureAwait(false);
+        var (ahead, behind) = await aheadBehindTask.ConfigureAwait(false);
+        var lastCommit = CommitTimeOf(entry, await describe.CommitTimes.ConfigureAwait(false));
+
+        return FromEntry(entry, path, index) with
+        {
+            DirtyFileCount = DirtyFiles(status),
+            AheadOfMain = ahead,
+            BehindMain = behind,
+            LastCommitAt = lastCommit,
+            LastActivityAt = canRunStatus ? LastActivity(path, status!, lastCommit) : lastCommit,
+        };
+    }
+
+    /// <summary>A worktree as <c>worktree list</c> describes it, with nothing yet known about its state.</summary>
+    private static WorktreeInfo FromEntry(WorktreeEntry entry, string path, int index) => new(
+        Path: path,
+        IsMain: index == 0,
+        Head: entry.Head,
+        Branch: ShortBranch(entry.Branch),
+        IsBare: entry.IsBare,
+        IsDetached: entry.IsDetached,
+        IsLocked: entry.IsLocked,
+        LockReason: entry.LockReason,
+        IsPrunable: entry.IsPrunable,
+        PrunableReason: entry.PrunableReason,
+        DirtyFileCount: null,
+        AheadOfMain: null,
+        BehindMain: null,
+        LastCommitAt: null,
+        LastActivityAt: null);
+
+    private static async Task<StatusReport?> ReadStatusAsync(CallContext call, string worktreePath) =>
+        StatusParser.Parse((await call.RunAsync(worktreePath, StatusParser.Arguments).ConfigureAwait(false)).StandardOutput);
+
+    private static int? DirtyFiles(StatusReport? status) => status?.Entries.Count(e => e.Kind != StatusEntryKind.Ignored);
+
+    private static async Task<(int? Ahead, int? Behind)> AheadBehindOfEntryAsync(DescribeContext describe, WorktreeEntry entry)
+    {
+        if (!CanCountAheadBehind(describe, entry))
+            return (null, null);
+
+        var result = await describe.Repo.RunAsync(["rev-list", "--left-right", "--count", $"{describe.MainRef}...{entry.Head}"]).ConfigureAwait(false);
+        var (behind, ahead) = ParseLeftRight(result);
+        return (ahead, behind);
+    }
+
+    private static bool CanCountAheadBehind(DescribeContext describe, WorktreeEntry entry) =>
+        describe.MainRef is not null && entry.Head is not null && !entry.IsPrunable;
+
+    /// <summary>The two counts <c>rev-list --left-right --count</c> prints: commits only on the left, then only on the right.</summary>
+    private static (int Left, int Right) ParseLeftRight(GitResult result)
+    {
+        var counts = result.StandardOutput.Split('\t', StringSplitOptions.TrimEntries);
+        return (int.Parse(counts[0], CultureInfo.InvariantCulture), int.Parse(counts[1], CultureInfo.InvariantCulture));
+    }
+
+    private static DateTimeOffset? CommitTimeOf(WorktreeEntry entry, Dictionary<string, DateTimeOffset> commitTimes) =>
+        entry.Head is { } head && commitTimes.TryGetValue(head, out var time) ? time : null;
+
+    private static async Task<Dictionary<string, DateTimeOffset>> CommitTimesAsync(RepoCalls repo, List<string> commits)
     {
         if (commits.Count == 0)
             return [];
 
         List<string> args = ["log", "--no-walk=unsorted", "--format=%H %ct"];
         args.AddRange(commits);
-        var result = await call.RunAsync(repoPath, args, ct).ConfigureAwait(false);
+        var result = await repo.RunAsync(args).ConfigureAwait(false);
         return result.StandardOutput
             .Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(line => line.Split(' '))
@@ -282,8 +312,7 @@ public sealed partial class RepoSnapshotBuilder
     // fsck counts every reflog as a reference, including the stash reflog (stash@{1} and older) and
     // each worktree's HEAD reflog. What is left is referenced by nothing at all.
     // Ids are passed on the command line, so they go in batches to stay well under Windows' length limit.
-    private static async Task<IReadOnlyList<UnreachableCommit>> FindUnreachableCommitsAsync(
-        CallContext call, string repoPath, Task<GitResult>? fsckTask, CancellationToken ct)
+    private static async Task<IReadOnlyList<UnreachableCommit>> FindUnreachableCommitsAsync(RepoCalls repo, Task<GitResult>? fsckTask)
     {
         if (fsckTask is null)
             return [];
@@ -298,7 +327,7 @@ public sealed partial class RepoSnapshotBuilder
         {
             List<string> args = ["log", "--no-walk=unsorted", "--format=%H%x1f%ct%x1f%s"];
             args.AddRange(batch);
-            var result = await call.RunAsync(repoPath, args, ct).ConfigureAwait(false);
+            var result = await repo.RunAsync(args).ConfigureAwait(false);
             return result.StandardOutput
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Select(line => line.Split('\x1f', 3))
@@ -343,11 +372,7 @@ public sealed partial class RepoSnapshotBuilder
             })
             .ToList();
 
-    private static bool IsOtherRef(string name) =>
-        name != Stash
-        && !name.StartsWith(Heads, StringComparison.Ordinal)
-        && !name.StartsWith(Remotes, StringComparison.Ordinal)
-        && !name.StartsWith(Tags, StringComparison.Ordinal);
+    private static bool IsOtherRef(string name) => name != Stash && !IsBranchOrTag(name);
 
     /// <summary>
     /// Folders git does not know as worktrees, in two places only:
@@ -428,12 +453,7 @@ public sealed partial class RepoSnapshotBuilder
     {
         try
         {
-            foreach (var entry in new DirectoryInfo(folder).EnumerateFileSystemInfos())
-            {
-                if (entry is FileInfo || entry.Attributes.HasFlag(FileAttributes.ReparsePoint) || !HoldsNoFiles(entry.FullName))
-                    return false;
-            }
-            return true;
+            return !new DirectoryInfo(folder).EnumerateFileSystemInfos().Any(HoldsFiles);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -441,19 +461,22 @@ public sealed partial class RepoSnapshotBuilder
         }
     }
 
+    private static bool HoldsFiles(FileSystemInfo entry) =>
+        entry is FileInfo || entry.Attributes.HasFlag(FileAttributes.ReparsePoint) || !HoldsNoFiles(entry.FullName);
+
     private static string NormalizePath(string path) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
 
     /// <summary>Runs git calls with a parallelism cap and records how long each one took.</summary>
-    private sealed class CallContext(GitRunnerOptions runnerOptions, int maxParallel)
+    private sealed class CallContext(GitRunnerOptions runnerOptions, int maxParallel, CancellationToken ct)
     {
         private readonly SemaphoreSlim _gate = new(maxParallel);
 
         public ConcurrentQueue<GitCallTiming> Timings { get; } = new();
 
-        public Task<GitResult> RunAsync(string workingDirectory, IReadOnlyList<string> args, CancellationToken ct) =>
-            RunAsync(workingDirectory, args, [], ct);
+        public Task<GitResult> RunAsync(string workingDirectory, IReadOnlyList<string> args) =>
+            RunAsync(workingDirectory, args, []);
 
-        public async Task<GitResult> RunAsync(string workingDirectory, IReadOnlyList<string> args, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct)
+        public async Task<GitResult> RunAsync(string workingDirectory, IReadOnlyList<string> args, IReadOnlyCollection<int> allowedExitCodes)
         {
             await _gate.WaitAsync(ct).ConfigureAwait(false);
             try
@@ -468,4 +491,13 @@ public sealed partial class RepoSnapshotBuilder
             }
         }
     }
+
+    /// <summary>Git calls that run in the repo's own folder.</summary>
+    private sealed record RepoCalls(CallContext Call, string Path)
+    {
+        public Task<GitResult> RunAsync(IReadOnlyList<string> args) => Call.RunAsync(Path, args);
+    }
+
+    /// <summary>What describing each worktree in a full snapshot shares.</summary>
+    private sealed record DescribeContext(RepoCalls Repo, string? MainRef, Task<Dictionary<string, DateTimeOffset>> CommitTimes);
 }

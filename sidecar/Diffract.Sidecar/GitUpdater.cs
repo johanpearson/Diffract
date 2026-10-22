@@ -83,6 +83,11 @@ internal sealed class GitUpdater(GitUpdateChecker checker, ICommandRunner comman
         // 0x8A150006: the installer itself ended with an error. Git for Windows' installer does that when programs use
         // git, because winget runs it silently and it cannot ask for them to be closed.
         0x8A150006 or 0x8A150101 or 0x8A150103 or 0x8A150111 => InstallerStopped(exitCode, inUse()),
+        _ => OtherFailure(exitCode),
+    };
+
+    private static GitUpdateResult OtherFailure(int exitCode) => (uint)exitCode switch
+    {
         0x8A15010C => Failed("The update was cancelled."),
         0x8A15002B => Failed("winget found no update to install."),
         0x8A150008 or 0x8A150107 or 0x8A15002E or 0x8A150086 => Failed("Downloading the update failed. Check the network connection and try again."),

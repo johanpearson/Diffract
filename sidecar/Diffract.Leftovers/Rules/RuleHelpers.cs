@@ -56,16 +56,19 @@ internal static class Worktrees
     public static TimeSpan? Idle(WorktreeInfo worktree, TimeProvider time) =>
         worktree.LastActivityAt is { } at ? time.GetUtcNow() - at : null;
 
-    public static Leftover Leftover(RepoSnapshot repo, DiffractConfig config, WorktreeInfo worktree, Verdict verdict, string reason) =>
+    public static Leftover Leftover(RepoSnapshot repo, DiffractConfig config, WorktreeInfo worktree, Finding finding) =>
         new(
             worktree.IsPrunable ? LeftoverKind.PrunableWorktree : LeftoverKind.Worktree,
             worktree.Branch ?? Path.GetFileName(worktree.Path),
             worktree.Path,
             Attribution.ForWorktree(config, worktree),
-            verdict,
+            finding.Verdict,
             Branch(repo, worktree)?.CommitsAtRisk ?? worktree.AheadOfMain,
-            reason);
+            finding.Reason);
 }
+
+/// <summary>What a rule decided about an item, and why.</summary>
+internal sealed record Finding(Verdict Verdict, string Reason);
 
 internal static class Branches
 {
@@ -77,4 +80,7 @@ internal static class Branches
 
     public static Leftover Leftover(DiffractConfig config, BranchInfo branch, Verdict verdict, string reason) =>
         new(LeftoverKind.LocalBranch, branch.Name, null, Attribution.ForBranch(config, branch.Name), verdict, branch.CommitsAtRisk, reason);
+
+    /// <summary>How long ago the branch's last commit was, or null when its date is unknown.</summary>
+    public static TimeSpan? Idle(BranchInfo branch, DateTimeOffset now) => now - branch.LastCommitAt;
 }

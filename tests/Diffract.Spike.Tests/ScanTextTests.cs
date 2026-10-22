@@ -12,8 +12,9 @@ public class ScanTextTests
         @"C:\src\checkout", "main", new GitVersion(2, 47, 1), [], [], [], [], [], [], [],
         new DateTimeOffset(2026, 3, 1, 12, 0, 0, TimeSpan.Zero));
 
-    private static Leftover Item(LeftoverKind kind, string name, Verdict verdict, string? agent = null, int? atRisk = 0, string reason = "Reason") =>
-        new(kind, name, null, agent, verdict, atRisk, reason);
+    /// <summary>A leftover with no agent, nothing at risk and the reason "Reason". Tests set what they look at with <c>with</c>.</summary>
+    private static Leftover Item(LeftoverKind kind, string name, Verdict verdict) =>
+        new(kind, name, null, null, verdict, 0, "Reason");
 
     private static string[] Write(IReadOnlyList<Leftover> leftovers, IReadOnlyList<GitCallTiming>? timings = null)
     {
@@ -27,10 +28,13 @@ public class ScanTextTests
     {
         var lines = Write(
         [
-            Item(Worktree, "copilot/update-deps", SafeToRemove, "GitHub Copilot", reason: "Branch merged into main, worktree is clean"),
-            Item(PrunableWorktree, "claude/spike-cache", SafeToRemove, "Claude Code", reason: "Folder was deleted outside git"),
-            Item(Worktree, "claude/refactor-cart", NeedsReview, "Claude Code", 2, "No activity for 9 days, 2 commits exist nowhere else"),
-            Item(Worktree, "claude/fix-flaky-login", InUse, "Claude Code", reason: "Files changed 2 minutes ago"),
+            Item(Worktree, "copilot/update-deps", SafeToRemove) with { Agent = "GitHub Copilot", Reason = "Branch merged into main, worktree is clean" },
+            Item(PrunableWorktree, "claude/spike-cache", SafeToRemove) with { Agent = "Claude Code", Reason = "Folder was deleted outside git" },
+            Item(Worktree, "claude/refactor-cart", NeedsReview) with
+            {
+                Agent = "Claude Code", CommitsAtRisk = 2, Reason = "No activity for 9 days, 2 commits exist nowhere else",
+            },
+            Item(Worktree, "claude/fix-flaky-login", InUse) with { Agent = "Claude Code", Reason = "Files changed 2 minutes ago" },
         ]);
 
         Assert.Equal(
@@ -52,7 +56,7 @@ public class ScanTextTests
     [Fact]
     public void Risk_that_was_not_counted_shows_a_dash()
     {
-        var lines = Write([Item(LocalBranch, "feature/x", NeedsReview, atRisk: 0), Item(LeftoverFolder, "repo-claude", NeedsReview, atRisk: null)]);
+        var lines = Write([Item(LocalBranch, "feature/x", NeedsReview), Item(LeftoverFolder, "repo-claude", NeedsReview) with { CommitsAtRisk = null }]);
 
         Assert.Equal("Needs review  Branch  feature/x    -      0        Reason", lines[4]);
         Assert.Equal("Needs review  Folder  repo-claude  -      -        Reason", lines[5]);

@@ -9,14 +9,21 @@ public class RpcHostTests
 {
     private static async Task<JsonElement> Methods(string method, JsonElement? parameters, CancellationToken ct) => method switch
     {
-        "echo" => parameters ?? JsonSerializer.SerializeToElement("no params"),
+        "echo" => Echo(parameters),
         "nothing" => RpcResponse.NullResult,
-        "fail" => throw new RpcException(RpcErrorCodes.InvalidParams, "Bad params"),
-        "notARepo" => throw new RpcException(ErrorKind.NotARepo, "Not a git repository: C:\\src"),
-        "crash" => throw new InvalidOperationException("Something broke"),
         "wait" => await WaitForCancellation(ct),
-        _ => throw new RpcException(RpcErrorCodes.MethodNotFound, $"Unknown method '{method}'"),
+        _ => throw Failure(method),
     };
+
+    private static Exception Failure(string method) => method switch
+    {
+        "fail" => new RpcException(RpcErrorCodes.InvalidParams, "Bad params"),
+        "notARepo" => new RpcException(ErrorKind.NotARepo, "Not a git repository: C:\\src"),
+        "crash" => new InvalidOperationException("Something broke"),
+        _ => new RpcException(RpcErrorCodes.MethodNotFound, $"Unknown method '{method}'"),
+    };
+
+    private static JsonElement Echo(JsonElement? parameters) => parameters ?? JsonSerializer.SerializeToElement("no params");
 
     private static async Task<JsonElement> WaitForCancellation(CancellationToken ct)
     {
