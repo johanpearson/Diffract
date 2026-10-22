@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Splitter, useStoredSize, type SizeSpec } from "../components/Splitter";
+import type { AppHost } from "../host";
 import type { FileChange, RepoState } from "../protocol";
 import type { RpcClient } from "../rpc";
 import { CommitPanel } from "./CommitPanel";
@@ -13,10 +15,15 @@ interface Props {
   client: RpcClient;
   state: RepoState;
   now: Date;
+  /** Remembers panel sizes and the diff layout. */
+  storage: AppHost["storage"];
 }
 
+export const DetailsWidth: SizeSpec = { key: "diffract.size.details", initial: 320, min: 220, max: 720 };
+export const DiffHeight: SizeSpec = { key: "diffract.size.diff", initial: 380, min: 120, max: 1600 };
+
 /** The repo's history as a graph, with the selected commit's details beside it and a file's diff below. */
-export function HistoryView({ client, state, now }: Props) {
+export function HistoryView({ client, state, now, storage }: Props) {
   const history = useHistory(client, state.repoId);
   const markers = useMemo(() => markersByCommit(history.refs, state.snapshot.worktrees), [history.refs, state.snapshot.worktrees]);
   const selection = useSelection(history);
@@ -24,6 +31,7 @@ export function HistoryView({ client, state, now }: Props) {
   const diff = useOpenFile(selection.id);
   const panel = useRef<HTMLElement>(null);
   const find = useRef<HTMLInputElement>(null);
+  const [detailsWidth, setDetailsWidth] = useStoredSize(storage, DetailsWidth);
 
   useHistoryKeys({ onFind: () => find.current?.focus(), onEscape: diff.file ? diff.close : null });
 
@@ -31,18 +39,19 @@ export function HistoryView({ client, state, now }: Props) {
     <section className="view history" aria-labelledby="history-title">
       <div className="bar">
         <h1 id="history-title">History</h1>
-        <FindBox ref={find} commits={history.commits} selected={selection.index} onSelect={selection.select} />
+        <FindBox ref={find} commits={history.commits} names={markers} selected={selection.index} onSelect={selection.select} />
         <span className="grow" />
         <span className="history-count" role="status">
           {countText(history)}
         </span>
       </div>
       <ReadError error={history.error} />
-      <div className="history-body">
+      <div className="history-body" style={{ gridTemplateColumns: `minmax(0, 1fr) auto ${detailsWidth}px` }}>
         <div className="history-main">
           <HistoryList history={history} markers={markers} selected={selection.index} onSelect={selection.select} onOpen={() => panel.current?.focus()} now={now} />
-          {diff.file && <DiffPane client={client} repoId={state.repoId} file={diff.file} onClose={diff.close} />}
+          {diff.file && <DiffArea client={client} repoId={state.repoId} file={diff.file} storage={storage} onClose={diff.close} />}
         </div>
+        <Splitter label="Resize commit details" orientation="vertical" spec={DetailsWidth} size={detailsWidth} onSize={setDetailsWidth} growsForward={false} />
         <CommitPanel
           ref={panel}
           state={details}
@@ -54,6 +63,19 @@ export function HistoryView({ client, state, now }: Props) {
         />
       </div>
     </section>
+  );
+}
+
+/** The diff below the list, with a bar above it to change its height. */
+function DiffArea(props: Parameters<typeof DiffPane>[0]) {
+  const [height, setHeight] = useStoredSize(props.storage, DiffHeight);
+  return (
+    <>
+      <Splitter label="Resize diff" orientation="horizontal" spec={DiffHeight} size={height} onSize={setHeight} growsForward={false} />
+      <div className="diff-frame" style={{ height }}>
+        <DiffPane {...props} />
+      </div>
+    </>
   );
 }
 

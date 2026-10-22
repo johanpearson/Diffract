@@ -5,6 +5,7 @@ import type { Screen } from "../model/session";
 import { ErrorPanel } from "./ErrorPanel";
 import { LeftoversView, type Filter } from "./LeftoversView";
 import { Sidebar } from "./Sidebar";
+import { Splitter, useStoredSize, type SizeSpec } from "./Splitter";
 import { tabId, Tabs, type View } from "./Tabs";
 import { HistoryView } from "../history/HistoryView";
 
@@ -24,11 +25,19 @@ export interface ScreenProps {
   now: Date;
 }
 
-/** The sidebar, only once a repo is open. */
+export const SidebarWidth: SizeSpec = { key: "diffract.size.sidebar", initial: 250, min: 180, max: 480 };
+
+/** The sidebar, only once a repo is open, with a bar to change its width. */
 export function RepoSidebar({ repo, terminals, onOpenFolder }: ScreenProps) {
+  const [width, setWidth] = useStoredSize(repo.session.host.storage, SidebarWidth);
   if (repo.screen.kind !== "ready") return null;
   return (
-    <Sidebar state={repo.screen.state} terminals={terminals.list} terminal={terminals.current} onOpenFolder={onOpenFolder} onOpenTerminal={terminals.open} />
+    <>
+      <div className="sidebar-frame" style={{ width }}>
+        <Sidebar state={repo.screen.state} terminals={terminals.list} terminal={terminals.current} onOpenFolder={onOpenFolder} onOpenTerminal={terminals.open} />
+      </div>
+      <Splitter label="Resize sidebar" orientation="vertical" spec={SidebarWidth} size={width} onSize={setWidth} growsForward />
+    </>
   );
 }
 
@@ -100,7 +109,7 @@ function Ready(props: ScreenProps) {
     <>
       <Tabs view={view} onView={onView} />
       <div className={`tab-panel ${view}`} role="tabpanel" aria-labelledby={tabId(view)}>
-        {view === "history" ? <HistoryView key={state.repoId} client={repo.session.client} state={state} now={props.now} /> : <Leftovers {...props} />}
+        {view === "history" ? <HistoryView key={state.repoId} client={repo.session.client} state={state} now={props.now} storage={repo.session.host.storage} /> : <Leftovers {...props} />}
       </div>
     </>
   );

@@ -39,6 +39,23 @@ describe("findMatches", () => {
   });
 });
 
+describe("findMatches with branch and tag names", () => {
+  const names = new Map([
+    [commits[1]!.id, [{ name: "main" }, { name: "origin/main" }]],
+    [commits[3]!.id, [{ name: "v2.4.0" }, { name: "feature/Cart-Export" }]],
+  ]);
+
+  it("finds commits by a branch or tag on them, ignoring case", () => {
+    expect(findMatches(commits, "v2.4", names)).toEqual([3]);
+    expect(findMatches(commits, "cart-export", names)).toEqual([3]);
+    expect(findMatches(commits, "origin/", names)).toEqual([1]);
+  });
+
+  it("lists a commit once when both its subject and a name match", () => {
+    expect(findMatches(commits, "cart", names)).toEqual([1, 3]);
+  });
+});
+
 describe("nextMatch", () => {
   const matches = [3, 10, 25];
 

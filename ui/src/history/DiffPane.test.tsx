@@ -4,22 +4,39 @@ import type { FileChange } from "../protocol";
 import { RpcClient } from "../rpc";
 import { FakeSidecar, sampleDetails, sampleState } from "../testing/fakeSidecar";
 import { HistoryView } from "./HistoryView";
-import { DiffPane } from "./DiffPane";
-import type { DiffSides } from "./monacoEditor";
+import { DiffLayoutKey, DiffPane } from "./DiffPane";
+import type { DiffLayout, FileSides } from "./monacoEditor";
 
-// jsdom runs neither Monaco nor a canvas. This stand-in records what the diff editor was asked to show.
-const monaco = vi.hoisted(() => ({ loads: 0, shown: [] as DiffSides[], disposed: 0 }));
+// jsdom runs neither Monaco nor a canvas. This stand-in records what the view was asked to do.
+const monaco = vi.hoisted(() => ({ loads: 0, shown: [] as FileSides[], layouts: [] as string[], moves: [] as string[] }));
 vi.mock("./monacoEditor", () => {
   monaco.loads++;
   return {
-    createDiffEditor: () => ({ show: (sides: DiffSides) => monaco.shown.push(sides), setDark: () => {}, dispose: () => monaco.disposed++ }),
+    createFileView: (_container: HTMLElement, _dark: boolean, layout: DiffLayout) => {
+      monaco.layouts.push(`created ${layout}`);
+      return {
+        show: (sides: FileSides) => void monaco.shown.push(sides),
+        setLayout: (value: DiffLayout) => void monaco.layouts.push(value),
+        setDark: () => {},
+        goToChange: (target: string) => void monaco.moves.push(target),
+        dispose: () => {},
+      };
+    },
   };
 });
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
   monaco.shown = [];
+  monaco.layouts = [];
+  monaco.moves = [];
 });
+
+/** Storage for one test, as the host gives it. */
+function memory(entries: Record<string, string> = {}) {
+  const map = new Map(Object.entries(entries));
+  return { map, get: (key: string) => map.get(key) ?? null, set: (key: string, value: string) => void map.set(key, value) };
+}
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -29,10 +46,10 @@ const [renamed] = sampleDetails.files as [FileChange];
 const panel = () => screen.getByRole("complementary", { name: "Commit details" });
 const list = () => screen.getByRole("listbox", { name: "Commits" });
 
-function setup(sidecar = new FakeSidecar()) {
+function setup(sidecar = new FakeSidecar(), storage = memory()) {
   const client = new RpcClient(sidecar.transport);
-  render(<HistoryView client={client} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} />);
-  return { sidecar, client };
+  render(<HistoryView client={client} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} storage={storage} />);
+  return { sidecar, client, storage };
 }
 
 async function openFile(path: string) {
@@ -93,19 +110,62 @@ describe("the diff of a commit's file", () => {
     expect(region()).toBeNull();
   });
 
-  it("shows an added file against an empty left side, asking only for the new side", async () => {
+  it("shows an added file on its own, asking only for the new side, with no layout to pick", async () => {
     const sidecar = new FakeSidecar();
     const added: FileChange = { ...renamed, kind: "Added", oldPath: null, oldId: null, similarity: null };
-    render(<DiffPane client={new RpcClient(sidecar.transport)} repoId="1" file={added} onClose={() => {}} />);
+    render(<DiffPane client={new RpcClient(sidecar.transport)} repoId="1" file={added} storage={memory()} onClose={() => {}} />);
 
     await waitFor(() => expect(monaco.shown).toHaveLength(1));
     expect(sidecar.filesAsked).toEqual([added.newId]);
-    expect(monaco.shown[0]!.original).toBe("");
+    expect(monaco.shown[0]).toMatchObject({ original: null, modified: expect.stringContaining("Räksmörgås") });
+    expect(screen.queryByRole("group", { name: "Diff layout" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next change" })).toBeNull();
+  });
+
+  it("shows a deleted file on its own, from the old side", async () => {
+    const sidecar = new FakeSidecar();
+    const deleted: FileChange = { ...renamed, kind: "Deleted", oldPath: null, newId: null, similarity: null };
+    render(<DiffPane client={new RpcClient(sidecar.transport)} repoId="1" file={deleted} storage={memory()} onClose={() => {}} />);
+
+    await waitFor(() => expect(monaco.shown).toHaveLength(1));
+    expect(sidecar.filesAsked).toEqual([deleted.oldId]);
+    expect(monaco.shown[0]).toMatchObject({ original: expect.stringContaining("Cart"), modified: null });
+  });
+
+  it("switches between side by side and inline, and remembers the choice", async () => {
+    const storage = memory();
+    render(<DiffPane client={new RpcClient(new FakeSidecar().transport)} repoId="1" file={renamed} storage={storage} onClose={() => {}} />);
+    await waitFor(() => expect(monaco.shown).toHaveLength(1));
+    const layout = screen.getByRole("group", { name: "Diff layout" });
+    expect(within(layout).getByRole("button", { name: "Side by side" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(within(layout).getByRole("button", { name: "Inline" }));
+
+    expect(monaco.layouts.at(-1)).toBe("inline");
+    expect(storage.map.get(DiffLayoutKey)).toBe("inline");
+    expect(within(layout).getByRole("button", { name: "Inline" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("opens in the layout chosen last time", async () => {
+    render(<DiffPane client={new RpcClient(new FakeSidecar().transport)} repoId="1" file={renamed} storage={memory({ [DiffLayoutKey]: "inline" })} onClose={() => {}} />);
+
+    await waitFor(() => expect(monaco.layouts[0]).toBe("created inline"));
+  });
+
+  it("moves to the next and previous change", async () => {
+    render(<DiffPane client={new RpcClient(new FakeSidecar().transport)} repoId="1" file={renamed} storage={memory()} onClose={() => {}} />);
+    const next = screen.getByRole("button", { name: "Next change" });
+    await waitFor(() => expect((next as HTMLButtonElement).disabled).toBe(false));
+
+    fireEvent.click(next);
+    fireEvent.click(screen.getByRole("button", { name: "Previous change" }));
+
+    expect(monaco.moves).toEqual(["next", "previous"]);
   });
 
   it("says a submodule has no text to compare", () => {
     const submodule: FileChange = { ...renamed, isSubmodule: true };
-    render(<DiffPane client={new RpcClient(new FakeSidecar().transport)} repoId="1" file={submodule} onClose={() => {}} />);
+    render(<DiffPane client={new RpcClient(new FakeSidecar().transport)} repoId="1" file={submodule} storage={memory()} onClose={() => {}} />);
 
     expect(screen.getByRole("region").textContent).toContain("This is a submodule.");
   });

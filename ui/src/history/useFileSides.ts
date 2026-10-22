@@ -5,12 +5,13 @@ import { isCancelled, type RpcClient } from "../rpc";
 
 export type SidesState =
   | { kind: "loading" }
-  | { kind: "ready"; original: string; modified: string }
+  /** A side is null when the file does not exist there: added or deleted. */
+  | { kind: "ready"; original: string | null; modified: string | null }
   /** Nothing to compare as text, with why: binary, too large or a submodule. */
   | { kind: "noText"; message: string }
   | { kind: "failed"; message: string };
 
-/** The two sides of a changed file. An added file has an empty left side, a deleted one an empty right side. */
+/** The two sides of a changed file. An added file has no left side, a deleted one no right side. */
 export function useFileSides(client: RpcClient, repoId: string, file: FileChange): SidesState {
   const [state, setState] = useState<SidesState>({ kind: "loading" });
 
@@ -23,7 +24,7 @@ export function useFileSides(client: RpcClient, repoId: string, file: FileChange
     setState({ kind: "loading" });
     const abort = new AbortController();
     const side = (blobId: string | null) =>
-      blobId === null ? Promise.resolve(emptySide) : client.call("history.file", { repoId, blobId }, { signal: abort.signal });
+      blobId === null ? Promise.resolve(null) : client.call("history.file", { repoId, blobId }, { signal: abort.signal });
     Promise.all([side(file.oldId), side(file.newId)])
       .then(([original, modified]) => setState(sidesOf(original, modified)))
       .catch((error: unknown) => {
@@ -35,8 +36,6 @@ export function useFileSides(client: RpcClient, repoId: string, file: FileChange
   return state;
 }
 
-const emptySide: HistoryFile = { kind: "Text", text: "", message: null };
-
 /** Why a file has no text to compare, known before asking the sidecar, or null. */
 function withoutText(file: FileChange): string | null {
   if (file.isSubmodule) return "This is a submodule. Its commits live in another repo, so there is no text to compare.";
@@ -44,8 +43,12 @@ function withoutText(file: FileChange): string | null {
   return null;
 }
 
-function sidesOf(original: HistoryFile, modified: HistoryFile): SidesState {
-  const plain = [original, modified].find((side) => side.kind !== "Text");
+function sidesOf(original: HistoryFile | null, modified: HistoryFile | null): SidesState {
+  const plain = [original, modified].find((side) => side !== null && side.kind !== "Text");
   if (plain) return { kind: "noText", message: plain.message ?? "There is no text to compare." };
-  return { kind: "ready", original: original.text ?? "", modified: modified.text ?? "" };
+  return { kind: "ready", original: textOf(original), modified: textOf(modified) };
+}
+
+function textOf(side: HistoryFile | null): string | null {
+  return side === null ? null : (side.text ?? "");
 }

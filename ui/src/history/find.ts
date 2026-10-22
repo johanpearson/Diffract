@@ -1,21 +1,28 @@
 import type { CommitEntry } from "../protocol";
 
+/** The names on each commit, by commit id: its branches, remote branches, tags and worktree HEADs. */
+export type NamesByCommit = ReadonlyMap<string, readonly { name: string }[]>;
+
 /**
  * The rows of the commits that match `query`, in order: a hash that starts with it, or a subject, author name or
- * email that contains it. Case does not matter. An empty query matches nothing.
+ * email, branch or tag that contains it. Case does not matter. An empty query matches nothing.
  */
-export function findMatches(commits: readonly CommitEntry[], query: string): number[] {
+export function findMatches(commits: readonly CommitEntry[], query: string, names: NamesByCommit = new Map()): number[] {
   const q = query.trim().toLowerCase();
   if (q === "") return [];
   const matches: number[] = [];
   commits.forEach((c, i) => {
-    if (matchesCommit(c, q)) matches.push(i);
+    if (matchesCommit(c, q) || matchesName(names.get(c.id), q)) matches.push(i);
   });
   return matches;
 }
 
 function matchesCommit(c: CommitEntry, q: string): boolean {
   return c.id.startsWith(q) || [c.subject, c.authorName, c.authorEmail].some((text) => text.toLowerCase().includes(q));
+}
+
+function matchesName(names: readonly { name: string }[] | undefined, q: string): boolean {
+  return names?.some(({ name }) => name.toLowerCase().includes(q)) ?? false;
 }
 
 /**
