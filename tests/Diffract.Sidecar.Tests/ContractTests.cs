@@ -3,6 +3,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Diffract.Fixtures;
 using Diffract.Git;
+using Diffract.Git.Changes;
+using Diffract.Git.Files;
 using Diffract.Git.History;
 using Diffract.Git.Parsing;
 using Diffract.Git.Snapshot;
@@ -80,6 +82,13 @@ public class ContractTests
                 new FileChange(FileChangeKind.Added, "docs/logo.png", null, null, BlobC, null, null, null, IsBinary: true, IsSubmodule: false),
             ])),
         ["history.file"] = () => Response(HistoryFile.From(new FileContent(FileContentKind.Text, "namespace Shop;\r\n"))),
+        ["changes.status"] = () => Response(new WorktreeChanges(AgentWorktree, "claude/räksmörgås-fix", Merge, "origin/claude/räksmörgås-fix", 2, 1,
+        [
+            new ChangedFile("src/räksmörgås.cs", "src/cart.cs", ChangedFileKind.Tracked, FileChangeKind.Renamed, FileChangeKind.Modified, BlobA, BlobB),
+            new ChangedFile("docs/new file.md", null, ChangedFileKind.Untracked, null, FileChangeKind.Added, null, null),
+            new ChangedFile("src/merge.cs", null, ChangedFileKind.Conflicted, null, null, null, null),
+        ])),
+        ["changes.file"] = () => Response(ChangesFile.From(new FileDiff(null, new FileContent(FileContentKind.Text, "# Notes\r\n")))),
         ["error.not-a-repo"] = () => Error(new NotAGitRepositoryException(@"C:\Users\johan\Downloads")),
         ["error.git-too-old"] = () => Error(new GitVersionTooOldException(new GitVersion(2, 39, 5))),
         ["error.git-failed"] = () => Error(new GitCommandException(["status", "--porcelain=v2", "-z"], 128, "fatal: unable to read tree\n")),
@@ -229,6 +238,7 @@ public class ContractTests
         ["historyRefKind"] = Values<HistoryRefKind>(),
         ["fileChangeKind"] = Values<FileChangeKind>(),
         ["fileContentKind"] = Values<FileContentKind>(),
+        ["changedFileKind"] = Values<ChangedFileKind>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

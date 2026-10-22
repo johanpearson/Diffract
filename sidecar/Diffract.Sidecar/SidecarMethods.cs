@@ -44,7 +44,7 @@ internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, Cance
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file"];
 
     /// <summary>
     /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only violation,
@@ -69,6 +69,7 @@ internal sealed class SidecarMethods : IDisposable
     private readonly GitUpdater _updater;
     private readonly HistoryReader _history;
     private readonly HistoryUpdater _historyUpdates;
+    private readonly ChangesMethods _changes;
     private readonly DiffractConfig _config;
     private readonly Func<string, JsonElement, Task> _notify;
     private readonly Dictionary<string, MethodHandler> _handlers;
@@ -93,6 +94,7 @@ internal sealed class SidecarMethods : IDisposable
             changed => _notify("repo.changed", Result(changed)),
             d.Log,
             paused: () => _updater.IsRunning);
+        _changes = new ChangesMethods(_repos, RunnerOptions);
         _handlers = new Dictionary<string, MethodHandler>
         {
             ["app.info"] = async (_, ct) => Result(await AppInfoAsync(ct).ConfigureAwait(false)),
@@ -104,6 +106,8 @@ internal sealed class SidecarMethods : IDisposable
             ["history.refs"] = ReadHistoryRefs,
             ["history.details"] = HistoryDetailsAsync,
             ["history.file"] = HistoryFileAsync,
+            ["changes.status"] = _changes.StatusAsync,
+            ["changes.file"] = _changes.FileAsync,
             ["system.openFolder"] = OpenFolder,
             ["system.listTerminals"] = (_, _) => Task.FromResult(Result(_terminal.List())),
             ["system.openTerminal"] = OpenTerminal,
@@ -308,7 +312,7 @@ internal sealed class SidecarMethods : IDisposable
 
     internal static JsonElement Result<T>(T value) => JsonSerializer.SerializeToElement(value, RpcJson.Type<T>());
 
-    private static T Params<T>(JsonElement? parameters) where T : class
+    internal static T Params<T>(JsonElement? parameters) where T : class
     {
         if (parameters is not { ValueKind: JsonValueKind.Object } p)
             throw new RpcException(RpcErrorCodes.InvalidParams, "Params must be an object");
@@ -326,6 +330,6 @@ internal sealed class SidecarMethods : IDisposable
     private static string RequiredObjectId(string? value, string name) =>
         ObjectId.IsValid(value) ? value! : throw new RpcException(RpcErrorCodes.InvalidParams, $"'{name}' must be a full commit or file id");
 
-    private static string Required(string? value, string name) =>
+    internal static string Required(string? value, string name) =>
         string.IsNullOrWhiteSpace(value) ? throw new RpcException(RpcErrorCodes.InvalidParams, $"'{name}' is required") : value;
 }

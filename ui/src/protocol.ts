@@ -189,6 +189,14 @@ export type FileChangeKind = (typeof fileChangeKinds)[number];
 export const fileContentKinds = ["Text", "Binary", "TooLarge"] as const;
 export type FileContentKind = (typeof fileContentKinds)[number];
 
+/**
+ * Tracked: a file git tracks or one added to the index. Conflicted: unmerged, listed but not resolved here.
+ * Submodule: a commit in another repo, with no diff. NestedRepo: an untracked folder holding a repo or worktree of
+ * its own, such as an agent's worktree inside this one. It has no diff and must never be staged.
+ */
+export const changedFileKinds = ["Tracked", "Untracked", "Conflicted", "Submodule", "NestedRepo"] as const;
+export type ChangedFileKind = (typeof changedFileKinds)[number];
+
 /** One commit as the history list shows it. */
 export interface CommitEntry {
   id: string;
@@ -307,6 +315,58 @@ export interface HistoryFile {
   message: string | null;
 }
 
+/** One file that differs between HEAD, the index and the worktree. */
+export interface ChangedFile {
+  /** Relative to the worktree, with forward slashes. */
+  path: string;
+  /** The path before a rename or copy. */
+  oldPath: string | null;
+  kind: ChangedFileKind;
+  /** How the index differs from HEAD. Null when it does not. */
+  staged: FileChangeKind | null;
+  /** How the worktree differs from the index. Null when it does not. Added for untracked files. */
+  unstaged: FileChangeKind | null;
+  /** Pass to `changes.file` as they are. Null when HEAD has no such file. */
+  headId: string | null;
+  /** Pass to `changes.file` as they are. Null when the index has none, as for a deleted or untracked file. */
+  indexId: string | null;
+}
+
+/** Result of `changes.status`: one worktree's branch and changed files. */
+export interface WorktreeChanges {
+  worktree: string;
+  /** Null when HEAD is detached. */
+  branch: string | null;
+  /** Null before the first commit. */
+  headCommit: string | null;
+  /** Such as "origin/main". Null when the branch has none. */
+  upstream: string | null;
+  /** Null without an upstream, or when it is gone. */
+  ahead: number | null;
+  behind: number | null;
+  /** In git's order: tracked files by path, then untracked ones. */
+  files: ChangedFile[];
+}
+
+/** Params of `changes.file`: the file's `path`, `headId` and `indexId` from `changes.status`. */
+export interface ChangesFileParams {
+  repoId: string;
+  worktree: string;
+  path: string;
+  /** HEAD against the index when true, the index against the worktree when false. */
+  staged: boolean;
+  headId: string | null;
+  indexId: string | null;
+}
+
+/** Result of `changes.file`: both sides of a file's diff. A side is null when the file is not there. */
+export interface ChangesFile {
+  /** HEAD for a staged diff, the index for an unstaged one. */
+  old: HistoryFile | null;
+  /** The index for a staged diff, the file on disk for an unstaged one. */
+  new: HistoryFile | null;
+}
+
 /** Every method the sidecar answers, with its params and result. */
 export interface Methods {
   "app.info": { params: undefined; result: AppInfo };
@@ -348,6 +408,13 @@ export interface Methods {
   "history.details": { params: { repoId: string; commitId: string }; result: CommitDetails };
   /** One side of a file's diff, by the `oldId` or `newId` from `history.details`. Binary and large files come without text. */
   "history.file": { params: { repoId: string; blobId: string }; result: HistoryFile };
+  /** One worktree's branch, ahead and behind, and changed files, every untracked file on its own. One git call. */
+  "changes.status": { params: { repoId: string; worktree: string }; result: WorktreeChanges };
+  /**
+   * Both sides of one file's diff. An unstaged diff has the line endings of the file on disk on both sides, so only
+   * real changes show. At most one git call per side.
+   */
+  "changes.file": { params: ChangesFileParams; result: ChangesFile };
 }
 
 /** Every notification the sidecar sends, with its params. */

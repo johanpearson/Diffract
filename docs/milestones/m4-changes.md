@@ -142,7 +142,7 @@ The methods grow phase by phase. Listed here so their shapes are decided togethe
 | Method | Params | Result |
 |---|---|---|
 | `changes.status` | `repoId`, worktree | branch, ahead and behind, and the files with their state |
-| `changes.file` | `repoId`, worktree, path, staged or not | the two sides, as `history.file` does |
+| `changes.file` | `repoId`, worktree, path, staged or not, and the file's `headId` and `indexId` from `changes.status` | the two sides, each as `history.file` answers |
 | `changes.stage` / `changes.unstage` | `repoId`, worktree, paths or one hunk | the new status |
 | `changes.commit` | `repoId`, worktree, message, amend | the new commit |
 | `remote.fetch` / `remote.pull` / `remote.push` | `repoId`, worktree | what happened, or why git refused |

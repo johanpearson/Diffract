@@ -1,5 +1,6 @@
 import {
   changeKinds,
+  changedFileKinds,
   fileChangeKinds,
   fileContentKinds,
   historyRefKinds,
@@ -10,6 +11,8 @@ import {
   leftoverKinds,
   verdicts,
   type AppInfo,
+  type ChangedFile,
+  type ChangesFile,
   type CommitDetails,
   type CommitEntry,
   type FileChange,
@@ -32,6 +35,7 @@ import {
   type RepoState,
   type SnapshotSummary,
   type TerminalInfo,
+  type WorktreeChanges,
   type WorktreeInfo,
 } from "../protocol";
 import { arrayOf, boolean, date, nullable, nullValue, number, object, oneOf, optional, string, type Shape } from "./shapes";
@@ -135,6 +139,18 @@ const commitDetails = object<CommitDetails>({
   files: arrayOf(fileChange),
 });
 
+const historyFile = object<HistoryFile>({ kind: oneOf(fileContentKinds), text: nullable(string), message: nullable(string) });
+
+const changedFile = object<ChangedFile>({
+  path: string,
+  oldPath: nullable(string),
+  kind: oneOf(changedFileKinds),
+  staged: nullable(oneOf(fileChangeKinds)),
+  unstaged: nullable(oneOf(fileChangeKinds)),
+  headId: nullable(string),
+  indexId: nullable(string),
+});
+
 /** The result of every method. Adding a method to `Methods` without a shape here fails the type check. */
 export const resultShapes: { [M in keyof Methods]: Shape } = {
   "app.info": appInfo,
@@ -163,7 +179,17 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
     agentSubjectPrefixes: arrayOf(string),
   }),
   "history.details": commitDetails,
-  "history.file": object<HistoryFile>({ kind: oneOf(fileContentKinds), text: nullable(string), message: nullable(string) }),
+  "history.file": historyFile,
+  "changes.status": object<WorktreeChanges>({
+    worktree: string,
+    branch: nullable(string),
+    headCommit: nullable(string),
+    upstream: nullable(string),
+    ahead: nullable(number),
+    behind: nullable(number),
+    files: arrayOf(changedFile),
+  }),
+  "changes.file": object<ChangesFile>({ old: nullable(historyFile), new: nullable(historyFile) }),
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {

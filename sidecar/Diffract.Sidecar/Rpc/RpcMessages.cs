@@ -120,4 +120,8 @@ internal static class RpcJson
 [JsonSerializable(typeof(HistoryRefs))]
 [JsonSerializable(typeof(Diffract.Git.Parsing.CommitDetails))]
 [JsonSerializable(typeof(HistoryFile))]
+[JsonSerializable(typeof(ChangesStatusParams))]
+[JsonSerializable(typeof(ChangesFileParams))]
+[JsonSerializable(typeof(Diffract.Git.Changes.WorktreeChanges))]
+[JsonSerializable(typeof(ChangesFile))]
 internal sealed partial class RpcJsonContext : JsonSerializerContext;

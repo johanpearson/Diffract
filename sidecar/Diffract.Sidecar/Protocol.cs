@@ -1,3 +1,5 @@
+using Diffract.Git.Changes;
+using Diffract.Git.Files;
 using Diffract.Git.History;
 using Diffract.Git.Parsing;
 using Diffract.Git.Snapshot;
@@ -31,6 +33,15 @@ internal sealed record HistoryDetailsParams(string? RepoId, string? CommitId);
 
 /// <param name="BlobId">The <c>oldId</c> or <c>newId</c> of a file in <c>history.details</c>.</param>
 internal sealed record HistoryFileParams(string? RepoId, string? BlobId);
+
+/// <param name="Worktree">The full path of one of the repo's worktrees, as the repo state lists them.</param>
+internal sealed record ChangesStatusParams(string? RepoId, string? Worktree);
+
+/// <param name="Path">The file's <c>path</c> from <c>changes.status</c>.</param>
+/// <param name="Staged">HEAD against the index when true, the index against the worktree when false.</param>
+/// <param name="HeadId">The file's <c>headId</c> from <c>changes.status</c>.</param>
+/// <param name="IndexId">The file's <c>indexId</c> from <c>changes.status</c>.</param>
+internal sealed record ChangesFileParams(string? RepoId, string? Worktree, string? Path, bool Staged, string? HeadId, string? IndexId);
 
 /// <param name="Terminal">Null for the default: Windows Terminal when installed, otherwise Windows PowerShell.</param>
 internal sealed record OpenTerminalParams(string? Path, TerminalKind? Terminal);
@@ -187,4 +198,14 @@ internal sealed record HistoryFile(FileContentKind Kind, string? Text, string? M
         FileContentKind.TooLarge => $"This file is larger than {HistoryReader.MaxFileBytes / (1024 * 1024)} MB, so Diffract does not show it.",
         _ => null,
     });
+}
+
+/// <summary>The result of <c>changes.file</c>: the two sides of a file's diff, each as <c>history.file</c> answers.</summary>
+/// <param name="Old">HEAD for a staged diff, the index for an unstaged one. Null when the file is not there, as for a new file.</param>
+/// <param name="New">The index for a staged diff, the file on disk for an unstaged one. Null when the file is not there, as for a deleted file.</param>
+internal sealed record ChangesFile(HistoryFile? Old, HistoryFile? New)
+{
+    public static ChangesFile From(FileDiff diff) => new(Side(diff.Old), Side(diff.New));
+
+    private static HistoryFile? Side(FileContent? content) => content is null ? null : HistoryFile.From(content);
 }

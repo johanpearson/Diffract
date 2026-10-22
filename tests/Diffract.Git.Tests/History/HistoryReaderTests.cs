@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Diffract.Fixtures;
+using Diffract.Git.Files;
 using Diffract.Git.History;
 using Diffract.Git.Parsing;
 using Diffract.Git.Snapshot;

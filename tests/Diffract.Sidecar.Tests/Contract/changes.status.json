@@ -1,0 +1,41 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "worktree": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+    "branch": "claude/räksmörgås-fix",
+    "headCommit": "9fceb02d0ae598e95dc970b74767f19372d61af8",
+    "upstream": "origin/claude/räksmörgås-fix",
+    "ahead": 2,
+    "behind": 1,
+    "files": [
+      {
+        "path": "src/räksmörgås.cs",
+        "oldPath": "src/cart.cs",
+        "kind": "Tracked",
+        "staged": "Renamed",
+        "unstaged": "Modified",
+        "headId": "8ab686eafeb1f44702738c8b0f24f2567c36da6d",
+        "indexId": "d670460b4b4aece5915caf5c68d12f560a9fe3e4"
+      },
+      {
+        "path": "docs/new file.md",
+        "oldPath": null,
+        "kind": "Untracked",
+        "staged": null,
+        "unstaged": "Added",
+        "headId": null,
+        "indexId": null
+      },
+      {
+        "path": "src/merge.cs",
+        "oldPath": null,
+        "kind": "Conflicted",
+        "staged": null,
+        "unstaged": null,
+        "headId": null,
+        "indexId": null
+      }
+    ]
+  }
+}

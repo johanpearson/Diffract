@@ -88,4 +88,53 @@ public class StatusParserTests
     {
         Assert.Throws<FormatException>(() => StatusParser.Parse("# branch.head main\0x what\0"));
     }
+
+    [Fact]
+    public void Blob_ids_of_head_and_index_and_none_for_a_missing_side()
+    {
+        var entries = StatusParser.Parse(Sample.Read("changes-status.bin")).Entries.ToDictionary(e => e.Path);
+
+        Assert.Equal(("732a4a8caacb0ae2de6aedf0f87b3c94cc3fb8d2", "1331c4ba68d396b070a5151c075a99bc5888cc47"), (entries["staged.txt"].HeadId, entries["staged.txt"].IndexId));
+        Assert.Equal((null, "3e757656cf36eca53338e520d134963a44f793f8"), (entries["added.txt"].HeadId, entries["added.txt"].IndexId));
+        Assert.Equal(("8da33f1e0bb93c47aff90a14c32b21f1f2c7aa7d", null), (entries["deleted.txt"].HeadId, entries["deleted.txt"].IndexId));
+        Assert.Equal(((string?)null, (string?)null), (entries["intent to add.txt"].HeadId, entries["intent to add.txt"].IndexId));
+        Assert.Equal("d74a8fa9de478ec483f7c06004e3ac7851bcf642", entries["renamed åäö.txt"].IndexId);
+        Assert.Null(entries["untracked file.txt"].HeadId);
+    }
+
+    [Fact]
+    public void A_submodule_is_marked_and_a_file_is_not()
+    {
+        var entries = StatusParser.Parse(Sample.Read("changes-status.bin")).Entries.ToDictionary(e => e.Path);
+
+        Assert.True(entries["vendor/library"].IsSubmodule);
+        Assert.False(entries["modified.txt"].IsSubmodule);
+    }
+
+    [Fact]
+    public void Every_untracked_file_on_its_own_and_a_nested_repo_as_one_folder()
+    {
+        var untracked = StatusParser.Parse(Sample.Read("changes-status.bin")).Entries.Where(e => e.Kind == StatusEntryKind.Untracked);
+
+        Assert.Equal([".claude/worktrees/task/", "new folder/räksmörgås/deep file.txt", "untracked file.txt"], untracked.Select(e => e.Path));
+    }
+
+    [Fact]
+    public void Conflicted_files_next_to_a_staged_one()
+    {
+        var entries = StatusParser.Parse(Sample.Read("changes-status-conflict.bin")).Entries;
+
+        Assert.Equal(
+            [(StatusEntryKind.Changed, "M.", "clean.txt"), (StatusEntryKind.Unmerged, "AA", "added.txt"), (StatusEntryKind.Unmerged, "UU", "both.txt")],
+            entries.Select(e => (e.Kind, $"{e.IndexStatus}{e.WorktreeStatus}", e.Path)));
+        Assert.All(entries.Where(e => e.Kind == StatusEntryKind.Unmerged), e => Assert.Null(e.IndexId));
+    }
+
+    [Fact]
+    public void The_changes_samples_are_captured_with_the_arguments_the_reader_uses()
+    {
+        var script = Sample.Script("capture-changes-samples.sh");
+
+        Assert.Contains("git " + string.Join(' ', StatusParser.ChangesArguments) + ";", script);
+    }
 }
