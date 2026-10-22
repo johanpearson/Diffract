@@ -12,6 +12,7 @@ import {
   verdicts,
   type AppInfo,
   type ChangedFile,
+  type ChangesCommitResult,
   type ChangesFile,
   type Hunk,
   type CommitDetails,
@@ -159,6 +160,7 @@ const worktreeChanges = object<WorktreeChanges>({
   upstream: nullable(string),
   ahead: nullable(number),
   behind: nullable(number),
+  headOnRemote: nullable(string),
   files: arrayOf(changedFile),
 });
 
@@ -197,6 +199,7 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "changes.file": object<ChangesFile>({ old: nullable(historyFile), new: nullable(historyFile), hunks: arrayOf(hunk) }),
   "changes.stage": worktreeChanges,
   "changes.unstage": worktreeChanges,
+  "changes.commit": object<ChangesCommitResult>({ commitId: string, status: worktreeChanges }),
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {

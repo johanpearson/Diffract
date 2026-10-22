@@ -95,7 +95,7 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Status_lists_the_worktrees_files_and_branch_with_one_git_call()
+    public async Task Status_lists_the_worktrees_files_and_branch_with_two_git_calls()
     {
         var (repo, _) = await OpenAsync((repo, _) =>
         {
@@ -110,7 +110,9 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
         Assert.Equal(repo.Path, status.GetProperty("worktree").GetString(), ignoreCase: true);
         Assert.Equal(["readme.md", "new folder/räka.txt"], status.GetProperty("files").EnumerateArray().Select(f => f.GetProperty("path").GetString()));
         Assert.Equal(("Untracked", "Added"), (FileIn(status, "new folder/räka.txt").GetProperty("kind").GetString(), FileIn(status, "new folder/räka.txt").GetProperty("unstaged").GetString()));
-        Assert.Equal(StatusParser.ChangesArguments, Assert.Single(_calls).Arguments);
+        Assert.Equal(2, _calls.Count);
+        Assert.Contains(_calls, c => c.Arguments.SequenceEqual(StatusParser.ChangesArguments));
+        Assert.Equal(JsonValueKind.Null, status.GetProperty("headOnRemote").ValueKind);
     }
 
     [Fact]
@@ -318,6 +320,44 @@ public sealed class ChangesMethodsTests : IAsyncDisposable
         Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.stage", new { repoId = "1", worktree = repo.Path, paths = new[] { ".claude/worktrees/task" } })));
         Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.unstage", new { repoId = "1", worktree = repo.Path, hunk = new { path = "readme.md" } })));
         Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.stage", new { repoId = "1", worktree = linked, paths = Array.Empty<string>() })));
+    }
+
+    // --- commit ----------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Commit_answers_with_the_new_commit_and_a_clean_status()
+    {
+        var (repo, _) = await OpenAsync(async (repo, _) =>
+        {
+            repo.WriteFile("readme.md", "HELLO\n");
+            await repo.GitAsync("add", "readme.md");
+        });
+
+        var result = Result(await RequestAsync("changes.commit", new { repoId = "1", worktree = repo.Path, message = "Shout the greeting\n\nWith åäö." }));
+
+        Assert.Equal(await repo.RevParseAsync("HEAD"), result.GetProperty("commitId").GetString());
+        Assert.Equal(0, result.GetProperty("status").GetProperty("files").GetArrayLength());
+        Assert.Equal("Shout the greeting\n\nWith åäö.\n", (await repo.GitAsync("log", "-1", "--format=%B")).StandardOutput[..^1]);
+    }
+
+    [Fact]
+    public async Task Nothing_staged_is_a_commit_refused_error_in_plain_words()
+    {
+        var (repo, _) = await OpenAsync();
+
+        var error = (await RequestAsync("changes.commit", new { repoId = "1", worktree = repo.Path, message = "Nothing" })).GetProperty("error");
+
+        Assert.Equal("CommitRefused", error.GetProperty("data").GetProperty("kind").GetString());
+        Assert.Equal("Nothing is staged, so there is nothing to commit.", error.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task A_commit_without_a_subject_is_refused_as_invalid_params()
+    {
+        var (repo, _) = await OpenAsync();
+
+        Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.commit", new { repoId = "1", worktree = repo.Path, message = "\nbody" })));
+        Assert.Equal(RpcErrorCodes.InvalidParams, ErrorCode(await RequestAsync("changes.commit", new { repoId = "1", worktree = repo.Path })));
     }
 
     private static object Params(string worktree, JsonElement file, bool staged) => new

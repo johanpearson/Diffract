@@ -85,6 +85,7 @@ public class ContractTests
         ["changes.status"] = () => Response(Changes),
         ["changes.stage"] = () => Response(Changes),
         ["changes.unstage"] = () => Response(Changes),
+        ["changes.commit"] = () => Response(new ChangesCommitResult(Side, Changes with { HeadCommit = Side, Files = [] })),
         ["changes.file"] = () => Response(ChangesFile.From(new FileDiff(
             new FileContent(FileContentKind.Text, "one\r\ntwo\r\n"),
             new FileContent(FileContentKind.Text, "one\r\nTWO\r\nthree\r\n"),
@@ -96,6 +97,8 @@ public class ContractTests
         ["error.git-too-old"] = () => Error(new GitVersionTooOldException(new GitVersion(2, 39, 5))),
         ["error.git-failed"] = () => Error(new GitCommandException(["status", "--porcelain=v2", "-z"], 128, "fatal: unable to read tree\n")),
         ["error.timed-out"] = () => Error(new GitTimeoutException(["fsck", "--unreachable", "--no-reflogs"], TimeSpan.FromSeconds(30))),
+        ["error.commit-refused"] = () => Error(new CommitRefusedException(
+            "Git did not commit. A hook or commit signing can stop a commit. This is what git said:", "lint failed: src/räksmörgås.cs line 3\n")),
         ["error.index-locked"] = () => Error(new IndexLockedException()),
         ["error.changed-since-shown"] = () => Error(new ChangedSinceShownException("src/räksmörgås.cs")),
         ["error.config-invalid"] = () => Error(new ConfigException("staleAfterDays must be at least 1.")),
@@ -116,6 +119,7 @@ public class ContractTests
         Upstream = "origin/claude/räksmörgås-fix",
         Ahead = 2,
         Behind = 1,
+        HeadOnRemote = "origin/claude/räksmörgås-fix",
         Files =
         [
             new ChangedFile

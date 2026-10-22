@@ -38,6 +38,10 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
     /// <summary>As <see cref="RunAsync(IReadOnlyList{string}, CancellationToken)"/>, with standard input. Any non-zero exit code fails.</summary>
     public Task<GitResult> RunAsync(GitCommandLine command, CancellationToken ct) => BufferAsync(command, [], ct);
 
+    /// <summary>With standard input, and exit codes that are returned rather than thrown.</summary>
+    public Task<GitResult> RunAsync(GitCommandLine command, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct) =>
+        BufferAsync(command, allowedExitCodes, ct);
+
     /// <summary>
     /// Runs git. A non-zero exit code throws <see cref="GitCommandException"/> unless it is in
     /// <paramref name="allowedExitCodes"/>, for commands like <c>merge-base --is-ancestor</c> that answer with it.

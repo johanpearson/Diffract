@@ -74,6 +74,25 @@ internal sealed record ChangesStageParams
     public ChangesHunkParams? Hunk { get; init; }
 }
 
+/// <summary>The params of <c>changes.commit</c>.</summary>
+internal sealed record ChangesCommitParams
+{
+    public string? RepoId { get; init; }
+
+    public string? Worktree { get; init; }
+
+    /// <summary>The subject, then optionally a blank line and a body, exactly as typed.</summary>
+    public string? Message { get; init; }
+
+    /// <summary>Replace the last commit. Refused when it is already pushed.</summary>
+    public bool Amend { get; init; }
+}
+
+/// <summary>The result of <c>changes.commit</c>.</summary>
+/// <param name="CommitId">The new commit.</param>
+/// <param name="Status">The worktree after the commit.</param>
+internal sealed record ChangesCommitResult(string CommitId, WorktreeChanges Status);
+
 /// <summary>One hunk, as <c>changes.file</c> showed it.</summary>
 internal sealed record ChangesHunkParams
 {

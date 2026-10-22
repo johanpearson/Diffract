@@ -42,6 +42,14 @@ public sealed class ChangedSinceShownException(string path)
     public string Path { get; } = path;
 }
 
+/// <summary>Git did not commit, or Diffract did not ask it to. Says why in plain words, with git's own output when there is some.</summary>
+public sealed class CommitRefusedException(string reason, string? gitOutput = null)
+    : GitException(gitOutput is null ? reason : $"{reason}\n\n{gitOutput.Trim()}")
+{
+    public string Reason { get; } = reason;
+    public string? GitOutput { get; } = gitOutput;
+}
+
 /// <param name="detail">Why, when there is more to say than "not a repo", as a full sentence.</param>
 public sealed class NotAGitRepositoryException(string path, string? detail = null)
     : GitException(detail is null ? $"Not a git repository: {path}" : $"Not a git repository: {path}. {detail}")

@@ -22,8 +22,9 @@ export type LeftoverKind = (typeof leftoverKinds)[number];
 /**
  * IndexLocked: another git process, probably an agent, held the index for 2 seconds; try again later.
  * ChangedSinceShown: the file changed since its diff was read, so nothing was staged; read it again.
+ * CommitRefused: nothing was committed. The message says why, with git's own output under it for a hook or signing.
  */
-export const errorKinds = ["NotARepo", "GitTooOld", "GitFailed", "TimedOut", "ConfigInvalid", "IndexLocked", "ChangedSinceShown"] as const;
+export const errorKinds = ["NotARepo", "GitTooOld", "GitFailed", "TimedOut", "ConfigInvalid", "IndexLocked", "ChangedSinceShown", "CommitRefused"] as const;
 export type ErrorKind = (typeof errorKinds)[number];
 
 /** What a live change refreshed. */
@@ -348,6 +349,8 @@ export interface WorktreeChanges {
   /** Null without an upstream, or when it is gone. */
   ahead: number | null;
   behind: number | null;
+  /** The remote branch that already has HEAD, such as "origin/main". Amend is allowed only when this is null. */
+  headOnRemote: string | null;
   /** In git's order: tracked files by path, then untracked ones. */
   files: ChangedFile[];
 }
@@ -384,6 +387,13 @@ export interface ChangesFile {
   new: HistoryFile | null;
   /** Empty when a side is missing: a new or deleted file is staged as a whole. Empty for binary files too. */
   hunks: Hunk[];
+}
+
+/** Result of `changes.commit`. */
+export interface ChangesCommitResult {
+  commitId: string;
+  /** The worktree after the commit. */
+  status: WorktreeChanges;
 }
 
 /** Params of `changes.stage` and `changes.unstage`: files, or one hunk, never both. */
@@ -447,6 +457,14 @@ export interface Methods {
   "changes.stage": { params: ChangesStageParams; result: WorktreeChanges };
   /** Unstages files, or one hunk of the staged diff, leaving them as they are on disk. Answers with the new status. */
   "changes.unstage": { params: ChangesStageParams; result: WorktreeChanges };
+  /**
+   * Commits what is staged, with the message exactly as written (a subject first). Hooks run and signing follows the
+   * repo's config. `amend` replaces the last commit, and is refused when `headOnRemote` is set.
+   */
+  "changes.commit": {
+    params: { repoId: string; worktree: string; message: string; amend: boolean };
+    result: ChangesCommitResult;
+  };
 }
 
 /** Every notification the sidecar sends, with its params. */

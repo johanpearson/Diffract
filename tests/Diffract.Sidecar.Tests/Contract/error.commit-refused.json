@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32008,
+    "message": "Git did not commit. A hook or commit signing can stop a commit. This is what git said:\n\nlint failed: src/räksmörgås.cs line 3",
+    "data": {
+      "kind": "CommitRefused"
+    }
+  }
+}
