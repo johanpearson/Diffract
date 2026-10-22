@@ -289,3 +289,55 @@ test("opens on History and shows it before the leftover scan has finished", asyn
   await page.getByRole("tab", { name: "History" }).click();
   await expect(list(page).getByRole("option").first()).toBeVisible();
 });
+
+/** As if an agent made `count` commits on main: the fake sidecar adds them and sends repo.changed. */
+async function commitOnMain(page: Page, count: number) {
+  await page.evaluate((n) => window.diffractTest.sidecar.commitOnMain("1", n), count);
+}
+
+const scrollTop = (page: Page) => list(page).evaluate((el) => el.scrollTop);
+
+test("new commits appear without moving the commits in view or the selection", async ({ page }) => {
+  await openHistory(page, 5_000);
+  await list(page).evaluate((el) => (el.scrollTop = 28 * 1_000 + 5));
+  const row = list(page).locator('[aria-posinset="1003"]');
+  await row.click();
+  const subject = await row.locator(".subject").textContent();
+  const before = await scrollTop(page);
+
+  await commitOnMain(page, 3);
+
+  await expect(page.getByRole("status").filter({ hasText: "commits" })).toHaveText("5,003 commits");
+  await expect(selected(page)).toHaveAttribute("aria-posinset", "1006");
+  await expect(selected(page).locator(".subject")).toHaveText(subject!);
+  await expect(selected(page)).toBeInViewport();
+  expect(await scrollTop(page)).toBe(before + 3 * 28);
+  await expect(subjectOf(page)).toHaveText(subject!);
+});
+
+test("at the top, new commits come into view and the selection stays on its commit", async ({ page }) => {
+  await openHistory(page, 2_000);
+  const subject = await selected(page).locator(".subject").textContent();
+
+  await commitOnMain(page, 2);
+
+  await expect(list(page).getByRole("option").first().locator(".subject")).toHaveText("New commit 2");
+  await expect(list(page).getByRole("option").first()).toContainText("main");
+  await expect(selected(page)).toHaveAttribute("aria-posinset", "3");
+  await expect(selected(page).locator(".subject")).toHaveText(subject!);
+  expect(await scrollTop(page)).toBe(0);
+});
+
+test("the toggles fade merged branches, or everything but agent work", async ({ page }) => {
+  await openHistory(page, 200);
+  const toggle = (name: string) => page.getByRole("checkbox", { name });
+
+  await expect(toggle("Fade merged branches")).toBeChecked();
+  await expect(list(page).locator(".commit-row.faded").first()).toBeVisible();
+  await toggle("Fade merged branches").uncheck();
+  await expect(list(page).locator(".commit-row.faded")).toHaveCount(0);
+
+  await toggle("Agent work only").check();
+  // The generated history has no agent branches, so every row fades.
+  await expect(list(page).locator(".commit-row:not(.faded)")).toHaveCount(0);
+});

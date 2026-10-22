@@ -38,20 +38,34 @@ public sealed class HistoryReader
         _pageSize = pageSize;
     }
 
-    /// <summary>The worktree HEADs history starts from, besides branches and tags. Unborn branches have none.</summary>
-    public static IReadOnlyList<string> HeadsOf(RepoSnapshot snapshot) =>
-        snapshot.Worktrees.Select(w => w.Head).OfType<string>().Distinct(StringComparer.Ordinal).ToList();
+    /// <summary>
+    /// The commits history starts from by default: what local branches, remote-tracking branches and tags point at,
+    /// and every worktree's HEAD. A detached HEAD is the only one not already among them. Each commit once.
+    /// </summary>
+    public static IReadOnlyList<string> TipsOf(RepoSnapshot snapshot) =>
+    [
+        .. snapshot.Branches.Select(b => b.TargetId)
+            .Concat(snapshot.Tags.Select(t => t.TargetId))
+            .Concat(snapshot.Worktrees.Select(w => w.Head).OfType<string>())
+            .Distinct(StringComparer.Ordinal),
+    ];
 
-    /// <summary>Reads the whole history in topological order with one git call, handing it on page by page as it streams.</summary>
+    /// <summary>
+    /// Reads the history from <paramref name="tips"/> in topological order with one git call, handing it on page by
+    /// page as it streams. No tips, as in an empty repo, need no git at all.
+    /// </summary>
     /// <returns>How many commits were read.</returns>
-    public async Task<int> ReadAsync(string repoRoot, IEnumerable<string> heads, Func<IReadOnlyList<CommitEntry>, Task> onPage, CancellationToken ct)
+    public async Task<int> ReadAsync(string repoRoot, IReadOnlyCollection<string> tips, Func<IReadOnlyList<CommitEntry>, Task> onPage, CancellationToken ct)
     {
+        if (tips.Count == 0)
+            return 0;
+
         var total = 0;
-        await Runner(repoRoot).StreamAsync(CommitLogParser.Arguments(heads), async (output, token) =>
+        await Runner(repoRoot).StreamAsync(new GitCommandLine(CommitLogParser.Arguments, CommitLogParser.Input(tips)), async (output, token) =>
         {
             total = await CommitLogParser.ReadPagesAsync(output, _pageSize, onPage, token).ConfigureAwait(false);
             return true;
-        }, [], ct).ConfigureAwait(false);
+        }, ct).ConfigureAwait(false);
         return total;
     }
 

@@ -12,6 +12,9 @@ import type {
   HistoryFile,
   HistoryPage,
   HistoryRef,
+  HistoryRefs,
+  HistoryShow,
+  HistoryUpdateResult,
   Methods,
   RepoChange,
   RepoState,
@@ -26,7 +29,7 @@ export const sampleState = (openSample as { result: RepoState }).result;
 
 /** The history in the contract samples: a merge whose second parent is not in it, and a root commit. */
 export const sampleCommits = (pageSample as { params: HistoryPage }).params.commits;
-export const sampleRefs = (refsSample as { result: HistoryRef[] }).result;
+export const sampleRefs = (refsSample as { result: HistoryRefs }).result;
 export const sampleDetails = (detailsSample as { result: CommitDetails }).result;
 
 /** Commits per history.page, as the sidecar sends them. */
@@ -71,10 +74,19 @@ export class FakeSidecar {
   readonly held = new Set<keyof Methods>();
   /** Set to make the next request to that method fail. */
   readonly failures = new Map<keyof Methods, Answer>();
-  /** What history.read streams, newest first. */
+  /**
+   * Every commit the repo has, newest first in topological order. history.read streams those its refs reach, and
+   * history.update works out what changed from them, so a test changes the repo by changing these and `refs`.
+   */
   history: CommitEntry[] = sampleCommits;
-  /** What history.refs answers. */
-  refs: HistoryRef[] = sampleRefs;
+  /** The refs history.refs answers with. Their targets, and the worktree HEADs, are the tips. */
+  refs: HistoryRef[] = sampleRefs.refs;
+  agentHeads: string[] = sampleRefs.agentHeads;
+  agentSubjectPrefixes: string[] = sampleRefs.agentSubjectPrefixes;
+  /** When true, the next history.update answers that the whole history must be read again. */
+  rereadNext = false;
+  /** The params of every history.update. */
+  readonly updatesAsked: { tips: string[]; show: HistoryShow }[] = [];
   /** Every commit history.details was asked for. */
   readonly detailsAsked: string[] = [];
   /** What history.file answers, by blob id. Any other blob is a one-line text naming it. */
@@ -124,6 +136,24 @@ export class FakeSidecar {
     ({ commits: this.history, refs: this.refs } = generateHistory(count));
   }
 
+  /** As if `count` commits were made on main: they go on top of the history, main moves, and repo.changed follows. */
+  commitOnMain(repoId: string, count: number): void {
+    const main = this.refs.find((r) => r.kind === "Branch" && r.name === "main")!;
+    let parent = main.targetId;
+    const added: CommitEntry[] = [];
+    for (let i = 0; i < count; i++) {
+      const at = new Date(Date.parse("2026-10-21T09:00:00+02:00") + (++this.newCommits) * 1000).toISOString();
+      const id = this.newCommits.toString(16).padStart(40, "f");
+      added.unshift({ id, parentIds: [parent], authorName: "Claude", authorEmail: "noreply@anthropic.com", authoredAt: at, committedAt: at, subject: `New commit ${this.newCommits}` });
+      parent = id;
+    }
+    this.history = [...added, ...this.history];
+    this.refs = this.refs.map((r) => (r === main ? { ...r, targetId: parent } : r));
+    this.change(repoId, (s) => ({ ...s, takenAt: new Date(Date.parse(s.takenAt) + this.newCommits * 1000).toISOString() }));
+  }
+
+  private newCommits = 0;
+
   release(): void {
     this.held.clear();
     for (const answer of this.waiting.splice(0)) answer();
@@ -141,7 +171,7 @@ export class FakeSidecar {
       this.waiting.push(() => this.transport.emit(JSON.stringify({ jsonrpc: "2.0", id, result: this.respond(method, params) })));
       return undefined;
     }
-    if (method === "history.read") return this.streamHistory((params as { token: string }).token);
+    if (method === "history.read") return this.streamHistory(params as { token: string } & HistoryShow);
     return this.respond(method, params);
   }
 
@@ -150,14 +180,56 @@ export class FakeSidecar {
     return this.transport.sent.at(-1)?.id;
   }
 
+  /** The commits history starts from: what the refs shown point at, and every worktree's HEAD. */
+  private tips(show: HistoryShow): string[] {
+    const shown = this.refs.filter((r) => (r.kind !== "Checkpoint" || show.checkpoints) && (r.kind !== "Stash" || show.stashes));
+    const heads = [...this.repos.values()].flatMap((s) => s.snapshot.worktrees.map((w) => w.head)).filter((h) => h !== null);
+    return [...new Set([...shown.map((r) => r.targetId), ...heads])];
+  }
+
+  /** The ids of the commits `tips` reach, through the parents the fake history has. */
+  private reach(tips: string[]): Set<string> {
+    const byId = new Map(this.history.map((c) => [c.id, c]));
+    const reached = new Set<string>();
+    const stack = tips.filter((t) => byId.has(t));
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      if (reached.has(id)) continue;
+      reached.add(id);
+      stack.push(...byId.get(id)!.parentIds.filter((p) => byId.has(p)));
+    }
+    return reached;
+  }
+
+  /** As the sidecar does: the commits the new tips reach that the old ones did not, on top, and those no longer reached. */
+  private updateHistory({ tips, checkpoints, stashes }: { tips: string[] } & HistoryShow): HistoryUpdateResult {
+    const show = { checkpoints, stashes };
+    this.updatesAsked.push({ tips, show });
+    const now = this.tips(show);
+    if (this.rereadNext) {
+      this.rereadNext = false;
+      return { added: [], removed: [], tips: now, reread: true };
+    }
+    const before = this.reach(tips);
+    const after = this.reach(now);
+    return {
+      added: this.history.filter((c) => after.has(c.id) && !before.has(c.id)),
+      removed: [...before].filter((id) => !after.has(id)),
+      tips: now,
+      reread: false,
+    };
+  }
+
   /** Sends the history page by page, each in its own task as from a real pipe, then the totals. */
-  private streamHistory(token: string): undefined {
+  private streamHistory({ token, ...show }: { token: string } & HistoryShow): undefined {
     const id = this.lastRequestId();
-    const commits = this.history;
+    const tips = this.tips(show);
+    const reached = this.reach(tips);
+    const commits = this.history.filter((c) => reached.has(c.id));
     const pages = Math.ceil(commits.length / HistoryPageSize);
     const send = (index: number) => {
       if (index === pages) {
-        this.transport.emit(JSON.stringify({ jsonrpc: "2.0", id, result: { commits: commits.length, pages } }));
+        this.transport.emit(JSON.stringify({ jsonrpc: "2.0", id, result: { commits: commits.length, pages, tips } }));
         return;
       }
       const page: HistoryPage = { token, index, commits: commits.slice(index * HistoryPageSize, (index + 1) * HistoryPageSize) };
@@ -186,8 +258,10 @@ export class FakeSidecar {
     switch (method) {
       case "history.read":
         return undefined; // streamed by answer()
+      case "history.update":
+        return this.updateHistory(params as { tips: string[] } & HistoryShow);
       case "history.refs":
-        return this.refs;
+        return { refs: this.refs, agentHeads: this.agentHeads, agentSubjectPrefixes: this.agentSubjectPrefixes } satisfies HistoryRefs;
       case "history.details":
         return this.details(p.commitId ?? "");
       case "history.file":

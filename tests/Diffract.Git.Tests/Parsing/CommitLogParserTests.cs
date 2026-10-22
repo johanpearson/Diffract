@@ -145,23 +145,43 @@ public class CommitLogParserTests
     }
 
     [Fact]
-    public void Arguments_read_default_refs_and_each_head_once()
+    public void Arguments_read_the_commits_from_standard_input_only()
     {
-        var head = new string('a', 40);
+        Assert.Equal(["log", "--topo-order", "-z", "--no-show-signature", "--format=" + CommitLogParser.Format, "--stdin", "--"], CommitLogParser.Arguments);
+    }
 
-        var args = CommitLogParser.Arguments([head, head]);
+    [Fact]
+    public void Input_names_each_tip_once_and_each_excluded_commit_once_with_a_caret()
+    {
+        var (a, b, c) = (new string('a', 40), new string('b', 40), new string('c', 64));
 
-        Assert.Equal(["log", "--topo-order", "-z", "--no-show-signature", "--format=" + CommitLogParser.Format, "--branches", "--remotes", "--tags", head, "--"], args);
-        Assert.DoesNotContain("--all", args);
+        var input = CommitLogParser.Input([a, b, a], [c, c]);
+
+        Assert.Equal([a, b, "^" + c], input);
     }
 
     [Theory]
     [InlineData("--all")]
     [InlineData("HEAD")]
     [InlineData("main~1")]
-    public void Arguments_refuse_anything_but_an_object_id_as_a_head(string head)
+    [InlineData("^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    public void Input_refuses_anything_but_an_object_id(string tip)
     {
-        Assert.Throws<ArgumentException>(() => CommitLogParser.Arguments([head]));
+        Assert.Throws<ArgumentException>(() => CommitLogParser.Input([tip]));
+        Assert.Throws<ArgumentException>(() => CommitLogParser.Input([], [tip]));
+    }
+
+    [Fact]
+    public async Task Reading_at_most_a_number_of_commits_gives_all_of_them_or_null()
+    {
+        var bytes = Sample.ReadBytes("log-history.bin");
+        var count = CommitLogParser.Parse(bytes).Count;
+
+        var all = await CommitLogParser.ReadAtMostAsync(new MemoryStream(bytes), count, Ct);
+        var tooMany = await CommitLogParser.ReadAtMostAsync(new MemoryStream(bytes), count - 1, Ct);
+
+        Assert.Equal(count, all?.Count);
+        Assert.Null(tooMany);
     }
 
     /// <summary>Every field, parents included, which record equality compares only by reference.</summary>

@@ -53,3 +53,26 @@ export function moveSelection(key: string, current: number, pageRows: number, co
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+
+/**
+ * What keeps the view still while rows are added or removed above it: the commit in the top row and how far into
+ * that row the view starts. Null at the very top, where new commits should come into view.
+ */
+export interface ScrollAnchor {
+  id: string;
+  offset: number;
+}
+
+export function anchorAt(scrollTop: number, rowHeight: number, idAt: (index: number) => string | undefined): ScrollAnchor | null {
+  if (scrollTop <= 0) return null;
+  const index = Math.floor(scrollTop / rowHeight);
+  const id = idAt(index);
+  return id === undefined ? null : { id, offset: scrollTop - index * rowHeight };
+}
+
+/** The scroll position that puts the anchor's commit back where it was, or null when it is gone or there is none. */
+export function anchoredScrollTop(anchor: ScrollAnchor | null, indexOf: (id: string) => number, rowHeight: number): number | null {
+  if (anchor === null) return null;
+  const index = indexOf(anchor.id);
+  return index < 0 ? null : index * rowHeight + anchor.offset;
+}

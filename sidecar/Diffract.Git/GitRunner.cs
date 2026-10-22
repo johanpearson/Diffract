@@ -8,6 +8,13 @@ namespace Diffract.Git;
 /// </summary>
 public delegate Task<bool> GitOutputReader(Stream output, CancellationToken ct);
 
+/// <summary>A git command and the lines for its standard input.</summary>
+/// <param name="Input">
+/// Such as the revisions for <c>--stdin</c>, which has no length limit as the command line has. Written while git
+/// runs, then closed. Git stopping before it has read them all is no error.
+/// </param>
+public sealed record GitCommandLine(IReadOnlyList<string> Arguments, IReadOnlyList<string> Input);
+
 /// <summary>Runs git as a child process in one working directory.</summary>
 public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
 {
@@ -37,9 +44,16 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
     /// When <paramref name="read"/> returns false, git is stopped and its exit code is not checked. When it throws,
     /// git is stopped and the exception is passed on. Timeout and cancellation cover the reading too.
     /// </summary>
-    public async Task<GitStreamResult> StreamAsync(
-        IReadOnlyList<string> args, GitOutputReader read, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct)
+    public Task<GitStreamResult> StreamAsync(IReadOnlyList<string> args, GitOutputReader read, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct) =>
+        StreamAsync(new GitCommandLine(args, []), read, allowedExitCodes, ct);
+
+    /// <summary>As the other StreamAsync, with lines for git's standard input. Any non-zero exit code fails.</summary>
+    public Task<GitStreamResult> StreamAsync(GitCommandLine command, GitOutputReader read, CancellationToken ct) =>
+        StreamAsync(command, read, [], ct);
+
+    private async Task<GitStreamResult> StreamAsync(GitCommandLine command, GitOutputReader read, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct)
     {
+        var (args, input) = command;
         if (Options.ReadOnly && !ReadOnlyPolicy.IsAllowed(args, out var reason))
             throw new ReadOnlyViolationException(args, reason);
 
@@ -51,8 +65,9 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         process.Start();
         try
         {
-            process.StandardInput.Close();
+            var writing = WriteInputAsync(process.StandardInput.BaseStream, input);
             var result = await ReadAsync(process, args, read, ct).ConfigureAwait(false);
+            await writing.ConfigureAwait(false);
             var streamed = new GitStreamResult(args, result.ExitCode, result.StandardError, time.GetElapsedTime(started));
             if (Failed(streamed.ExitCode, allowedExitCodes))
                 throw new GitCommandException(args, streamed.ExitCode!.Value, streamed.StandardError);
@@ -97,6 +112,22 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
             Kill(process);
             await StandardErrorSoFarAsync(stderrTask).ConfigureAwait(false);
             throw;
+        }
+    }
+
+    /// <summary>Writes one line per item, ending each with a line feed, then closes standard input so git sees the end.</summary>
+    private static async Task WriteInputAsync(Stream stdin, IReadOnlyList<string> lines)
+    {
+        try
+        {
+            if (lines.Count > 0)
+                await stdin.WriteAsync(Encoding.UTF8.GetBytes(string.Concat(lines.Select(line => line + "\n")))).ConfigureAwait(false);
+            await stdin.FlushAsync().ConfigureAwait(false);
+            stdin.Close();
+        }
+        catch (IOException)
+        {
+            // Git stopped reading: it ended, or was stopped. Its exit code, or the caller, says why.
         }
     }
 

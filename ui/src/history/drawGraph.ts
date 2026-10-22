@@ -4,7 +4,7 @@ import type { RowRange } from "./viewport";
 /** The part of a 2D canvas context the graph uses, so tests can record the calls without a real canvas. */
 export type GraphContext = Pick<
   CanvasRenderingContext2D,
-  "beginPath" | "moveTo" | "lineTo" | "bezierCurveTo" | "arc" | "stroke" | "fill" | "clearRect" | "strokeStyle" | "fillStyle" | "lineWidth"
+  "beginPath" | "moveTo" | "lineTo" | "bezierCurveTo" | "arc" | "stroke" | "fill" | "clearRect" | "strokeStyle" | "fillStyle" | "lineWidth" | "globalAlpha"
 >;
 
 export interface GraphMetrics {
@@ -36,11 +36,15 @@ export interface GraphStyle {
   metrics?: GraphMetrics;
 }
 
-/** One row to draw: its layout, and whether its commit is a merge. */
+/** One row to draw: its layout, whether its commit is a merge, and whether a toggle fades it. */
 export interface GraphRow {
   layout: LaneRow;
   isMerge: boolean;
+  faded?: boolean;
 }
+
+/** How opaque a faded row's dot and lines are. Lines that only pass through the row keep their own branch's look. */
+export const FadedAlpha = 0.35;
 
 /**
  * Draws the rows in `range` with the first one at the top of the canvas. Each row draws only the lines inside its
@@ -64,10 +68,15 @@ class Painter {
     this.metrics = metrics;
   }
 
-  row({ layout, isMerge }: GraphRow, top: number): void {
+  row({ layout, isMerge, faded = false }: GraphRow, top: number): void {
     this.ctx.lineWidth = 2;
-    for (const line of layout.lines) this.line(line, top);
+    for (const line of layout.lines) {
+      this.ctx.globalAlpha = faded && line.part !== "through" ? FadedAlpha : 1;
+      this.line(line, top);
+    }
+    this.ctx.globalAlpha = faded ? FadedAlpha : 1;
     this.dot(layout, isMerge, top);
+    this.ctx.globalAlpha = 1;
   }
 
   private line({ part, from, to, color }: LaneLine, top: number): void {

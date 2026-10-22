@@ -26,16 +26,35 @@ public static class CommitLogParser
     public const string Format = "%H%x00%P%x00%an%x00%ae%x00%at%x00%ct%x00%s";
 
     /// <summary>
-    /// The refs history shows by default: local branches, remote-tracking branches, tags, and the HEAD of every
-    /// worktree, passed as <paramref name="heads"/>. A detached HEAD is the only one not already among the branches.
+    /// The commits to read come on standard input, one per line: <see cref="Input"/>. A repo can have more refs than
+    /// fit on a command line.
     /// </summary>
-    public static IReadOnlyList<string> Arguments(IEnumerable<string> heads)
+    /// <remarks>--no-show-signature: log.showSignature would mix gpg's output into the stream.</remarks>
+    public static IReadOnlyList<string> Arguments { get; } =
+        ["log", "--topo-order", "-z", "--no-show-signature", "--format=" + Format, "--stdin", "--"];
+
+    /// <summary>
+    /// Standard input for <see cref="Arguments"/>: the commits reachable from <paramref name="tips"/> and from none of
+    /// <paramref name="excluded"/>. Each id once.
+    /// </summary>
+    public static IReadOnlyList<string> Input(IEnumerable<string> tips, IEnumerable<string>? excluded = null) =>
+    [
+        .. tips.Select(ObjectId.Require).Distinct(StringComparer.Ordinal),
+        .. (excluded ?? []).Select(ObjectId.Require).Distinct(StringComparer.Ordinal).Select(id => "^" + id),
+    ];
+
+    /// <summary>All the commits in the stream, or null as soon as there are more than <paramref name="max"/>.</summary>
+    public static async Task<IReadOnlyList<CommitEntry>?> ReadAtMostAsync(Stream output, int max, CancellationToken ct)
     {
-        // --no-show-signature: log.showSignature would mix gpg's output into the stream.
-        List<string> args = ["log", "--topo-order", "-z", "--no-show-signature", "--format=" + Format, "--branches", "--remotes", "--tags"];
-        args.AddRange(heads.Select(ObjectId.Require).Distinct(StringComparer.Ordinal));
-        args.Add("--");
-        return args;
+        var reader = new NulFieldReader(output);
+        List<CommitEntry> commits = [];
+        while (await ReadCommitAsync(reader, ct).ConfigureAwait(false) is { } commit)
+        {
+            if (commits.Count == max)
+                return null;
+            commits.Add(commit);
+        }
+        return commits;
     }
 
     /// <summary>Reads commits as they stream and hands them on in pages of <paramref name="pageSize"/>, the last one shorter.</summary>

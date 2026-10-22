@@ -50,7 +50,9 @@
   "historyRefKind": [
     "Branch",
     "RemoteBranch",
-    "Tag"
+    "Tag",
+    "Checkpoint",
+    "Stash"
   ],
   "fileChangeKind": [
     "Added",

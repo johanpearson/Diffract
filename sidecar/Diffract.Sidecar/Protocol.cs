@@ -18,7 +18,12 @@ internal sealed record RepoCloseParams(string? RepoId);
 internal sealed record OpenFolderParams(string? Path);
 
 /// <param name="Token">Chosen by the UI and sent back with every <c>history.page</c>, so it knows which read a page belongs to.</param>
-internal sealed record HistoryReadParams(string? RepoId, string? Token);
+/// <param name="Checkpoints">Also start from agents' checkpoint refs.</param>
+/// <param name="Stashes">Also start from every stash. The scan after opening lists them, so before it there are none.</param>
+internal sealed record HistoryReadParams(string? RepoId, string? Token, bool Checkpoints, bool Stashes);
+
+/// <param name="Tips">The <c>tips</c> of the history the UI has: from <c>history.read</c>, or from the last <c>history.update</c>.</param>
+internal sealed record HistoryUpdateParams(string? RepoId, IReadOnlyList<string>? Tips, bool Checkpoints, bool Stashes);
 
 internal sealed record HistoryRefsParams(string? RepoId);
 
@@ -144,21 +149,32 @@ internal enum ChangeKind
 internal sealed record HistoryPage(string Token, int Index, IReadOnlyList<CommitEntry> Commits);
 
 /// <summary>The result of <c>history.read</c>, sent after its last page.</summary>
-internal sealed record HistoryReadResult(int Commits, int Pages);
+/// <param name="Tips">The commits the history was read from. Pass them to <c>history.update</c> to learn what changed since.</param>
+internal sealed record HistoryReadResult(int Commits, int Pages, IReadOnlyList<string> Tips);
 
-internal enum HistoryRefKind { Branch, RemoteBranch, Tag }
+/// <summary>The result of <c>history.update</c>: how the history changes to match the repo's current refs and the toggles.</summary>
+/// <param name="Added">New commits in topological order. They all go above the commits the UI has.</param>
+/// <param name="Removed">Commits no ref shown reaches any more, such as those a force-move left behind.</param>
+/// <param name="Tips">The commits the updated history starts from, for the next <c>history.update</c>.</param>
+/// <param name="Reread">
+/// Too much changed to send as an update: read the whole history again with <c>history.read</c>. Added and Removed
+/// are then empty.
+/// </param>
+internal sealed record HistoryUpdateResult(IReadOnlyList<CommitEntry> Added, IReadOnlyList<string> Removed, IReadOnlyList<string> Tips, bool Reread);
 
-/// <summary>A ref history shows by default. Worktree HEADs are in the repo state.</summary>
-/// <param name="Name">Short name: "feature/x", "origin/feature/x" or "v1.0".</param>
+/// <summary>Checkpoints and stashes are shown only when the UI asks for them.</summary>
+internal enum HistoryRefKind { Branch, RemoteBranch, Tag, Checkpoint, Stash }
+
+/// <summary>A ref history can show. Worktree HEADs are in the repo state.</summary>
+/// <param name="Name">Short name: "feature/x", "origin/feature/x", "v1.0", "copilot/checkpoints/abc/1" or "stash@{0}".</param>
 /// <param name="TargetId">The commit it points at, after peeling annotated tags.</param>
-internal sealed record HistoryRef(string Name, HistoryRefKind Kind, string TargetId)
-{
-    public static IReadOnlyList<HistoryRef> From(RepoSnapshot s) =>
-    [
-        .. s.Branches.Select(b => new HistoryRef(b.Name, b.IsRemote ? HistoryRefKind.RemoteBranch : HistoryRefKind.Branch, b.TargetId)),
-        .. s.Tags.Select(t => new HistoryRef(t.Name, HistoryRefKind.Tag, t.TargetId)),
-    ];
-}
+/// <param name="Agent">The agent it looks like it belongs to, from the patterns in diffract.json. A hint only.</param>
+internal sealed record HistoryRef(string Name, HistoryRefKind Kind, string TargetId, string? Agent);
+
+/// <summary>The result of <c>history.refs</c>: the refs, and what tells agent work apart.</summary>
+/// <param name="AgentHeads">The HEAD of every worktree that looks like it belongs to an agent, by its folder or branch.</param>
+/// <param name="AgentSubjectPrefixes">A commit whose subject starts with one of these looks like an agent made it.</param>
+internal sealed record HistoryRefs(IReadOnlyList<HistoryRef> Refs, IReadOnlyList<string> AgentHeads, IReadOnlyList<string> AgentSubjectPrefixes);
 
 /// <summary>The result of <c>history.file</c>: one side of a file's diff.</summary>
 /// <param name="Text">The content, when <see cref="Kind"/> is Text.</param>

@@ -51,14 +51,28 @@ public class ContractTests
         ["repo.changed"] = () => Notification("repo.changed", new RepoChanged(
             [new RepoChange(ChangeKind.WorktreeFiles, AgentWorktree), new RepoChange(ChangeKind.Refs, null)],
             State("1"))),
-        ["history.read"] = () => Response(new HistoryReadResult(Commits: 1203, Pages: 3)),
+        ["history.read"] = () => Response(new HistoryReadResult(Commits: 1203, Pages: 3, Tips: [Merge, Side])),
+        ["history.update"] = () => Response(new HistoryUpdateResult(
+            [new CommitEntry(Side, [Merge], "Claude", "noreply@anthropic.com", Now.AddMinutes(-1), Now.AddMinutes(-1), "Fix the flaky login test")],
+            [Parent],
+            [Side],
+            Reread: false)),
         ["history.page"] = () => Notification("history.page", new HistoryPage("read-1", 0,
         [
             new CommitEntry(Merge, [Parent, Side], "Åsa Öberg", "åsa@exempel.se", Now.AddHours(-3), Now.AddHours(-2), "Merge branch 'claude/räksmörgås-fix'"),
             new CommitEntry(Parent, [], "GitHub Copilot", "198982749+Copilot@users.noreply.github.com", Now.AddDays(-2), Now.AddDays(-2), ""),
         ])),
-        ["history.refs"] = () => Response<IReadOnlyList<HistoryRef>>(
-            [new("main", HistoryRefKind.Branch, Merge), new("origin/main", HistoryRefKind.RemoteBranch, Parent), new("v1.0", HistoryRefKind.Tag, Parent)]),
+        ["history.refs"] = () => Response(new HistoryRefs(
+            [
+                new("main", HistoryRefKind.Branch, Merge, null),
+                new("origin/main", HistoryRefKind.RemoteBranch, Parent, null),
+                new("v1.0", HistoryRefKind.Tag, Parent, null),
+                new("claude/räksmörgås-fix", HistoryRefKind.Branch, Side, "Claude Code"),
+                new("copilot/checkpoints/7f3a/1", HistoryRefKind.Checkpoint, Side, "GitHub Copilot"),
+                new("stash@{0}", HistoryRefKind.Stash, Side, null),
+            ],
+            [Side],
+            ["copilot checkpoint: "])),
         ["history.details"] = () => Response(new CommitDetails(Merge, [Parent, Side], "Åsa Öberg", "åsa@exempel.se", Now.AddHours(-3),
             "GitHub", "noreply@github.com", Now.AddHours(-2), "Merge branch 'claude/räksmörgås-fix'", "Fixes the cart.\n\nCo-authored-by: Claude <noreply@anthropic.com>",
             [

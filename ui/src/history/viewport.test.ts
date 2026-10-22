@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moveSelection, scrollToShow, visibleRange } from "./viewport";
+import { anchoredScrollTop, anchorAt, moveSelection, scrollToShow, visibleRange } from "./viewport";
 
 describe("visibleRange", () => {
   it("covers the rows in view and the overscan around them", () => {
@@ -63,5 +63,33 @@ describe("moveSelection", () => {
   it("ignores other keys and empty lists", () => {
     expect(moveSelection("a", 5, 10, 100)).toBeNull();
     expect(moveSelection("ArrowDown", -1, 10, 0)).toBeNull();
+  });
+});
+
+describe("scroll anchor", () => {
+  const ids = ["a", "b", "c", "d", "e"];
+  const idAt = (i: number) => ids[i];
+
+  it("is null at the very top, so new commits come into view there", () => {
+    expect(anchorAt(0, 28, idAt)).toBeNull();
+  });
+
+  it("is the commit in the top row and how far into it the view starts", () => {
+    expect(anchorAt(28 * 2 + 5, 28, idAt)).toEqual({ id: "c", offset: 5 });
+  });
+
+  it("puts the commit back where it was after rows are added above it", () => {
+    const after = ["x", "y", ...ids];
+    expect(anchoredScrollTop({ id: "c", offset: 5 }, (id) => after.indexOf(id), 28)).toBe(28 * 4 + 5);
+  });
+
+  it("puts the commit back where it was after rows above it are removed", () => {
+    const after = ["b", "c", "d"];
+    expect(anchoredScrollTop({ id: "c", offset: 5 }, (id) => after.indexOf(id), 28)).toBe(28 + 5);
+  });
+
+  it("leaves the scroll position alone when there is no anchor or its commit is gone", () => {
+    expect(anchoredScrollTop(null, () => 0, 28)).toBeNull();
+    expect(anchoredScrollTop({ id: "gone", offset: 0 }, () => -1, 28)).toBeNull();
   });
 });

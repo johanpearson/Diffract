@@ -1,7 +1,7 @@
 import type { HistoryRef, HistoryRefKind, WorktreeInfo } from "../protocol";
 import { folderName } from "../model/format";
 
-/** A label on a commit's row: a branch, remote branch or tag, or a detached worktree's HEAD. */
+/** A label on a commit's row: a branch, remote branch, tag, checkpoint or stash, or a detached worktree's HEAD. */
 export interface Marker {
   name: string;
   kind: HistoryRefKind | "Head";
@@ -11,7 +11,7 @@ export interface Marker {
   worktree: string | null;
 }
 
-const order: Record<Marker["kind"], number> = { Head: 0, Branch: 1, RemoteBranch: 2, Tag: 3 };
+const order: Record<Marker["kind"], number> = { Head: 0, Branch: 1, RemoteBranch: 2, Tag: 3, Checkpoint: 4, Stash: 5 };
 
 /**
  * The markers for each commit, by commit id. A branch checked out in a worktree is marked with that worktree;
