@@ -18,7 +18,7 @@ These come from the brief and the visual plan.
 - **Plan, then apply.** The planner turns the selected leftovers into a `CleanupPlan`: every git command, every backup tag and every folder move, in order. The dialog shows that plan. Applying runs that plan and nothing else, so the dialog and the real operation can never disagree.
 - **Check before every step.** Agents keep working while the dialog is open. Each step records what it expects, such as "branch X is still at commit abc", "this worktree is still clean" or "nothing is in use". If something changed, that step and the steps that depend on it are skipped, and the result says why. Nothing is forced.
 - **"In use" is never offered.** Rows with that verdict have no checkbox. A row can also become "In use" while the dialog is open, and the step check catches that.
-- **Unique work gets a backup first.** When a leftover has commits at risk, an annotated tag under `archive/` is created before anything is removed. If the tag cannot be created, nothing of that leftover is removed.
+- **Unique work gets a backup first.** When a leftover has commits at risk, except a branch whose upstream is gone (decision 8), an annotated tag under `archive/` is created before anything is removed. If the tag cannot be created, nothing of that leftover is removed.
 - **Every step can be undone or is shown as final.** The operation log records each step with what it needs to reverse it. Steps that cannot be undone are marked so in the dialog before the user confirms.
 - **Diffract writes through a separate runner.** The read-only runner stays as it is. A cleanup runner allows only the commands in the table below. The sidecar test changes from "never creates a writable runner" to "only the cleanup executor creates the cleanup runner, and it rejects everything else".
 
@@ -30,7 +30,7 @@ A first proposal, to settle in phase 0. "Backup" applies only when the leftover 
 |---|---|---|---|
 | Worktree (clean, not locked) | `git worktree remove <path>`, then `git branch -D <branch>` | tag on the branch tip | recreate the branch, then `git worktree add <path> <branch>` |
 | Prunable worktree (folder gone) | `git worktree prune` for its record | tag on its HEAD | recreate the branch from the tag; the folder was already gone |
-| Local branch | `git branch -D <name>` | tag on the tip | `git branch <name> <sha>` |
+| Local branch | `git branch -D <name>` | tag on the tip, none when its upstream is gone (decision 8) | `git branch <name> <sha>` |
 | Remote-tracking branch | `git branch -d -r <remote>/<name>`, local only, never pushed | tag on the tip | `git update-ref refs/remotes/<remote>/<name> <sha>` |
 | Stash | `git stash drop`, after checking its commit is still the same | tag on the stash commit | `git stash store -m <message> <sha>` |
 | Checkpoint session | `git update-ref --stdin` deleting each of its refs, with their expected values | none, see decision 4 | the same command, recreating them |
@@ -58,18 +58,7 @@ Johan decided these on 2026-10-21, in #28.
 5. **Leftover folders go to the Recycle Bin**, so Windows itself is the undo. A folder that cannot be moved, for example because a file is locked, is skipped with the reason.
 6. **A worktree's branch is removed with it**, as in the visual plan, listed as its own step in the dialog with its own checkbox, ticked by default.
 7. **Cleanup moved from milestone 3 to milestone 5**, after history and changes, so Diffract becomes usable for daily work sooner. See the brief.
-
-### Open question: backup tags for gone branches
-
-Johan asked on 2026-10-22 for a way to remove all merged local branches at once, like a local prune. His Diffract repo had 29 local branches, and 27 of them had an upstream that was deleted after a squash merge. `git branch --merged` finds only one of them, because a squash merge leaves the branch's own commits off main.
-
-Those commits exist nowhere else, so the rule above gives each such branch its own backup tag. Pruning 27 branches would create 27 `archive/` tags, and 30 days later they all come back as "old backup tag" leftovers. Johan picks one before phase 1:
-
-- **A. One tag per branch,** as planned. Simple and exact, but noisy.
-- **B. One tag per cleanup** for all gone branches in it, `archive/prune-<yyyy-mm-dd>`. A tag points at one commit, so Diffract first makes a commit that has every branch tip as a parent, with `git commit-tree`, and tags that. One row to remove later, but `commit-tree` joins the allowlist.
-- **C. No tag when the upstream is gone,** since the work most likely landed through a squash merge. Undo still works from the log for as long as git keeps the commits. Matches what decision 4 does for checkpoint sessions.
-
-Branches merged the normal way have nothing at risk and get no tag in any option.
+8. **A branch whose upstream is gone gets no backup tag.** Johan decided this on 2026-10-22, after asking for a way to remove all merged local branches at once. Such a branch was most likely squash-merged, so its own commits are not on main and the rule above would tag every one. Pruning his Diffract repo's 27 gone branches would have made 27 `archive/` tags, which come back as "old backup tag" leftovers 30 days later. Undo still works from the operation log for as long as git keeps the commits, as for checkpoint sessions in decision 4. The confirm dialog says this step cannot be undone once git has removed the commits. An unmerged branch whose upstream still exists keeps its tag.
 
 ### Hiding rows
 
