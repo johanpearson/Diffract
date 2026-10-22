@@ -22,91 +22,20 @@ public static class LargeHistory
         ["Fix flaky login test", "Add retry policy", "Refactor cart pricing", "Bump dependencies", "Räkna moms rätt",
          "Update README", "Extract service", "WIP", "Rename helpers", "Handle empty response"];
 
+    /// <summary>At most this many feature branches are open at once.</summary>
+    private const int MaxOpenBranches = 6;
+
     /// <param name="commits">How many commits, merges included.</param>
-    /// <param name="maxBranches">At most this many feature branches are open at once.</param>
-    public static async Task<LargeHistoryRepo> BuildAsync(TempDirectory temp, string name, int commits, int seed = 1, int maxBranches = 6)
+    public static async Task<LargeHistoryRepo> BuildAsync(TempDirectory temp, string name, int commits, int seed = 1)
     {
         var repo = await FixtureRepo.InitAsync(temp, name);
-        var (stream, stats) = Generate(commits, seed, maxBranches);
-        await FastImportAsync(temp, repo.Path, stream);
+        var history = new HistoryWriter(seed);
+        for (var mark = 1; mark <= commits; mark++)
+            history.AddCommit(mark);
+        await FastImportAsync(temp, repo.Path, history.Finish());
         // fast-import writes refs and objects only. Check main out, so the repo looks like any other.
         await repo.GitAsync("reset", "-q", "--hard", "main");
-        return stats with { Path = repo.Path };
-    }
-
-    /// <summary>The fast-import stream: main with feature branches that start from it, grow, and merge back.</summary>
-    private static (byte[] Stream, LargeHistoryRepo Stats) Generate(int commits, int seed, int maxBranches)
-    {
-        var random = new Random(seed);
-        var output = new MemoryStream();
-        var start = new DateTimeOffset(2024, 1, 1, 8, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
-        var tips = new Dictionary<string, int>();   // branch to its newest commit's mark
-        var open = new List<string>();
-        int merges = 0, tags = 0, mainCommits = 0, nextBranch = 1;
-
-        for (var mark = 1; mark <= commits; mark++)
-        {
-            var roll = random.NextDouble();
-            string branch;
-            int? parent, merged = null;
-            string? mergedBranch = null;
-
-            if (mark == 1 || roll < 0.3)
-            {
-                branch = "main";
-            }
-            else if (roll < 0.42 && open.Count < maxBranches)
-            {
-                branch = $"feature/{nextBranch++:D5}";
-                open.Add(branch);
-                tips[branch] = tips["main"];
-            }
-            else if (roll < 0.52 && open.Count > 0)
-            {
-                var done = open[random.Next(open.Count)];
-                open.Remove(done);
-                branch = "main";
-                merged = tips[done];
-                mergedBranch = done;
-                tips.Remove(done);
-                merges++;
-            }
-            else
-            {
-                branch = open.Count > 0 ? open[random.Next(open.Count)] : "main";
-            }
-
-            parent = tips.TryGetValue(branch, out var tip) ? tip : null;
-            var author = Authors[random.Next(Authors.Length)];
-            var subject = merged is null ? $"{Subjects[random.Next(Subjects.Length)]} ({mark})" : $"Merge {mergedBranch} ({mark})";
-            var when = start + mark * 60L;
-
-            Write(output, $"commit refs/heads/{branch}\nmark :{mark}\n");
-            Write(output, $"author {author} <{Email(author)}> {when} +0000\ncommitter {author} <{Email(author)}> {when} +0000\n");
-            Data(output, $"{subject}\n");
-            if (parent is { } p)
-                Write(output, $"from :{p}\n");
-            if (merged is { } m)
-                Write(output, $"merge :{m}\n");
-            Write(output, "M 644 inline history.txt\n");
-            Data(output, $"{mark}\n");
-            Write(output, "\n");
-            tips[branch] = mark;
-
-            // A merged branch is deleted, as most people do after merging. A null "from" deletes the ref.
-            if (merged is not null)
-                Write(output, $"reset refs/heads/{mergedBranch}\nfrom 0000000000000000000000000000000000000000\n\n");
-
-            // A release tag on every 1,000th commit on main.
-            if (branch == "main" && ++mainCommits % 1000 == 0)
-            {
-                tags++;
-                Write(output, $"reset refs/tags/v{tags}.0.0\nfrom :{mark}\n\n");
-            }
-        }
-
-        Write(output, "done\n");
-        return (output.ToArray(), new LargeHistoryRepo("", commits, merges, open.Count + 1, tags));
+        return history.Stats(commits) with { Path = repo.Path };
     }
 
     /// <summary>The author's ASCII letters, so the address stays plain whatever the name.</summary>
@@ -114,16 +43,6 @@ public static class LargeHistory
     {
         var local = new string([.. author.ToLowerInvariant().Where(char.IsAsciiLetter)]);
         return (local.Length > 0 ? local : "dev") + "@example.com";
-    }
-
-    private static void Write(MemoryStream output, string text) => output.Write(Encoding.UTF8.GetBytes(text));
-
-    /// <summary>fast-import's <c>data</c> counts bytes, not characters.</summary>
-    private static void Data(MemoryStream output, string text)
-    {
-        var bytes = Encoding.UTF8.GetBytes(text);
-        Write(output, $"data {bytes.Length.ToString(CultureInfo.InvariantCulture)}\n");
-        output.Write(bytes);
     }
 
     /// <summary>
@@ -158,5 +77,108 @@ public static class LargeHistory
         if (process.ExitCode != 0)
             throw new InvalidOperationException($"git fast-import failed with exit code {process.ExitCode}: {await stderr}");
         await stdout;
+    }
+
+    /// <param name="Merged">The mark of the branch tip a merge commit merges, or null for a plain commit.</param>
+    private sealed record Step(string Branch, int? Merged = null, string? MergedBranch = null);
+
+    /// <summary>The fast-import stream: main with feature branches that start from it, grow, and merge back.</summary>
+    private sealed class HistoryWriter(int seed)
+    {
+        private static readonly long Start = new DateTimeOffset(2024, 1, 1, 8, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+
+        private readonly Random _random = new(seed);
+        private readonly MemoryStream _output = new();
+        private readonly Dictionary<string, int> _tips = [];   // branch to its newest commit's mark
+        private readonly List<string> _open = [];
+        private int _merges;
+        private int _tags;
+        private int _mainCommits;
+        private int _nextBranch = 1;
+
+        public void AddCommit(int mark)
+        {
+            var step = ChooseStep(mark);
+            WriteCommit(mark, step);
+            _tips[step.Branch] = mark;
+
+            // A merged branch is deleted, as most people do after merging. A null "from" deletes the ref.
+            if (step.Merged is not null)
+                Write($"reset refs/heads/{step.MergedBranch}\nfrom 0000000000000000000000000000000000000000\n\n");
+
+            // A release tag on every 1,000th commit on main.
+            if (step.Branch == "main" && ++_mainCommits % 1000 == 0)
+            {
+                _tags++;
+                Write($"reset refs/tags/v{_tags}.0.0\nfrom :{mark}\n\n");
+            }
+        }
+
+        public byte[] Finish()
+        {
+            Write("done\n");
+            return _output.ToArray();
+        }
+
+        public LargeHistoryRepo Stats(int commits) => new("", commits, _merges, _open.Count + 1, _tags);
+
+        private Step ChooseStep(int mark)
+        {
+            var roll = _random.NextDouble();
+            if (mark == 1 || roll < 0.3)
+                return new Step("main");
+            if (roll < 0.42 && _open.Count < MaxOpenBranches)
+                return StartBranch();
+            if (roll < 0.52 && _open.Count > 0)
+                return MergeBranch();
+            return new Step(_open.Count > 0 ? _open[_random.Next(_open.Count)] : "main");
+        }
+
+        private Step StartBranch()
+        {
+            var branch = $"feature/{_nextBranch++:D5}";
+            _open.Add(branch);
+            _tips[branch] = _tips["main"];
+            return new Step(branch);
+        }
+
+        private Step MergeBranch()
+        {
+            var done = _open[_random.Next(_open.Count)];
+            _open.Remove(done);
+            var merged = _tips[done];
+            _tips.Remove(done);
+            _merges++;
+            return new Step("main", merged, done);
+        }
+
+        private void WriteCommit(int mark, Step step)
+        {
+            int? parent = _tips.TryGetValue(step.Branch, out var tip) ? tip : null;
+            var author = Authors[_random.Next(Authors.Length)];
+            var subject = step.Merged is null ? $"{Subjects[_random.Next(Subjects.Length)]} ({mark})" : $"Merge {step.MergedBranch} ({mark})";
+            var when = Start + mark * 60L;
+
+            Write($"commit refs/heads/{step.Branch}\nmark :{mark}\n");
+            Write($"author {author} <{Email(author)}> {when} +0000\ncommitter {author} <{Email(author)}> {when} +0000\n");
+            Data($"{subject}\n");
+            if (parent is { } p)
+                Write($"from :{p}\n");
+            if (step.Merged is { } m)
+                Write($"merge :{m}\n");
+            Write("M 644 inline history.txt\n");
+            Data($"{mark}\n");
+            Write("\n");
+        }
+
+        private void Write(string text) => _output.Write(Encoding.UTF8.GetBytes(text));
+
+        /// <summary>fast-import's <c>data</c> counts bytes, not characters.</summary>
+        private void Data(string text)
+        {
+            var bytes = Encoding.UTF8.GetBytes(text);
+            Write($"data {bytes.Length.ToString(CultureInfo.InvariantCulture)}\n");
+            _output.Write(bytes);
+        }
     }
 }

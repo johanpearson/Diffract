@@ -138,13 +138,11 @@ public class FixtureRepoBuilderTests
         var snapshot = await SnapshotAsync(temp, "Clean");
 
         var main = Assert.Single(snapshot.Worktrees);
-        Assert.Equal(0, main.DirtyFileCount);
-        Assert.Equal("main", Assert.Single(snapshot.Branches).Name);
-        Assert.Empty(snapshot.Tags);
-        Assert.Empty(snapshot.Stashes);
-        Assert.Empty(snapshot.OtherRefs);
-        Assert.Empty(snapshot.UnreachableCommits);
-        Assert.Empty(snapshot.LeftoverFolders);
+        Assert.Equal((0, "main"), (main.DirtyFileCount, Assert.Single(snapshot.Branches).Name));
+        // No tags, stashes, other refs, unreachable commits or leftover folders.
+        Assert.Equal(
+            (0, 0, 0, 0, 0),
+            (snapshot.Tags.Count, snapshot.Stashes.Count, snapshot.OtherRefs.Count, snapshot.UnreachableCommits.Count, snapshot.LeftoverFolders.Count));
     }
 
     [Fact]
@@ -294,11 +292,11 @@ public class FixtureRepoBuilderTests
 
     private static void AssertCheckpointSession(RepoSnapshot snapshot, string session, DateTimeOffset newest)
     {
-        Assert.Equal(3, snapshot.OtherRefs.Count);
+        // Three refs on three different commits, the newest at the given time, and no unreachable commits.
+        Assert.Equal(
+            (3, 3, newest, 0),
+            (snapshot.OtherRefs.Count, snapshot.OtherRefs.Select(r => r.TargetId).Distinct().Count(), snapshot.OtherRefs.Max(r => r.CreatedAt), snapshot.UnreachableCommits.Count));
         Assert.All(snapshot.OtherRefs, r => Assert.Matches($@"^refs/copilot/checkpoints/{session}/\d{{20}}/[0-9a-f-]{{36}}$", r.FullName));
-        Assert.Equal(3, snapshot.OtherRefs.Select(r => r.TargetId).Distinct().Count());
-        Assert.Equal(newest, snapshot.OtherRefs.Max(r => r.CreatedAt));
-        Assert.Empty(snapshot.UnreachableCommits);
     }
 
     [Fact]
@@ -322,8 +320,7 @@ public class FixtureRepoBuilderTests
 
         var worktree = Linked(snapshot);
         Assert.Equal(Full(temp.Combine("PrewarmWorktree", "copilot-worktrees", "repo", "copilot-prewarm-curly-waddle")), worktree.Path);
-        Assert.Equal((true, 0, 0), (worktree.IsDetached, worktree.DirtyFileCount, worktree.AheadOfMain));
-        Assert.Equal(Now.AddDays(-9), worktree.LastActivityAt);
+        Assert.Equal((true, 0, 0, Now.AddDays(-9)), (worktree.IsDetached, worktree.DirtyFileCount, worktree.AheadOfMain, worktree.LastActivityAt));
         Assert.Empty(snapshot.LeftoverFolders);
     }
 
@@ -392,12 +389,13 @@ public class FixtureRepoBuilderTests
 
         var linked = snapshot.Worktrees.Where(w => !w.IsMain).ToList();
         Assert.Equal(["feature/long", "feature/smörgås", "feature/spaces"], linked.Select(w => w.Branch).Order(StringComparer.Ordinal));
-        Assert.Contains(linked, w => w.Path == Full(temp.Combine("AwkwardPaths", "my worktrees", "feature with spaces")));
-        Assert.Contains(linked, w => w.Path == Full(temp.Combine("AwkwardPaths", "räksmörgås", "åäö ÅÄÖ")));
-        Assert.Contains(linked, w => w.Path.Length >= 200);
-        Assert.All(linked, w => Assert.Equal((0, 0, Now.AddDays(-3)), (w.DirtyFileCount, w.AheadOfMain, w.LastActivityAt)));
-        Assert.All(linked, w => Assert.True(Directory.Exists(w.Path)));
+        Assert.All(linked, w => Assert.Equal((0, 0, Now.AddDays(-3), true), (w.DirtyFileCount, w.AheadOfMain, w.LastActivityAt, Directory.Exists(w.Path))));
         Assert.Contains(snapshot.Branches, b => b.Name == "feature/smörgås" && b.IsMergedIntoMain);
+
+        var paths = linked.Select(w => w.Path).ToList();
+        Assert.Contains(Full(temp.Combine("AwkwardPaths", "my worktrees", "feature with spaces")), paths);
+        Assert.Contains(Full(temp.Combine("AwkwardPaths", "räksmörgås", "åäö ÅÄÖ")), paths);
+        Assert.Contains(paths, p => p.Length >= 200);
     }
 
     [Fact]
