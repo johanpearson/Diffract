@@ -20,36 +20,29 @@ public sealed class StaleBranchRule : ILeftoverRule
     public IEnumerable<Leftover> Evaluate(RepoSnapshot repo, DiffractConfig config, TimeProvider time)
     {
         var now = time.GetUtcNow();
-        foreach (var b in Branches.WithoutWorktree(repo))
-        {
-            if (Branches.IsMergedOrGone(b) || b.LastCommitAt is not { } last || now - last < TimeSpan.FromDays(config.StaleAfterDays))
-                continue;
-
-            yield return Branches.Leftover(config, b, Verdict.NeedsReview,
-                $"No commits for {Describe.Age(now - last)}, {Describe.AtRisk(b.CommitsAtRisk ?? 0)}");
-        }
+        return
+            from b in Branches.WithoutWorktree(repo)
+            where !Branches.IsMergedOrGone(b)
+            let idle = Branches.Idle(b, now)
+            where idle >= TimeSpan.FromDays(config.StaleAfterDays)
+            select Branches.Leftover(config, b, Verdict.NeedsReview,
+                $"No commits for {Describe.Age(idle.Value)}, {Describe.AtRisk(b.CommitsAtRisk ?? 0)}");
     }
 }
 
 /// <summary>A merged remote-tracking branch matching <c>remoteBranchPatterns</c>, still on the remote.</summary>
 public sealed class MergedRemoteBranchRule : ILeftoverRule
 {
-    public IEnumerable<Leftover> Evaluate(RepoSnapshot repo, DiffractConfig config, TimeProvider time)
-    {
-        foreach (var b in repo.Branches)
-        {
-            var slash = b.Name.IndexOf('/', StringComparison.Ordinal);
-            if (!b.IsRemote || !b.IsMergedIntoMain || slash < 0)
-                continue;
-
-            var (remote, name) = (b.Name[..slash], b.Name[(slash + 1)..]);
-            if (name == repo.MainBranch || !GlobMatcher.IsMatchAny(config.RemoteBranchPatterns, name, ignoreCase: false))
-                continue;
-
-            yield return new(LeftoverKind.RemoteBranch, b.Name, null, Attribution.ForBranch(config, name),
-                Verdict.SafeToRemove, 0, $"Merged into {repo.MainBranch}, still on {remote}");
-        }
-    }
+    public IEnumerable<Leftover> Evaluate(RepoSnapshot repo, DiffractConfig config, TimeProvider time) =>
+        from b in repo.Branches
+        where b.IsRemote && b.IsMergedIntoMain
+        let slash = b.Name.IndexOf('/', StringComparison.Ordinal)
+        where slash >= 0
+        let remote = b.Name[..slash]
+        let name = b.Name[(slash + 1)..]
+        where name != repo.MainBranch && GlobMatcher.IsMatchAny(config.RemoteBranchPatterns, name, ignoreCase: false)
+        select new Leftover(LeftoverKind.RemoteBranch, b.Name, null, Attribution.ForBranch(config, name),
+            Verdict.SafeToRemove, 0, $"Merged into {repo.MainBranch}, still on {remote}");
 }
 
 /// <summary>A stash whose message points to a tool, such as a rebase autostash.</summary>
@@ -144,15 +137,13 @@ public sealed class OldBackupTagRule : ILeftoverRule
     public IEnumerable<Leftover> Evaluate(RepoSnapshot repo, DiffractConfig config, TimeProvider time)
     {
         var now = time.GetUtcNow();
-        foreach (var t in repo.Tags)
-        {
-            if (!t.Name.StartsWith(config.Archive.TagPrefix, StringComparison.Ordinal) || t.CreatedAt is not { } created
-                || now - created < TimeSpan.FromDays(config.Archive.ReviewAfterDays))
-                continue;
-
-            yield return new(LeftoverKind.BackupTag, t.Name, null, null, Verdict.NeedsReview, t.CommitsAtRisk,
-                $"Backup tag is {Describe.Age(now - created)} old, {Describe.AtRisk(t.CommitsAtRisk ?? 0)}");
-        }
+        return
+            from t in repo.Tags
+            where t.Name.StartsWith(config.Archive.TagPrefix, StringComparison.Ordinal)
+            let age = now - t.CreatedAt
+            where age >= TimeSpan.FromDays(config.Archive.ReviewAfterDays)
+            select new Leftover(LeftoverKind.BackupTag, t.Name, null, null, Verdict.NeedsReview, t.CommitsAtRisk,
+                $"Backup tag is {Describe.Age(age.Value)} old, {Describe.AtRisk(t.CommitsAtRisk ?? 0)}");
     }
 }
 
