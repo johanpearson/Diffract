@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { messageOf } from "../model/format";
-import type { DiffLayout, FileSides, FileView } from "./monacoEditor";
+import type { ChangeAction, DiffLayout, FileSides, FileView } from "./monacoEditor";
 
 /** Loads Monaco the first time a diff is shown. Every diff after that reuses the loaded module. */
 export const loadMonaco = () => import("./monacoEditor");
@@ -10,10 +10,12 @@ interface Props {
   layout: DiffLayout;
   /** The view once Monaco has loaded, for the change buttons. */
   onView(view: FileView | null): void;
+  /** A button above each change, such as "Stage hunk". None in history. */
+  actions?: readonly ChangeAction[];
 }
 
 /** A read-only Monaco view of a changed file, following the Windows theme. */
-export function MonacoDiff({ sides, layout, onView }: Props) {
+export function MonacoDiff({ sides, layout, onView, actions }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const { view, error } = useFileView(container, layout);
 
@@ -23,6 +25,9 @@ export function MonacoDiff({ sides, layout, onView }: Props) {
   useEffect(() => {
     view?.setLayout(layout);
   }, [view, layout]);
+  useEffect(() => {
+    if (actions) view?.setActions(actions);
+  }, [view, actions]);
   useEffect(() => onView(view), [view, onView]);
   useFollowTheme(view);
 

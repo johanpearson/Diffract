@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** in progress. Phases 0 to 2 are done; phase 3, commit, is next.
+**Status:** in progress. Phases 0 to 3 are done; phase 4, the Changes view, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -120,6 +120,8 @@ Johan accepted all these proposals on 2026-10-22, in #43. Decision 11 came from 
 - Status says which remote branch already has HEAD, read side by side with status, so the view knows before a click whether amend is allowed.
 - A commit may take up to 10 minutes, not the usual 30 seconds, as a `pre-commit` hook may run linters or tests.
 
+**Done** 2026-10-23, in #47. Windows CI also found a write that failed instead of waiting when an agent let go of the index lock at just the wrong moment; that is fixed there too. Failing tests now show as annotations on the PR.
+
 ## Phase 4: the Changes view
 
 From the visual plan:
@@ -129,6 +131,8 @@ From the visual plan:
 - The commit box under the lists: Commit is enabled when something is staged and the message has a subject.
 - Keyboard: up and down move through the files, Space stages or unstages the selected file, Ctrl+Enter commits.
 - Folders that are this repo's own worktrees, such as an agent's worktree under `.claude/worktrees`, are not listed. Any other nested repo is listed without Stage.
+- Each change in the diff has its Stage hunk or Unstage hunk button just above it. Monaco hides its own lines from screen readers, so the bar above the diff also goes through the changes one at a time, with the same action, for the keyboard.
+- Fetch, Pull and Push join the bar in phase 5, with what they do.
 - After a commit, History shows it at the top, as for any new commit.
 - Tests: Vitest for the lists and the commit box. Playwright against a fake sidecar: stage a file, stage a hunk, commit, see the lists empty.
 

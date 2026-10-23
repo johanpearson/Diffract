@@ -43,15 +43,11 @@ export function DiffPane({ client, repoId, file, storage, onClose }: Props) {
 
 const layoutLabels: Record<DiffLayout, string> = { sideBySide: "Side by side", inline: "Inline" };
 
-function DiffTools({ layout, onLayout, view }: { layout: DiffLayout; onLayout(layout: DiffLayout): void; view: FileView | null }) {
+/** Previous and next change, and the side by side or inline choice. Without `moves`, only the layout. */
+export function DiffTools({ layout, onLayout, view, moves = true }: { layout: DiffLayout; onLayout(layout: DiffLayout): void; view: FileView | null; moves?: boolean }) {
   return (
     <>
-      <button className="abtn small" disabled={!view} onClick={() => view?.goToChange("previous")} title="Previous change" aria-label="Previous change">
-        ↑ Previous
-      </button>
-      <button className="abtn small" disabled={!view} onClick={() => view?.goToChange("next")} title="Next change" aria-label="Next change">
-        ↓ Next
-      </button>
+      {moves && <ChangeMoves view={view} />}
       <div className="segmented" role="group" aria-label="Diff layout">
         {(["sideBySide", "inline"] as const).map((l) => (
           <button key={l} className="abtn small" aria-pressed={layout === l} onClick={() => onLayout(l)}>
@@ -63,7 +59,21 @@ function DiffTools({ layout, onLayout, view }: { layout: DiffLayout; onLayout(la
   );
 }
 
-function useStoredLayout(storage: AppHost["storage"]): [DiffLayout, (layout: DiffLayout) => void] {
+function ChangeMoves({ view }: { view: FileView | null }) {
+  return (
+    <>
+      <button className="abtn small" disabled={!view} onClick={() => view?.goToChange("previous")} title="Previous change" aria-label="Previous change">
+        ↑ Previous
+      </button>
+      <button className="abtn small" disabled={!view} onClick={() => view?.goToChange("next")} title="Next change" aria-label="Next change">
+        ↓ Next
+      </button>
+    </>
+  );
+}
+
+/** The diff layout the user chose last, in history or in Changes alike. */
+export function useStoredLayout(storage: AppHost["storage"]): [DiffLayout, (layout: DiffLayout) => void] {
   const [layout, setLayout] = useState<DiffLayout>(() => (storage.get(DiffLayoutKey) === "inline" ? "inline" : "sideBySide"));
   return [
     layout,

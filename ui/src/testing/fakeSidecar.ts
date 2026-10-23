@@ -21,6 +21,7 @@ import type {
   TerminalInfo,
   TerminalKind,
 } from "../protocol";
+import { sampleWorktrees, type FakeWorktree } from "./fakeChanges";
 import { detailsOf, generateHistory, sampleFiles } from "./fakeHistory";
 import { FakeTransport } from "./fakeTransport";
 
@@ -93,6 +94,10 @@ export class FakeSidecar {
   readonly files = new Map<string, HistoryFile>(sampleFiles);
   /** Every blob history.file was asked for. */
   readonly filesAsked: string[] = [];
+  /** The changes of each worktree, by path, lower case. changes.* reads and changes them. */
+  readonly worktreeChanges = sampleWorktrees();
+  /** The params of every changes.stage and changes.unstage, in order. */
+  readonly stagesAsked: { method: string; paths?: string[]; hunk?: { path: string; id: string } }[] = [];
 
   private readonly waiting: (() => void)[] = [];
 
@@ -137,19 +142,51 @@ export class FakeSidecar {
   }
 
   /** As if `count` commits were made on main: they go on top of the history, main moves, and repo.changed follows. */
-  commitOnMain(repoId: string, count: number): void {
+  commitOnMain(repoId: string, count: number, subject?: string): void {
     const main = this.refs.find((r) => r.kind === "Branch" && r.name === "main")!;
     let parent = main.targetId;
     const added: CommitEntry[] = [];
     for (let i = 0; i < count; i++) {
       const at = new Date(Date.parse("2026-10-21T09:00:00+02:00") + (++this.newCommits) * 1000).toISOString();
       const id = this.newCommits.toString(16).padStart(40, "f");
-      added.unshift({ id, parentIds: [parent], authorName: "Claude", authorEmail: "noreply@anthropic.com", authoredAt: at, committedAt: at, subject: `New commit ${this.newCommits}` });
+      added.unshift({ id, parentIds: [parent], authorName: "Claude", authorEmail: "noreply@anthropic.com", authoredAt: at, committedAt: at, subject: subject ?? `New commit ${this.newCommits}` });
       parent = id;
     }
     this.history = [...added, ...this.history];
     this.refs = this.refs.map((r) => (r === main ? { ...r, targetId: parent } : r));
     this.change(repoId, (s) => ({ ...s, takenAt: new Date(Date.parse(s.takenAt) + this.newCommits * 1000).toISOString() }));
+  }
+
+  /** The changes of one worktree. */
+  worktree(path: string): FakeWorktree {
+    const worktree = this.worktreeChanges.get(path.toLowerCase());
+    if (!worktree) throw { code: -32602, message: `Not a worktree of this repo with files to show: ${path}` };
+    return worktree;
+  }
+
+  private changes(method: keyof Methods, params: unknown): unknown {
+    const p = params as { repoId: string; worktree: string; path?: string; staged?: boolean; paths?: string[]; hunk?: { path: string; id: string }; message?: string; amend?: boolean };
+    const worktree = this.worktree(p.worktree);
+    switch (method) {
+      case "changes.status":
+        return worktree.status;
+      case "changes.file":
+        return worktree.diff(p.path ?? "", p.staged ?? false);
+      case "changes.stage":
+      case "changes.unstage": {
+        this.stagesAsked.push({ method, paths: p.paths, hunk: p.hunk });
+        const from = method === "changes.stage" ? "unstaged" : "staged";
+        if (p.hunk) return worktree.moveHunk(p.hunk.path, p.hunk.id, from);
+        return from === "unstaged" ? worktree.stage(p.paths ?? []) : worktree.unstage(p.paths ?? []);
+      }
+      case "changes.commit": {
+        const status = worktree.commit(p.message ?? "", p.amend ?? false);
+        // A new commit on main shows at the top of History, as the watcher would make it.
+        if (status.branch === "main" && !p.amend) this.commitOnMain(p.repoId, 1, (p.message ?? "").split("\n")[0]);
+        return { commitId: status.headCommit, status };
+      }
+    }
+    return undefined;
   }
 
   private newCommits = 0;
@@ -296,6 +333,12 @@ export class FakeSidecar {
       case "repo.close":
       case "app.shutdown":
         return null;
+      case "changes.status":
+      case "changes.file":
+      case "changes.stage":
+      case "changes.unstage":
+      case "changes.commit":
+        return this.changes(method, params);
     }
   }
 }
