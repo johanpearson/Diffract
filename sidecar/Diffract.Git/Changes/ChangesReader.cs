@@ -48,11 +48,19 @@ public sealed class ChangesReader
         _blobs = new BlobReader(runnerOptions);
     }
 
-    /// <summary>The worktree's branch and changed files, untracked files one by one. One git call.</summary>
+    /// <summary>
+    /// The worktree's branch and changed files, untracked files one by one, and whether HEAD is pushed. Two git calls,
+    /// run side by side.
+    /// </summary>
     public async Task<WorktreeChanges> ReadStatusAsync(string worktree, CancellationToken ct)
     {
-        var result = await new GitRunner(worktree, _runnerOptions).RunAsync(StatusParser.ChangesArguments, ct).ConfigureAwait(false);
-        return WorktreeChanges.From(worktree, StatusParser.Parse(result.StandardOutput));
+        var runner = new GitRunner(worktree, _runnerOptions);
+        var statusTask = runner.RunAsync(StatusParser.ChangesArguments, ct);
+        var onRemoteTask = HeadOnRemote.ReadAsync(runner, ct);
+        await Task.WhenAll(statusTask, onRemoteTask).ConfigureAwait(false);
+        var status = StatusParser.Parse((await statusTask.ConfigureAwait(false)).StandardOutput);
+        var onRemote = await onRemoteTask.ConfigureAwait(false);
+        return WorktreeChanges.From(worktree, status) with { HeadOnRemote = status.Branch.Oid is null ? null : onRemote.Name() };
     }
 
     /// <summary>

@@ -8,6 +8,7 @@
     "upstream": "origin/claude/räksmörgås-fix",
     "ahead": 2,
     "behind": 1,
+    "headOnRemote": "origin/claude/räksmörgås-fix",
     "files": [
       {
         "path": "src/räksmörgås.cs",

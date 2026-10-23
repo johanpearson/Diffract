@@ -22,7 +22,8 @@
     "TimedOut",
     "ConfigInvalid",
     "IndexLocked",
-    "ChangedSinceShown"
+    "ChangedSinceShown",
+    "CommitRefused"
   ],
   "changeKind": [
     "WorktreeFiles",

@@ -7,7 +7,7 @@ namespace Diffract.Sidecar;
 
 /// <summary>
 /// The Changes view's methods for one worktree. <c>changes.status</c> and <c>changes.file</c> only read.
-/// <c>changes.stage</c> and <c>changes.unstage</c> write through a changes runner, which allows nothing but
+/// <c>changes.stage</c>, <c>changes.unstage</c> and <c>changes.commit</c> write through a changes runner, which allows nothing but
 /// <see cref="ChangesPolicy"/>. The worktree must be one in the repo's snapshot, so git only ever runs where the repo lives.
 /// </summary>
 internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runnerOptions)
@@ -46,6 +46,17 @@ internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runner
     /// <summary>Unstages files, or one hunk of the staged diff, then answers with the new status.</summary>
     public Task<JsonElement> UnstageAsync(JsonElement? parameters, CancellationToken ct) =>
         ChangeAsync(parameters, new Change((w, paths, t) => w.UnstageAsync(paths, t), (w, hunk, t) => w.UnstageHunkAsync(hunk, t)), ct);
+
+    /// <summary>Commits what is staged, or amends the last commit, then answers with the new commit and status.</summary>
+    public async Task<JsonElement> CommitAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var commit = SidecarMethods.Params<ChangesCommitParams>(parameters);
+        var worktree = WorktreeOf(commit.RepoId, commit.Worktree);
+        var request = new CommitRequest(SidecarMethods.Required(commit.Message, "message"), commit.Amend);
+        await Checked(() => new CommitWriter(worktree, runnerOptions).CommitAsync(request, ct)).ConfigureAwait(false);
+        var status = await _reader.ReadStatusAsync(worktree, ct).ConfigureAwait(false);
+        return SidecarMethods.Result(new ChangesCommitResult(status.HeadCommit!, status));
+    }
 
     private async Task<JsonElement> ChangeAsync(JsonElement? parameters, Change change, CancellationToken ct)
     {

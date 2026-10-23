@@ -47,7 +47,7 @@ internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, Cance
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit"];
 
     /// <summary>
     /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only or changes
@@ -63,6 +63,7 @@ internal sealed class SidecarMethods : IDisposable
         (typeof(ChangesPolicyViolationException), null),
         (typeof(IndexLockedException), ErrorKind.IndexLocked),
         (typeof(ChangedSinceShownException), ErrorKind.ChangedSinceShown),
+        (typeof(CommitRefusedException), ErrorKind.CommitRefused),
         (typeof(GitException), ErrorKind.GitFailed),
         (typeof(Win32Exception), ErrorKind.GitFailed),
         (typeof(ConfigException), ErrorKind.ConfigInvalid),
@@ -116,6 +117,7 @@ internal sealed class SidecarMethods : IDisposable
             ["changes.file"] = _changes.FileAsync,
             ["changes.stage"] = _changes.StageAsync,
             ["changes.unstage"] = _changes.UnstageAsync,
+            ["changes.commit"] = _changes.CommitAsync,
             ["system.openFolder"] = OpenFolder,
             ["system.listTerminals"] = (_, _) => Task.FromResult(Result(_terminal.List())),
             ["system.openTerminal"] = OpenTerminal,

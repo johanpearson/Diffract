@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** in progress. Phases 0 and 1 are done; phase 2, the changes runner and staging, is next.
+**Status:** in progress. Phases 0 to 2 are done; phase 3, commit, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -110,11 +110,15 @@ Johan accepted all these proposals on 2026-10-22, in #43. Decision 11 came from 
 - Stage and unstage a hunk: the patch is built from the hunk the UI shows, applied with `git apply --cached`, and checked to still fit. If the file changed in the meantime, nothing is staged and the user is told to look again.
 - Tests: every case from phase 0 step 2, in fixture repos. After each, `git diff --cached` shows exactly the hunk and nothing else. A locked index, as in decision 9.
 
+**Done** 2026-10-22, in #46. Before the first commit there is no HEAD for `restore --staged`, so unstaging uses `git rm --cached`, which keeps the files on disk; Johan merged it as proposed. A new or deleted file is staged as a whole: with no context lines it is one hunk anyway.
+
 ## Phase 3: commit
 
 - Commit with the message from the box, subject and body. Amend as in decision 5.
 - A missing name or email, a failing hook or a failing signature are each shown plainly, with git's own message underneath.
 - Tests: commits in fixture repos with set author and dates, a multi-line message, non-ASCII text, a failing `pre-commit` hook, amend allowed and refused, an empty commit refused.
+- Status says which remote branch already has HEAD, read side by side with status, so the view knows before a click whether amend is allowed.
+- A commit may take up to 10 minutes, not the usual 30 seconds, as a `pre-commit` hook may run linters or tests.
 
 ## Phase 4: the Changes view
 
@@ -149,7 +153,7 @@ The methods grow phase by phase. Listed here so their shapes are decided togethe
 | `changes.status` | `repoId`, worktree | branch, ahead and behind, and the files with their state |
 | `changes.file` | `repoId`, worktree, path, staged or not, and the file's `headId` and `indexId` from `changes.status` | the two sides, each as `history.file` answers |
 | `changes.stage` / `changes.unstage` | `repoId`, worktree, paths or one hunk | the new status |
-| `changes.commit` | `repoId`, worktree, message, amend | the new commit |
+| `changes.commit` | `repoId`, worktree, message, amend | the new commit and the new status |
 | `remote.fetch` / `remote.pull` / `remote.push` | `repoId`, worktree | what happened, or why git refused |
 | `branch.create` / `branch.switch` / `tag.create` | `repoId`, worktree, commit, name | the new ref, or why git refused |
 | `branch.reset` / `branch.undoReset` | `repoId`, worktree, commit, soft or mixed | the old and new commit of the branch |

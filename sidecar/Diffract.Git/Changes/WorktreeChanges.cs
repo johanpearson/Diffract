@@ -108,6 +108,12 @@ public sealed record WorktreeChanges
     /// <summary>Commits on the upstream that the branch lacks.</summary>
     public int? Behind { get; init; }
 
+    /// <summary>
+    /// The remote-tracking branch that already has the commit at HEAD, such as "origin/main". Null when none has it,
+    /// and before the first commit. Amend is allowed only when this is null.
+    /// </summary>
+    public string? HeadOnRemote { get; init; }
+
     /// <summary>In git's order: tracked files by path, then untracked ones.</summary>
     public required IReadOnlyList<ChangedFile> Files { get; init; }
 

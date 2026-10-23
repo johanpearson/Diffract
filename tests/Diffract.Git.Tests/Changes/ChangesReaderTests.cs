@@ -57,7 +57,7 @@ public sealed class ChangesReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task Status_lists_every_kind_of_change_with_one_git_call()
+    public async Task Status_lists_every_kind_of_change_with_two_git_calls_side_by_side()
     {
         var repo = await RepoAsync(("modified.txt", "a\n"), ("staged.txt", "a\n"), ("both.txt", "a\n"), ("deleted.txt", "d\n"), ("old name.txt", "r\n"));
         repo.WriteFile("modified.txt", "b\n");
@@ -83,7 +83,7 @@ public sealed class ChangesReaderTests : IDisposable
         ], changes.Files.Select(f => (f.Path, f.Staged, f.Unstaged)));
         Assert.Equal("old name.txt", changes.Files.Single(f => f.Path == "ny räka.txt").OldPath);
         Assert.Equal(("main", await repo.RevParseAsync("HEAD")), (changes.Branch, changes.HeadCommit));
-        Assert.Equal(StatusParser.ChangesArguments, Assert.Single(_calls).Arguments);
+        Assert.Equal([HeadOnRemote.Arguments, StatusParser.ChangesArguments], _calls.Select(c => c.Arguments).OrderBy(a => a[0], StringComparer.Ordinal));
     }
 
     [Fact]
