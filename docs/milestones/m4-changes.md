@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** in progress. Phases 0 to 4 are done; phase 5, fetch, pull and push, is next.
+**Status:** in progress. Phases 0 to 5 are done; phase 6, the history menu, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -142,6 +142,8 @@ From the visual plan:
 
 - Fetch, pull and push as in decisions 6 and 7, against the remote of the current branch. They run in the background and can be cancelled. The bar shows they are running and what came of it.
 - Tests: against a bare fixture remote: fetch with new commits, pull that fast-forwards, pull refused because the branch diverged, first push that sets the upstream, push refused because the remote moved on. A remote that cannot be reached gives a plain message within the timeout.
+
+**Done** 2026-10-24, in #49. A branch that follows a remote branch with another name, such as `topic` following `origin/main`, is not pushed from Diffract, and the button says why; Johan merged it as proposed, so that stays a job for a terminal.
 
 ## Phase 6: the history menu
 
