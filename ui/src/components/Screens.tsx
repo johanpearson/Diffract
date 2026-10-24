@@ -2,12 +2,14 @@ import type { GitUpdate } from "../model/useGitUpdate";
 import type { RepoSession } from "../model/useRepoSession";
 import type { Terminals } from "../model/useTerminals";
 import type { Screen } from "../model/session";
+import type { RepoState } from "../protocol";
 import { ErrorPanel } from "./ErrorPanel";
 import { LeftoversView, type Filter } from "./LeftoversView";
 import { Sidebar } from "./Sidebar";
 import { Splitter, useStoredSize, type SizeSpec } from "./Splitter";
 import { tabId, Tabs, type View } from "./Tabs";
 import { HistoryView } from "../history/HistoryView";
+import { ChangesView } from "../changes/ChangesView";
 
 /** What the screens need besides the screen itself. */
 export interface ScreenProps {
@@ -109,10 +111,23 @@ function Ready(props: ScreenProps) {
     <>
       <Tabs view={view} onView={onView} />
       <div className={`tab-panel ${view}`} role="tabpanel" aria-labelledby={tabId(view)}>
-        {view === "history" ? <HistoryView key={state.repoId} client={repo.session.client} state={state} now={props.now} storage={repo.session.host.storage} /> : <Leftovers {...props} />}
+        <ViewOf {...props} state={state} />
       </div>
     </>
   );
+}
+
+function ViewOf(props: ScreenProps & { state: RepoState }) {
+  const { repo, view, state } = props;
+  const { client, host } = repo.session;
+  switch (view) {
+    case "history":
+      return <HistoryView key={state.repoId} client={client} state={state} now={props.now} storage={host.storage} />;
+    case "changes":
+      return <ChangesView key={state.repoId} client={client} state={state} openedPath={repo.session.repo.current?.path ?? state.repoRoot} storage={host.storage} />;
+    case "leftovers":
+      return <Leftovers {...props} />;
+  }
 }
 
 function refreshBlocked(updatingGit: boolean, scanning: boolean): string | null {

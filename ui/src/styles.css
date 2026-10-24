@@ -1122,3 +1122,236 @@ body {
 .files .del {
   color: var(--red);
 }
+
+/* Changes: the file lists and commit box on the left, the diff on the right. Only the lists and the diff scroll. */
+.tab-panel.changes,
+.view.changes {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.view.changes .muted {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.ref.branch {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--lane-0);
+}
+
+.worktree-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.worktree-picker select {
+  max-width: 420px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+
+.notice.warn {
+  background: var(--amber-soft);
+  border-color: var(--amber);
+}
+
+.changes-body {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.changes-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+}
+
+.change-lists {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px;
+}
+
+.change-lists:focus-visible {
+  outline-offset: -2px;
+}
+
+.change-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 6px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.change-count {
+  font-weight: 400;
+}
+
+.empty.small {
+  font-size: 12px;
+  padding: 2px 6px 6px;
+}
+
+.change-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.change-row:hover {
+  background: var(--panel-2);
+}
+
+.change-row[aria-selected="true"] {
+  background: var(--sel);
+}
+
+.change-lists:focus-visible .change-row[aria-selected="true"] {
+  outline: 1px solid var(--focus);
+}
+
+.change-letter {
+  width: 14px;
+  flex: none;
+  font-weight: 700;
+}
+
+.change-letter.add {
+  color: var(--ok);
+}
+
+.change-letter.mod {
+  color: var(--amber);
+}
+
+.change-letter.del {
+  color: var(--red);
+}
+
+.change-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The row's button shows on hover and on the selected row, as in the visual plan. */
+.change-row .abtn {
+  opacity: 0;
+}
+
+.change-row:hover .abtn,
+.change-row[aria-selected="true"] .abtn {
+  opacity: 1;
+}
+
+.change-blocked {
+  flex: none;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.commit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.commit-box textarea {
+  height: 72px;
+  resize: vertical;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px;
+}
+
+.commit-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.commit-refusal {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--red);
+  background: var(--red-soft);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.diff-side {
+  color: var(--ink-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* The line above a change in the diff that holds its Stage hunk or Unstage hunk button. */
+.change-action {
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+  font-family: var(--sans);
+}
+
+.change-action .abtn {
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.view.changes .notice {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.hunk-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hunk-place {
+  color: var(--ink-2);
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 0 4px;
+}

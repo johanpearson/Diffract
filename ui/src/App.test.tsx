@@ -117,6 +117,9 @@ describe("App", () => {
     expect(screen.getByRole("tabpanel", { name: "History" })).toBeTruthy();
     expect(sent(sidecar, "history.read")[0]?.params).toMatchObject({ repoId: sampleState.repoId });
     fireEvent.keyDown(screen.getByRole("tab", { name: "History" }), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Changes" }));
+    expect(await screen.findByRole("listbox", { name: "Changed files" })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Changes" }), { key: "ArrowRight" });
     expect(await screen.findByRole("list", { name: "Leftovers" })).toBeTruthy();
     expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Worktrees and agents" }));
     vi.restoreAllMocks();
@@ -324,6 +327,7 @@ describe("App", () => {
       expect(await screen.findByRole("listbox", { name: "Commits" })).toBeTruthy();
       expect(screen.getAllByRole("tab").map((t) => [t.textContent, t.getAttribute("aria-selected")])).toEqual([
         ["History", "true"],
+        ["Changes", "false"],
         ["Worktrees and agents", "false"],
       ]);
       vi.restoreAllMocks();
