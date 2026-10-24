@@ -1,0 +1,10 @@
+{
+  "repoId": "1",
+  "worktree": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+  "reset": {
+    "branch": "claude/räksmörgås-fix",
+    "oldCommit": "9fceb02d0ae598e95dc970b74767f19372d61af8",
+    "newCommit": "e83c5163316f89bfbde7d9ab23ca2e25604af290",
+    "mode": "Soft"
+  }
+}

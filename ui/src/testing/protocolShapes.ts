@@ -173,7 +173,7 @@ const hunk = object<Hunk>({ id: string, oldStart: number, oldLines: number, newS
 
 const refChange = object<RefChange>({ ref: nullable(string), message: string });
 
-const resetResult = object<ResetResult>({ branch: string, oldCommit: string, newCommit: string, mode: oneOf(resetModes) });
+export const resetResult = object<ResetResult>({ branch: string, oldCommit: string, newCommit: string, mode: oneOf(resetModes) });
 
 const remoteSyncResult = object<RemoteSyncResult>({ outcome: oneOf(remoteOutcomes), message: string, status: worktreeChanges });
 
