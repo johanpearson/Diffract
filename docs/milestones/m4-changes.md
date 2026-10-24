@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** in progress. Phases 0 to 5 are done; phase 6, the history menu, is next.
+**Status:** in progress. Phases 0 to 6 are done; phase 7, protocol and contract samples, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -152,21 +152,37 @@ From the visual plan:
 - Reset asks soft or mixed in a confirm dialog that lists the commits leaving the branch. "Undo reset" is offered in the result, and moves the branch back only if it is still where the reset left it.
 - Tests: fixture repos for each item, including switching with uncommitted changes that git refuses, a remote-tracking branch, a detached HEAD, a taken branch name, and reset then undo, ending where it started. Playwright: the menu opens by mouse and keyboard, and runs each item against the fake sidecar.
 
+**Done** 2026-10-24, in #50. Johan merged both proposals: names are checked by a read-only `ref.checkName` before anything runs, with `git check-ref-format` added to the read-only allowlist, and the menu acts on the worktree the repo was opened from.
+
 ## Phase 7: protocol and contract samples
 
-The methods grow phase by phase. Listed here so their shapes are decided together.
+The methods grew phase by phase. This is what they settled on. Every method answers a sample in `tests/Diffract.Sidecar.Tests/Contract/`, and every method that takes params has a request sample in `Contract/requests/`, written from the sidecar's own types. The UI's tests check both against the TypeScript types, so a field the two sides name or type differently fails a test.
 
 | Method | Params | Result |
 |---|---|---|
-| `changes.status` | `repoId`, worktree | branch, ahead and behind, and the files with their state |
-| `changes.file` | `repoId`, worktree, path, staged or not, and the file's `headId` and `indexId` from `changes.status` | the two sides, each as `history.file` answers |
-| `changes.stage` / `changes.unstage` | `repoId`, worktree, paths or one hunk | the new status |
-| `changes.commit` | `repoId`, worktree, message, amend | the new commit and the new status |
-| `remote.fetch` / `remote.pull` / `remote.push` | `repoId`, worktree | what happened, or why git refused |
-| `branch.create` / `branch.switch` / `tag.create` | `repoId`, worktree, commit, name | the new ref, or why git refused |
-| `branch.reset` / `branch.undoReset` | `repoId`, worktree, commit, soft or mixed | the old and new commit of the branch |
+| `changes.status` | `repoId`, `worktree` | the branch, upstream, ahead and behind, the remote branch that has HEAD, and the files with their state |
+| `changes.file` | `repoId`, `worktree`, `path`, `oldPath`, `staged`, and the file's `headId` and `indexId` from `changes.status` | the two sides, each as `history.file` answers, and the hunks |
+| `changes.stage` / `changes.unstage` | `repoId`, `worktree`, and either `paths` or one `hunk` (`path`, `oldPath`, `id`) | the new status |
+| `changes.commit` | `repoId`, `worktree`, `message`, `amend` | the new commit and the new status |
+| `remote.fetch` / `remote.pull` / `remote.push` | `repoId`, `worktree` | `outcome` (Done, UpToDate, Diverged or Rejected), a plain `message`, and the new status |
+| `ref.checkName` | `repoId`, `worktree`, `kind` (Branch or Tag), `name` | why the name cannot be used, or null. Only reads |
+| `branch.create` | `repoId`, `worktree`, `commit`, `name`, `switch` | the new ref and a plain `message` |
+| `tag.create` | `repoId`, `worktree`, `commit`, `name`, `message` | the new ref and a plain `message` |
+| `branch.switch` | `repoId`, `worktree`, and one of `branch`, `remoteBranch` or `commit` | the ref now checked out, null when detached, and a plain `message` |
+| `branch.reset` | `repoId`, `worktree`, `commit`, `mode` (Soft or Mixed) | the branch, its old and new commit, and the mode |
+| `branch.undoReset` | `repoId`, `worktree`, and `reset`, the result of `branch.reset` as it came | the move back, in the same shape |
 
-Status changes arrive as `repo.changed`, as they already do. Contract samples for every shape, as in milestone 2.
+Commits are always full ids. Status changes arrive as `repo.changed`, as they already do.
+
+When git or Diffract refuses, the error's `data.kind` says why, and its message says it in plain words with git's own output under it:
+
+| Kind | Code | When |
+|---|---|---|
+| `IndexLocked` | -32006 | another git process held the index for 2 seconds |
+| `ChangedSinceShown` | -32007 | a hunk's file changed since its diff was read; nothing was staged |
+| `CommitRefused` | -32008 | nothing was committed: no identity, nothing staged, a pushed commit to amend, or a hook or signing failed |
+| `RemoteFailed` | -32009 | a fetch, pull or push could not run or finish, such as an unreachable remote |
+| `ChangeRefused` | -32010 | a branch, tag, switch or reset was not made, such as a switch over uncommitted changes |
 
 ## Phase 8: real-world check
 
