@@ -14,7 +14,7 @@ afterEach(() => {
 const [merge, root] = sampleCommits as [(typeof sampleCommits)[0], (typeof sampleCommits)[0]];
 
 function setup(sidecar = new FakeSidecar()) {
-  render(<HistoryView client={new RpcClient(sidecar.transport)} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} storage={{ get: () => null, set: () => {} }} />);
+  render(<HistoryView client={new RpcClient(sidecar.transport)} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} openedPath={sampleState.repoRoot} storage={{ get: () => null, set: () => {} }} />);
   return sidecar;
 }
 

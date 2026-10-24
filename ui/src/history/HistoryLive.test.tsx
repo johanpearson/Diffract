@@ -31,7 +31,7 @@ function setup(history: CommitEntry[], refs: HistoryRef[], stored: Record<string
   const saved = new Map(Object.entries(stored));
   const storage = { get: (key: string) => saved.get(key) ?? null, set: (key: string, value: string) => void saved.set(key, value) };
   const client = new RpcClient(sidecar.transport);
-  const view = (s: RepoState) => <HistoryView client={client} state={s} now={new Date("2026-10-21T09:30:00+02:00")} storage={storage} />;
+  const view = (s: RepoState) => <HistoryView client={client} state={s} now={new Date("2026-10-21T09:30:00+02:00")} openedPath={s.repoRoot} storage={storage} />;
   const { rerender } = render(view(state));
   let snapshots = 0;
   /** As after a repo.changed: the same repo, a newer snapshot. */

@@ -8,15 +8,19 @@ import { DiffPane } from "./DiffPane";
 import { fadedCommits } from "./emphasis";
 import { FindBox } from "./FindBox";
 import { HistoryList } from "./HistoryList";
+import { currentWorktree, HistoryMenu, RefNoteBar, useOpenMenu } from "./HistoryMenu";
 import { HistoryToggles, useHistoryToggles, type Toggles } from "./HistoryToggles";
 import { markersByCommit } from "./markers";
 import { useCommitDetails } from "./useCommitDetails";
 import { useHistory, type History } from "./useHistory";
+import { useRefActions } from "./useRefActions";
 
 interface Props {
   client: RpcClient;
   state: RepoState;
   now: Date;
+  /** The folder the repo was opened from. The menu's switch and reset act on its worktree. */
+  openedPath: string;
   /** Remembers panel sizes and the diff layout. */
   storage: AppHost["storage"];
 }
@@ -25,7 +29,7 @@ export const DetailsWidth: SizeSpec = { key: "diffract.size.details", initial: 3
 export const DiffHeight: SizeSpec = { key: "diffract.size.diff", initial: 380, min: 120, max: 1600 };
 
 /** The repo's history as a graph, with the selected commit's details beside it and a file's diff below. */
-export function HistoryView({ client, state, now, storage }: Props) {
+export function HistoryView({ client, state, now, openedPath, storage }: Props) {
   const [toggles, setToggle] = useHistoryToggles(storage);
   const show = { checkpoints: toggles.checkpoints, stashes: toggles.stashes };
   const history = useHistory(client, state.repoId, state.takenAt, show);
@@ -41,6 +45,9 @@ export function HistoryView({ client, state, now, storage }: Props) {
   const panel = useRef<HTMLElement>(null);
   const find = useRef<HTMLInputElement>(null);
   const [detailsWidth, setDetailsWidth] = useStoredSize(storage, DetailsWidth);
+  const current = currentWorktree(state, openedPath, history.refs.refs);
+  const actions = useRefActions(client, state.repoId, current.path);
+  const menu = useOpenMenu();
 
   useHistoryKeys({ onFind: () => find.current?.focus(), onEscape: diff.file ? diff.close : null });
 
@@ -56,9 +63,10 @@ export function HistoryView({ client, state, now, storage }: Props) {
         </span>
       </div>
       <ReadError error={history.error} />
+      <RefNoteBar actions={actions} />
       <div className="history-body" style={{ gridTemplateColumns: `minmax(0, 1fr) auto ${detailsWidth}px` }}>
         <div className="history-main">
-          <HistoryList history={history} markers={markers} faded={faded} selected={selection.index} onSelect={selection.select} onOpen={() => panel.current?.focus()} now={now} />
+          <HistoryList history={history} markers={markers} faded={faded} selected={selection.index} onSelect={selection.select} onOpen={() => panel.current?.focus()} onMenu={menu.open} now={now} />
           {diff.file && <DiffArea client={client} repoId={state.repoId} file={diff.file} storage={storage} onClose={diff.close} />}
         </div>
         <Splitter label="Resize commit details" orientation="vertical" spec={DetailsWidth} size={detailsWidth} onSize={setDetailsWidth} growsForward={false} />
@@ -72,6 +80,7 @@ export function HistoryView({ client, state, now, storage }: Props) {
           onOpenFile={diff.open}
         />
       </div>
+      <HistoryMenu client={client} state={state} commits={history.commits} refs={history.refs.refs} markers={markers} current={current} actions={actions} menu={menu.menu} onClose={menu.close} />
     </section>
   );
 }

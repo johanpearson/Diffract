@@ -1,0 +1,84 @@
+import { expect, test, type Page } from "@playwright/test";
+import type {} from "../src/e2eHost";
+
+// The repo in the repo.open contract sample: main on a merge, whose first parent is the root commit with origin/main
+// and v1.0 on it.
+const repoRoot = "C:\\src\\shop";
+
+async function openHistory(page: Page) {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Open a repo" })).toBeVisible();
+  await page.evaluate((path) => (window.diffractTest.nextFolder = path), repoRoot);
+  await page.getByRole("button", { name: "Open repo…" }).first().click();
+  await expect(rows(page)).toHaveCount(2);
+}
+
+const list = (page: Page) => page.getByRole("listbox", { name: "Commits" });
+const rows = (page: Page) => list(page).getByRole("option");
+const menu = (page: Page) => page.getByRole("menu");
+const dialog = (page: Page) => page.getByRole("dialog");
+const asked = (page: Page) => page.evaluate(() => window.diffractTest.sidecar.refsAsked.map((a) => a.method).filter((m) => m !== "ref.checkName"));
+
+/** Right-clicks the root commit's row and picks an item. */
+async function onRoot(page: Page, item: string | RegExp) {
+  await rows(page).nth(1).click({ button: "right" });
+  await menu(page).getByRole("menuitem", { name: item }).click();
+}
+
+test("opens with the keyboard on the selected row, and copies its hash", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await openHistory(page);
+  await list(page).focus();
+
+  await page.keyboard.press("Shift+F10");
+  await expect(menu(page).getByRole("menuitem").first()).toBeFocused();
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByText("Copied the hash.")).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^9fceb02d/);
+});
+
+test("creates a branch without switching, then switches to it from its row", async ({ page }) => {
+  await openHistory(page);
+  await onRoot(page, "Create branch here…");
+
+  await dialog(page).getByRole("textbox", { name: "Name" }).fill("main");
+  await expect(dialog(page).getByText("There is already a branch named main.")).toBeVisible();
+  await dialog(page).getByRole("textbox", { name: "Name" }).fill("fix/räksmörgås");
+  await dialog(page).getByRole("checkbox", { name: "Switch to it" }).uncheck();
+  await dialog(page).getByRole("button", { name: "Create branch" }).click();
+  await expect(page.getByText(/^Created branch fix\/räksmörgås at 4b825dc6\.$/)).toBeVisible();
+  await expect(rows(page).nth(1)).toContainText("fix/räksmörgås");
+
+  await onRoot(page, "Switch to fix/räksmörgås");
+
+  await expect(page.getByText("Switched to fix/räksmörgås.")).toBeVisible();
+  expect(await asked(page)).toEqual(["branch.create", "branch.switch"]);
+});
+
+test("creates a tag, and checks out a commit on a detached HEAD", async ({ page }) => {
+  await openHistory(page);
+  await onRoot(page, "Create tag here…");
+  await dialog(page).getByRole("textbox", { name: "Name" }).fill("v2.0");
+  await dialog(page).getByRole("button", { name: "Create tag" }).click();
+  await expect(page.getByText("Created tag v2.0 at 4b825dc6.")).toBeVisible();
+
+  await onRoot(page, "Check out this commit (detached)");
+
+  await expect(page.getByText("Checked out 4b825dc6 on a detached HEAD.")).toBeVisible();
+  expect(await asked(page)).toEqual(["tag.create", "branch.switch"]);
+});
+
+test("resets main soft after showing what leaves it, and undoes the reset", async ({ page }) => {
+  await openHistory(page);
+  await onRoot(page, "Reset main to here…");
+
+  await expect(dialog(page)).toContainText("1 commit leaves main:");
+  await expect(dialog(page).getByRole("radio", { name: /Soft/ })).toBeChecked();
+  await dialog(page).getByRole("button", { name: "Reset" }).click();
+  await expect(page.getByText("Reset main (soft) from 9fceb02d to 4b825dc6.")).toBeVisible();
+  await page.getByRole("button", { name: "Undo reset" }).click();
+
+  await expect(page.getByText("Undid the reset: main is back at 9fceb02d.")).toBeVisible();
+  expect(await asked(page)).toEqual(["branch.reset", "branch.undoReset"]);
+});

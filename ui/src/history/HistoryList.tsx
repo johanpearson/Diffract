@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import type { CommitEntry } from "../protocol";
 import { formatAge } from "../model/format";
 import { graphMetrics, graphWidth, type GraphRow } from "./drawGraph";
@@ -20,13 +20,15 @@ interface Props {
   onSelect(index: number): void;
   /** Enter: move to the details. */
   onOpen(): void;
+  /** A right-click on a row, or the menu key or Shift+F10 on the list: open the row's menu at this point. */
+  onMenu(index: number, at: { x: number; y: number }): void;
   now: Date;
 }
 
 const { rowHeight } = graphMetrics;
 
 /** Every commit, one row each, with the graph on the left. Only the rows in view are drawn. */
-export function HistoryList({ history, markers, faded, selected, onSelect, onOpen, now }: Props) {
+export function HistoryList({ history, markers, faded, selected, onSelect, onOpen, onMenu, now }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const viewport = useViewport(scrollRef);
   const { scrollTop, height } = viewport;
@@ -49,6 +51,15 @@ export function HistoryList({ history, markers, faded, selected, onSelect, onOpe
     onSelect(next);
   };
 
+  const onContextMenu = (event: MouseEvent<HTMLDivElement>) => {
+    const row = (event.target as HTMLElement).closest<HTMLElement>("[data-index]");
+    const index = row ? Number(row.dataset.index) : selected;
+    if (index < 0) return;
+    event.preventDefault();
+    if (index !== selected) onSelect(index);
+    onMenu(index, menuPoint(event, row ?? document.getElementById(optionId(index))));
+  };
+
   const shown = commits.slice(range.first, range.end);
   return (
     <div
@@ -60,6 +71,7 @@ export function HistoryList({ history, markers, faded, selected, onSelect, onOpe
       aria-activedescendant={selected >= 0 ? optionId(selected) : undefined}
       onScroll={onScroll}
       onKeyDown={onKeyDown}
+      onContextMenu={onContextMenu}
     >
       <div className="history-rows" role="presentation" style={{ height: commits.length * rowHeight }}>
         <GraphCanvas row={row} range={range} width={width} colors={colors} version={history.version} />
@@ -145,6 +157,7 @@ function CommitRow({ commit: c, index, count, color, markers = [], faded, select
   return (
     <div
       id={optionId(index)}
+      data-index={index}
       role="option"
       aria-selected={selected}
       aria-setsize={count}
@@ -163,6 +176,16 @@ function CommitRow({ commit: c, index, count, color, markers = [], faded, select
       </time>
     </div>
   );
+}
+
+/**
+ * Where a row's menu opens: at the pointer, or under the row's start for the menu key and Shift+F10, which raise
+ * contextmenu with no pointer position.
+ */
+function menuPoint(event: MouseEvent, row: HTMLElement | null): { x: number; y: number } {
+  if (event.clientX !== 0 || event.clientY !== 0 || row === null) return { x: event.clientX, y: event.clientY };
+  const rect = row.getBoundingClientRect();
+  return { x: rect.left + 24, y: rect.bottom };
 }
 
 function optionId(index: number): string {
