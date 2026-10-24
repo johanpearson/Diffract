@@ -28,6 +28,7 @@ public class ReadOnlyPolicyTests
     [InlineData("show-ref --verify refs/heads/main")]
     [InlineData("diff-tree -r -z --always --root --raw --numstat HEAD")]
     [InlineData("cat-file blob 0123456789abcdef0123456789abcdef01234567")]
+    [InlineData("check-ref-format refs/heads/topic")]
     public void Allows_reads(string commandLine)
     {
         Assert.True(ReadOnlyPolicy.IsAllowed(commandLine.Split(' '), out var reason), reason);

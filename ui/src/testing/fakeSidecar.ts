@@ -22,6 +22,7 @@ import type {
   TerminalKind,
 } from "../protocol";
 import { sampleWorktrees, type FakeWorktree } from "./fakeChanges";
+import { answerRefs } from "./fakeRefs";
 import { detailsOf, generateHistory, sampleFiles } from "./fakeHistory";
 import { FakeTransport } from "./fakeTransport";
 
@@ -189,6 +190,9 @@ export class FakeSidecar {
     return undefined;
   }
 
+  /** Every ref.checkName, branch.* and tag.create asked for, with its params, in order. */
+  readonly refsAsked: { method: string; params: unknown }[] = [];
+
   /** Every fetch, pull and push asked for, as "remote.pull C:\\src\\shop". */
   readonly remoteAsked: string[] = [];
 
@@ -351,6 +355,14 @@ export class FakeSidecar {
       case "remote.pull":
       case "remote.push":
         return this.remote(method, params as { worktree: string });
+      case "ref.checkName":
+      case "branch.create":
+      case "branch.switch":
+      case "tag.create":
+      case "branch.reset":
+      case "branch.undoReset":
+        this.refsAsked.push({ method, params });
+        return answerRefs(this, method, params as Parameters<typeof answerRefs>[2]);
     }
   }
 }

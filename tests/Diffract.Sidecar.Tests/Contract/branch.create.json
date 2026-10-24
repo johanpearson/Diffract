@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "ref": "refs/heads/fix/räksmörgås",
+    "message": "Created branch fix/räksmörgås at e83c5163, and switched to it."
+  }
+}

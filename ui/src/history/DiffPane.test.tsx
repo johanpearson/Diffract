@@ -48,7 +48,7 @@ const list = () => screen.getByRole("listbox", { name: "Commits" });
 
 function setup(sidecar = new FakeSidecar(), storage = memory()) {
   const client = new RpcClient(sidecar.transport);
-  render(<HistoryView client={client} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} storage={storage} />);
+  render(<HistoryView client={client} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} openedPath={sampleState.repoRoot} storage={storage} />);
   return { sidecar, client, storage };
 }
 

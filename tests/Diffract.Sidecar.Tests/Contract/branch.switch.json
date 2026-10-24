@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "ref": null,
+    "message": "Checked out e83c5163 on a detached HEAD."
+  }
+}

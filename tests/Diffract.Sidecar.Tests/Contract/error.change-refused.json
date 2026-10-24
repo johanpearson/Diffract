@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32010,
+    "message": "Git did not switch, so nothing changed. Git refuses rather than overwrite uncommitted changes. This is what git said:\n\nerror: Your local changes to the following files would be overwritten by checkout:\n\tsrc/räksmörgås.cs",
+    "data": {
+      "kind": "ChangeRefused"
+    }
+  }
+}

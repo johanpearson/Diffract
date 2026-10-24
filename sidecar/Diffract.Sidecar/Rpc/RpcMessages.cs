@@ -40,7 +40,7 @@ internal sealed record RpcError(
 internal sealed record RpcErrorData(ErrorKind Kind);
 
 /// <summary>What went wrong, for errors that are Diffract's own rather than the protocol's.</summary>
-internal enum ErrorKind { NotARepo, GitTooOld, GitFailed, TimedOut, ConfigInvalid, IndexLocked, ChangedSinceShown, CommitRefused, RemoteFailed }
+internal enum ErrorKind { NotARepo, GitTooOld, GitFailed, TimedOut, ConfigInvalid, IndexLocked, ChangedSinceShown, CommitRefused, RemoteFailed, ChangeRefused }
 
 /// <summary>The error codes JSON-RPC 2.0 defines, the one LSP adds for cancellation, and Diffract's own.</summary>
 internal static class RpcErrorCodes
@@ -65,6 +65,7 @@ internal static class RpcErrorCodes
         [ErrorKind.ChangedSinceShown] = -32007,
         [ErrorKind.CommitRefused] = -32008,
         [ErrorKind.RemoteFailed] = -32009,
+        [ErrorKind.ChangeRefused] = -32010,
     };
 
     public static int For(ErrorKind kind) => Codes.GetValueOrDefault(kind, InternalError);
@@ -133,4 +134,13 @@ internal static class RpcJson
 [JsonSerializable(typeof(ChangesCommitParams))]
 [JsonSerializable(typeof(ChangesCommitResult))]
 [JsonSerializable(typeof(RemoteSyncResult))]
+[JsonSerializable(typeof(RefCheckNameParams))]
+[JsonSerializable(typeof(RefNameCheck))]
+[JsonSerializable(typeof(BranchCreateParams))]
+[JsonSerializable(typeof(TagCreateParams))]
+[JsonSerializable(typeof(BranchSwitchParams))]
+[JsonSerializable(typeof(BranchResetParams))]
+[JsonSerializable(typeof(BranchUndoResetParams))]
+[JsonSerializable(typeof(Diffract.Git.Refs.RefChange))]
+[JsonSerializable(typeof(Diffract.Git.Refs.ResetResult))]
 internal sealed partial class RpcJsonContext : JsonSerializerContext;

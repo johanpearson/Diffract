@@ -5,6 +5,7 @@ import type { Hunk, RepoState, WorktreeChanges, WorktreeInfo } from "../protocol
 import type { RpcClient } from "../rpc";
 import { ChangesDiff } from "./ChangesDiff";
 import { CommitBox } from "./CommitBox";
+import { samePath, worktreeOf } from "../model/worktrees";
 import { listsOf, type Entry, type Lists } from "./entries";
 import { FileLists } from "./FileLists";
 import { RemoteActions, RemoteNotice } from "./RemoteBar";
@@ -182,11 +183,6 @@ function inUseReason(state: RepoState, worktree: string): string | null {
   return leftover?.reason ?? null;
 }
 
-/** The worktree that holds `path`, the longest match first, as a worktree can sit inside another. */
-function worktreeOf(path: string, worktrees: WorktreeInfo[]): string | null {
-  const inside = worktrees.filter((w) => samePath(w.path, path) || normalize(path).startsWith(`${normalize(w.path)}/`));
-  return inside.sort((a, b) => b.path.length - a.path.length)[0]?.path ?? null;
-}
 
 /**
  * The selected row, kept by key. When it goes, as after staging it, the same file in the other list is selected if
@@ -197,12 +193,4 @@ function useSelection(lists: Lists | null) {
   const all = lists ? [...lists.unstaged, ...lists.staged] : [];
   const entry = all.find((e) => e.key === key) ?? all.find((e) => key !== null && e.file.path === key.slice(key.indexOf(":") + 1)) ?? all[0] ?? null;
   return { entry, select: (e: Entry) => setKey(e.key) };
-}
-
-function normalize(path: string): string {
-  return path.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
-}
-
-function samePath(a: string, b: string): boolean {
-  return normalize(a) === normalize(b);
 }

@@ -24,7 +24,8 @@
     "IndexLocked",
     "ChangedSinceShown",
     "CommitRefused",
-    "RemoteFailed"
+    "RemoteFailed",
+    "ChangeRefused"
   ],
   "changeKind": [
     "WorktreeFiles",
@@ -84,5 +85,13 @@
     "UpToDate",
     "Diverged",
     "Rejected"
+  ],
+  "refNameKind": [
+    "Branch",
+    "Tag"
+  ],
+  "resetMode": [
+    "Soft",
+    "Mixed"
   ]
 }

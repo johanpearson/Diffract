@@ -122,7 +122,7 @@ function ViewOf(props: ScreenProps & { state: RepoState }) {
   const { client, host } = repo.session;
   switch (view) {
     case "history":
-      return <HistoryView key={state.repoId} client={client} state={state} now={props.now} storage={host.storage} />;
+      return <HistoryView key={state.repoId} client={client} state={state} now={props.now} openedPath={repo.session.repo.current?.path ?? state.repoRoot} storage={host.storage} />;
     case "changes":
       return <ChangesView key={state.repoId} client={client} state={state} openedPath={repo.session.repo.current?.path ?? state.repoRoot} storage={host.storage} />;
     case "leftovers":
