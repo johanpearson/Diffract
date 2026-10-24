@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** in progress. Phases 0 to 3 are done; phase 4, the Changes view, is next.
+**Status:** in progress. Phases 0 to 4 are done; phase 5, fetch, pull and push, is next.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -135,6 +135,8 @@ From the visual plan:
 - Fetch, Pull and Push join the bar in phase 5, with what they do.
 - After a commit, History shows it at the top, as for any new commit.
 - Tests: Vitest for the lists and the commit box. Playwright against a fake sidecar: stage a file, stage a hunk, commit, see the lists empty.
+
+**Done** 2026-10-24, in #48. A changed submodule is listed without Stage for now, as staging one needs more than `git add`; Johan merged it as proposed.
 
 ## Phase 5: fetch, pull and push
 

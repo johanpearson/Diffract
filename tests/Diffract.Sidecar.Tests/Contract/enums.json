@@ -23,7 +23,8 @@
     "ConfigInvalid",
     "IndexLocked",
     "ChangedSinceShown",
-    "CommitRefused"
+    "CommitRefused",
+    "RemoteFailed"
   ],
   "changeKind": [
     "WorktreeFiles",
@@ -77,5 +78,11 @@
     "Conflicted",
     "Submodule",
     "NestedRepo"
+  ],
+  "remoteOutcome": [
+    "Done",
+    "UpToDate",
+    "Diverged",
+    "Rejected"
   ]
 }

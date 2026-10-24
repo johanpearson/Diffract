@@ -7,7 +7,9 @@ import { ChangesDiff } from "./ChangesDiff";
 import { CommitBox } from "./CommitBox";
 import { listsOf, type Entry, type Lists } from "./entries";
 import { FileLists } from "./FileLists";
+import { RemoteActions, RemoteNotice } from "./RemoteBar";
 import { useChanges } from "./useChanges";
+import { useRemote } from "./useRemote";
 
 interface Props {
   client: RpcClient;
@@ -46,10 +48,12 @@ function ChangesBody({ client, state, worktree, worktrees, onWorktree, storage }
       <div className="bar">
         <h1 id="changes-title">Changes</h1>
         {changes.status && <BranchInfo status={changes.status} />}
+        {changes.status && <RemoteActions status={changes.status} remote={model.remote} disabled={changes.busy || model.warning !== null} />}
         <WorktreePicker worktree={worktree} worktrees={worktrees} onWorktree={onWorktree} />
       </div>
       {model.warning && <InUseWarning reason={model.warning} onAccept={model.accept} />}
       {changes.problem && <Problem message={changes.problem} onDismiss={changes.dismissProblem} />}
+      <RemoteNotice remote={model.remote} />
       {changes.status && lists ? <ChangesMain model={model} status={changes.status} lists={lists} storage={storage} /> : <Reading shown={!changes.problem} />}
     </>
   );
@@ -58,6 +62,7 @@ function ChangesBody({ client, state, worktree, worktrees, onWorktree, storage }
 /** One worktree's changes, the rows selected and what the user may do now. */
 function useChangesModel(client: RpcClient, state: RepoState, worktree: string) {
   const changes = useChanges(client, state.repoId, worktree);
+  const remote = useRemote(client, state.repoId, worktree, changes.apply);
   const inUse = inUseReason(state, worktree);
   const [accepted, setAccepted] = useState(false);
   const lists = useMemo(() => (changes.status ? listsOf(changes.status, state.snapshot.worktrees) : null), [changes.status, state.snapshot.worktrees]);
@@ -75,7 +80,9 @@ function useChangesModel(client: RpcClient, state: RepoState, worktree: string) 
     onToggleHunk,
     warning,
     accept: () => setAccepted(true),
-    locked: changes.busy || warning !== null,
+    remote,
+    // A pull moves the branch and the index, so nothing is staged or committed while it runs.
+    locked: changes.busy || warning !== null || remote.running === "pull",
   };
 }
 
@@ -161,7 +168,7 @@ function WorktreePicker({ worktree, worktrees, onWorktree }: { worktree: string;
 function InUseWarning({ reason, onAccept }: { reason: string; onAccept(): void }) {
   return (
     <div className="notice warn" role="alert">
-      <span>An agent may be working in this worktree: {reason} Staging or committing here can mix with its work.</span>
+      <span>An agent may be working in this worktree: {reason} Staging, committing, pulling or pushing here can mix with its work.</span>
       <button className="abtn" onClick={onAccept}>
         Work here anyway
       </button>

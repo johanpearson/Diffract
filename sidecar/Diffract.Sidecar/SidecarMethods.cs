@@ -41,13 +41,13 @@ internal sealed record SidecarDependencies
 internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, CancellationToken ct);
 
 /// <summary>
-/// The methods the sidecar answers. Every git call goes through a read-only runner, apart from staging, which goes
-/// through a changes runner that allows nothing but <see cref="ChangesPolicy"/>.
+/// The methods the sidecar answers. Every git call goes through a read-only runner, apart from staging, committing,
+/// fetch, pull and push, which go through a changes runner that allows nothing but <see cref="ChangesPolicy"/>.
 /// </summary>
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit", "remote.fetch", "remote.pull", "remote.push"];
 
     /// <summary>
     /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only or changes
@@ -64,6 +64,7 @@ internal sealed class SidecarMethods : IDisposable
         (typeof(IndexLockedException), ErrorKind.IndexLocked),
         (typeof(ChangedSinceShownException), ErrorKind.ChangedSinceShown),
         (typeof(CommitRefusedException), ErrorKind.CommitRefused),
+        (typeof(RemoteFailedException), ErrorKind.RemoteFailed),
         (typeof(GitException), ErrorKind.GitFailed),
         (typeof(Win32Exception), ErrorKind.GitFailed),
         (typeof(ConfigException), ErrorKind.ConfigInvalid),
@@ -77,6 +78,7 @@ internal sealed class SidecarMethods : IDisposable
     private readonly HistoryReader _history;
     private readonly HistoryUpdater _historyUpdates;
     private readonly ChangesMethods _changes;
+    private readonly RemoteMethods _remote;
     private readonly DiffractConfig _config;
     private readonly Func<string, JsonElement, Task> _notify;
     private readonly Dictionary<string, MethodHandler> _handlers;
@@ -101,7 +103,9 @@ internal sealed class SidecarMethods : IDisposable
             changed => _notify("repo.changed", Result(changed)),
             d.Log,
             paused: () => _updater.IsRunning);
-        _changes = new ChangesMethods(_repos, RunnerOptions);
+        var worktrees = new RepoWorktrees(_repos);
+        _changes = new ChangesMethods(worktrees, RunnerOptions);
+        _remote = new RemoteMethods(worktrees, RunnerOptions);
         _handlers = new Dictionary<string, MethodHandler>
         {
             ["app.info"] = async (_, ct) => Result(await AppInfoAsync(ct).ConfigureAwait(false)),
@@ -118,6 +122,9 @@ internal sealed class SidecarMethods : IDisposable
             ["changes.stage"] = _changes.StageAsync,
             ["changes.unstage"] = _changes.UnstageAsync,
             ["changes.commit"] = _changes.CommitAsync,
+            ["remote.fetch"] = _remote.FetchAsync,
+            ["remote.pull"] = _remote.PullAsync,
+            ["remote.push"] = _remote.PushAsync,
             ["system.openFolder"] = OpenFolder,
             ["system.listTerminals"] = (_, _) => Task.FromResult(Result(_terminal.List())),
             ["system.openTerminal"] = OpenTerminal,

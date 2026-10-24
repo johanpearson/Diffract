@@ -274,3 +274,100 @@ describe("the Changes view", () => {
     expect(await screen.findByText(/merge conflict/)).toBeTruthy();
   });
 });
+
+describe("fetch, pull and push", () => {
+  const remote = () => screen.getByRole("group", { name: "Remote" });
+  const button = (name: string | RegExp) => within(remote()).getByRole("button", { name });
+
+  it("says where push goes, pushes, and shows the result and the new counts", async () => {
+    const sidecar = setup();
+    await ready();
+
+    fireEvent.click(button("Push to origin/main"));
+
+    await waitFor(() => expect(remote().textContent).toContain("Pushed main to origin/main."));
+    expect(screen.getByRole("status").textContent).toBe("Up to date with origin/main");
+    expect(sidecar.remoteAsked).toEqual([`remote.push ${mainWorktree}`]);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("offers a branch without an upstream a push to a new branch on origin, and no pull", async () => {
+    setup(new FakeSidecar(), agentWorktree);
+    await ready();
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Work here anyway" }));
+
+    expect(button("Push to new origin/claude/räksmörgås-fix").hasAttribute("disabled")).toBe(false);
+    expect(button("Pull").getAttribute("title")).toBe("claude/räksmörgås-fix does not follow a branch on a remote yet. Push it first.");
+    expect(button("Pull").hasAttribute("disabled")).toBe(true);
+  });
+
+  it("is disabled in an agent's worktree until the user chooses to work there", async () => {
+    setup(new FakeSidecar(), agentWorktree);
+    await ready();
+
+    expect(button("Fetch").hasAttribute("disabled")).toBe(true);
+  });
+
+  it("says when pull could not fast-forward, until dismissed", async () => {
+    const sidecar = new FakeSidecar();
+    const wt = sidecar.worktree(mainWorktree);
+    wt.status = { ...wt.status, behind: 2 };
+    setup(sidecar);
+    await ready();
+
+    fireEvent.click(button("Pull"));
+
+    const notice = await screen.findByRole("alert");
+    expect(notice.textContent).toContain("main and origin/main have both moved on.");
+    fireEvent.click(within(notice).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows what is running with Cancel, and cancelling leaves nothing to read", async () => {
+    const sidecar = new FakeSidecar();
+    sidecar.held.add("remote.fetch");
+    setup(sidecar);
+    await ready();
+
+    fireEvent.click(button("Fetch"));
+
+    expect(remote().textContent).toContain("Fetching…");
+    expect(within(remote()).queryByRole("button", { name: "Fetch" })).toBeNull();
+    expect(within(group("Unstaged")).getAllByRole("button", { name: /^Stage/ })[0]!.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(button("Cancel"));
+    await waitFor(() => expect(button("Fetch")).toBeTruthy());
+    expect(sidecar.transport.sent.some((m) => m.method === "$/cancelRequest")).toBe(true);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("holds staging while a pull runs, as it moves the branch", async () => {
+    const sidecar = new FakeSidecar();
+    sidecar.held.add("remote.pull");
+    setup(sidecar);
+    await ready();
+
+    fireEvent.click(button("Pull"));
+
+    expect(remote().textContent).toContain("Pulling…");
+    expect(within(group("Unstaged")).getAllByRole("button", { name: /^Stage/ })[0]!.hasAttribute("disabled")).toBe(true);
+    act(() => sidecar.release());
+    await waitFor(() => expect(remote().textContent).toContain("Nothing to pull."));
+  });
+
+  it("shows git's own words when the remote cannot be reached", async () => {
+    const sidecar = new FakeSidecar();
+    sidecar.failures.set("remote.fetch", {
+      error: {
+        code: -32009,
+        message: "Git could not fetch from origin. Check the network, and that you can sign in. This is what git said:\n\nfatal: unable to access 'https://github.com/johan/shop.git/'",
+        data: { kind: "RemoteFailed" },
+      },
+    });
+    setup(sidecar);
+    await ready();
+
+    fireEvent.click(button("Fetch"));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("fatal: unable to access");
+  });
+});

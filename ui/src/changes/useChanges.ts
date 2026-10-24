@@ -18,6 +18,8 @@ export interface Changes {
   toggleHunk(entry: Entry, hunk: Hunk): void;
   /** Resolves with null when it committed, or with why not, which the commit box shows. */
   commit(message: string, amend: boolean): Promise<string | null>;
+  /** Shows a status that arrived with another answer, such as a pull's. */
+  apply(status: WorktreeChanges): void;
 }
 
 /**
@@ -66,6 +68,8 @@ export function useChanges(client: RpcClient, repoId: string, worktree: string):
     [show, read],
   );
 
+  const apply = useCallback((next: WorktreeChanges) => show(++latest.current, next), [show]);
+
   const act = useCallback((action: () => Promise<WorktreeChanges>) => void run(action).then((failed) => failed && setProblem(failed)), [run]);
 
   return {
@@ -77,6 +81,7 @@ export function useChanges(client: RpcClient, repoId: string, worktree: string):
     unstage: (entries) => act(() => client.call("changes.unstage", { repoId, worktree, paths: pathsOf(entries) })),
     toggleHunk: (entry, hunk) => act(() => client.call(entry.side === "unstaged" ? "changes.stage" : "changes.unstage", { repoId, worktree, hunk: hunkOf(entry, hunk) })),
     commit: (message, amend) => run(async () => (await client.call("changes.commit", { repoId, worktree, message, amend })).status),
+    apply,
   };
 }
 

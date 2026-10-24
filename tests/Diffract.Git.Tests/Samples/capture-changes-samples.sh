@@ -6,7 +6,7 @@
 # Nothing outside that folder is written by git. Run from Git Bash, or any bash:
 #   tests/Diffract.Git.Tests/Samples/capture-changes-samples.sh
 #
-# The arguments must match StatusParser.ChangesArguments and FilePatch.Arguments. The tests check that they do.
+# The arguments must match StatusParser.ChangesArguments, FilePatch.Arguments and BranchTracking.Arguments. The tests check that they do.
 # Status prints paths relative to the worktree, so no temp path ends up in a sample.
 set -euo pipefail
 
@@ -103,5 +103,33 @@ hunks -- ":(literal)new.txt" > "$out/diff-new-file.bin"
 hunks -- ":(literal)image.bin" > "$out/diff-binary.bin"
 git mv old.txt "renamed.txt" && printf 'keep\nrenamed\nplease\n' > renamed.txt && git add renamed.txt
 hunks --cached -M -- ":(literal)renamed.txt" ":(literal)old.txt" > "$out/diff-staged-rename.bin"
+
+# --- push: one line per ref, as --porcelain writes them ------------------------
+# The temp folder's path is in the "To" line, so it is replaced with C:/remote.git.
+push() { git push --porcelain "$@" 2> /dev/null | sed "s|$tmp/push-origin.git|C:/remote.git|" || true; }
+git init -q --bare -b main "$tmp/push-origin.git"
+git clone -q "$tmp/push-origin.git" "$tmp/push-a" 2> /dev/null
+git clone -q "$tmp/push-origin.git" "$tmp/push-b" 2> /dev/null
+cd "$tmp/push-a"
+commit a.txt "a" "First"
+push -u origin main > "$out/push-new-branch.txt"
+# Branches with and without an upstream, one following a branch of another name, and a detached HEAD.
+tracking() { git for-each-ref "--format=%(HEAD)%00%(refname)%00%(upstream:remotename)%00%(upstream:remoteref)%00%(upstream)%00%(upstream:short)" refs/heads/; }
+git branch "räksmörgås"
+git branch --track other origin/main > /dev/null
+tracking > "$out/tracking-branches.bin"
+git switch -q --detach
+tracking > "$out/tracking-detached.bin"
+git switch -q main
+commit a.txt "aa" "Second"
+push origin main > "$out/push-fast-forward.txt"
+push origin main > "$out/push-up-to-date.txt"
+cd "$tmp/push-b"
+git pull -q 2> /dev/null
+commit b.txt "b" "Elsewhere"
+push origin main > /dev/null
+cd "$tmp/push-a"
+commit a.txt "aaa" "Diverged"
+push origin main > "$out/push-rejected.txt"
 
 echo "Samples written to $out"

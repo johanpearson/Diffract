@@ -62,3 +62,11 @@ public sealed class GitVersionTooOldException(GitVersion found)
 {
     public GitVersion Found { get; } = found;
 }
+
+/// <summary>A fetch, pull or push that could not run or did not finish. Says why in plain words, with git's own output when there is some.</summary>
+public sealed class RemoteFailedException(string reason, string? gitOutput = null)
+    : GitException(gitOutput is null ? reason : $"{reason}\n\n{gitOutput.Trim()}")
+{
+    public string Reason { get; } = reason;
+    public string? GitOutput { get; } = gitOutput;
+}

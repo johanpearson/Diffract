@@ -23,8 +23,10 @@ export type LeftoverKind = (typeof leftoverKinds)[number];
  * IndexLocked: another git process, probably an agent, held the index for 2 seconds; try again later.
  * ChangedSinceShown: the file changed since its diff was read, so nothing was staged; read it again.
  * CommitRefused: nothing was committed. The message says why, with git's own output under it for a hook or signing.
+ * RemoteFailed: a fetch, pull or push could not run or did not finish, such as an unreachable remote. The message says
+ * why, with git's own output under it.
  */
-export const errorKinds = ["NotARepo", "GitTooOld", "GitFailed", "TimedOut", "ConfigInvalid", "IndexLocked", "ChangedSinceShown", "CommitRefused"] as const;
+export const errorKinds = ["NotARepo", "GitTooOld", "GitFailed", "TimedOut", "ConfigInvalid", "IndexLocked", "ChangedSinceShown", "CommitRefused", "RemoteFailed"] as const;
 export type ErrorKind = (typeof errorKinds)[number];
 
 /** What a live change refreshed. */
@@ -396,6 +398,23 @@ export interface ChangesCommitResult {
   status: WorktreeChanges;
 }
 
+/**
+ * How a fetch, pull or push ended, when git did not fail. UpToDate: nothing to pull or push. Diverged: pull did
+ * nothing, as the branch and its upstream both have commits the other lacks. Rejected: git did not push, as the
+ * remote branch has commits this one lacks; pull first.
+ */
+export const remoteOutcomes = ["Done", "UpToDate", "Diverged", "Rejected"] as const;
+export type RemoteOutcome = (typeof remoteOutcomes)[number];
+
+/** Result of `remote.fetch`, `remote.pull` and `remote.push`. */
+export interface RemoteSyncResult {
+  outcome: RemoteOutcome;
+  /** What happened, in plain words, for the bar. */
+  message: string;
+  /** The worktree afterwards, with new ahead and behind counts. */
+  status: WorktreeChanges;
+}
+
 /** Params of `changes.stage` and `changes.unstage`: files, or one hunk, never both. */
 export type ChangesStageParams = { repoId: string; worktree: string } & (
   | { paths: string[]; hunk?: undefined }
@@ -465,6 +484,15 @@ export interface Methods {
     params: { repoId: string; worktree: string; message: string; amend: boolean };
     result: ChangesCommitResult;
   };
+  /** Fetches the remote of the branch's upstream, or origin when it has none. Never prunes. Cancel the request to stop it. */
+  "remote.fetch": { params: { repoId: string; worktree: string }; result: RemoteSyncResult };
+  /** Fetches, then fast-forwards the branch only when it is behind its upstream and not ahead. Never merges or rebases. */
+  "remote.pull": { params: { repoId: string; worktree: string }; result: RemoteSyncResult };
+  /**
+   * Pushes the branch to its upstream. A branch with no upstream goes to origin under the same name and gets it as its
+   * upstream. Never forces: a remote that moved on is a Rejected outcome.
+   */
+  "remote.push": { params: { repoId: string; worktree: string }; result: RemoteSyncResult };
 }
 
 /** Every notification the sidecar sends, with its params. */

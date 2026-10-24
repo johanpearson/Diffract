@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   changeKinds,
   changedFileKinds,
+  remoteOutcomes,
   errorKinds,
   fileChangeKinds,
   fileContentKinds,
@@ -70,6 +71,7 @@ describe("contract samples from the sidecar", () => {
       fileChangeKind: [...fileChangeKinds],
       fileContentKind: [...fileContentKinds],
       changedFileKind: [...changedFileKinds],
+      remoteOutcome: [...remoteOutcomes],
     });
   });
 

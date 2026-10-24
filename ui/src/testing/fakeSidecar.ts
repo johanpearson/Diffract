@@ -189,6 +189,14 @@ export class FakeSidecar {
     return undefined;
   }
 
+  /** Every fetch, pull and push asked for, as "remote.pull C:\\src\\shop". */
+  readonly remoteAsked: string[] = [];
+
+  private remote(method: "remote.fetch" | "remote.pull" | "remote.push", params: { worktree: string }) {
+    this.remoteAsked.push(`${method} ${params.worktree}`);
+    return this.worktree(params.worktree).remote(method.slice("remote.".length) as "fetch" | "pull" | "push");
+  }
+
   private newCommits = 0;
 
   release(): void {
@@ -339,6 +347,10 @@ export class FakeSidecar {
       case "changes.unstage":
       case "changes.commit":
         return this.changes(method, params);
+      case "remote.fetch":
+      case "remote.pull":
+      case "remote.push":
+        return this.remote(method, params as { worktree: string });
     }
   }
 }

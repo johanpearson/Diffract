@@ -1,6 +1,7 @@
 import {
   changeKinds,
   changedFileKinds,
+  remoteOutcomes,
   fileChangeKinds,
   fileContentKinds,
   historyRefKinds,
@@ -13,6 +14,7 @@ import {
   type AppInfo,
   type ChangedFile,
   type ChangesCommitResult,
+  type RemoteSyncResult,
   type ChangesFile,
   type Hunk,
   type CommitDetails,
@@ -166,6 +168,8 @@ const worktreeChanges = object<WorktreeChanges>({
 
 const hunk = object<Hunk>({ id: string, oldStart: number, oldLines: number, newStart: number, newLines: number });
 
+const remoteSyncResult = object<RemoteSyncResult>({ outcome: oneOf(remoteOutcomes), message: string, status: worktreeChanges });
+
 /** The result of every method. Adding a method to `Methods` without a shape here fails the type check. */
 export const resultShapes: { [M in keyof Methods]: Shape } = {
   "app.info": appInfo,
@@ -200,6 +204,9 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "changes.stage": worktreeChanges,
   "changes.unstage": worktreeChanges,
   "changes.commit": object<ChangesCommitResult>({ commitId: string, status: worktreeChanges }),
+  "remote.fetch": remoteSyncResult,
+  "remote.pull": remoteSyncResult,
+  "remote.push": remoteSyncResult,
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {
