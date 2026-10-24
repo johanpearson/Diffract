@@ -1147,13 +1147,15 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   margin-left: auto;
   color: var(--ink-2);
   font-size: 12.5px;
 }
 
 .worktree-picker select {
-  max-width: 420px;
+  min-width: 0;
+  max-width: 300px;
   font: inherit;
   color: var(--ink);
   background: var(--panel);
@@ -1354,4 +1356,45 @@ body {
   font-size: 12px;
   white-space: nowrap;
   padding: 0 4px;
+}
+
+/* The worktree picker gives way first, so a result stays readable. */
+.remote-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.changes .bar > .muted {
+  white-space: nowrap;
+}
+
+.remote-actions .abtn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.remote-running {
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.remote-note {
+  max-width: 380px;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Git's own output comes on the lines after the reason, so line breaks are kept. */
+.remote-notice span {
+  white-space: pre-wrap;
+}
+
+.notice.error {
+  background: var(--red-soft);
 }

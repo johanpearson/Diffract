@@ -1,4 +1,4 @@
-import type { ChangedFile, ChangesFile, Hunk, WorktreeChanges } from "../protocol";
+import type { ChangedFile, ChangesFile, Hunk, RemoteSyncResult, WorktreeChanges } from "../protocol";
 
 type Side = "unstaged" | "staged";
 
@@ -102,6 +102,34 @@ export class FakeWorktree {
     const head = (this.commits.length + 0xc0ffee).toString(16).padStart(40, "0");
     this.status = { ...this.status, headCommit: head, ahead: (this.status.ahead ?? 0) + (amend ? 0 : 1) };
     return this.update((f) => (f.staged === null ? f : { ...f, staged: null }));
+  }
+
+  /** Fetch, pull and push as the sidecar decides them, from the branch, upstream and counts. */
+  remote(kind: "fetch" | "pull" | "push"): RemoteSyncResult {
+    const { branch, upstream, ahead, behind } = this.status;
+    if (kind === "fetch") return this.answer("Done", "Fetched from origin.");
+    if (branch === null) throw error(-32009, `No branch with commits is checked out here, so there is nothing to ${kind}.`, "RemoteFailed");
+    return kind === "pull" ? this.pull(branch, upstream, ahead ?? 0, behind ?? 0) : this.push(branch, upstream, ahead ?? 0, behind ?? 0);
+  }
+
+  private pull(branch: string, upstream: string | null, ahead: number, behind: number): RemoteSyncResult {
+    if (upstream === null) throw error(-32009, `${branch} does not follow a branch on a remote, so there is nothing to pull. Push it first.`, "RemoteFailed");
+    if (behind === 0) return this.answer("UpToDate", `Nothing to pull. ${branch} has everything on ${upstream}.`);
+    if (ahead > 0) return this.answer("Diverged", `${branch} and ${upstream} have both moved on. Pull only fast-forwards for now, so nothing was changed.`);
+    this.status = { ...this.status, behind: 0 };
+    return this.answer("Done", `Pulled ${behind} commits from ${upstream}.`);
+  }
+
+  private push(branch: string, upstream: string | null, ahead: number, behind: number): RemoteSyncResult {
+    const target = upstream ?? `origin/${branch}`;
+    if (behind > 0) return this.answer("Rejected", `${target} has commits that ${branch} lacks, so git did not push. Pull first, then push.`);
+    if (upstream !== null && ahead === 0) return this.answer("UpToDate", `Nothing to push. ${target} already has everything on ${branch}.`);
+    this.status = { ...this.status, upstream: target, ahead: 0, behind: 0, headOnRemote: target };
+    return this.answer("Done", upstream === null ? `Pushed ${branch} to ${target}, which it now follows.` : `Pushed ${branch} to ${target}.`);
+  }
+
+  private answer(outcome: RemoteSyncResult["outcome"], message: string): RemoteSyncResult {
+    return { outcome, message, status: this.status };
   }
 
   private move(f: ChangedFile, from: Side): ChangedFile {
