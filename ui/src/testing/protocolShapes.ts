@@ -2,6 +2,7 @@ import {
   changeKinds,
   changedFileKinds,
   remoteOutcomes,
+  resetModes,
   fileChangeKinds,
   fileContentKinds,
   historyRefKinds,
@@ -15,6 +16,8 @@ import {
   type ChangedFile,
   type ChangesCommitResult,
   type RemoteSyncResult,
+  type RefChange,
+  type ResetResult,
   type ChangesFile,
   type Hunk,
   type CommitDetails,
@@ -168,6 +171,10 @@ const worktreeChanges = object<WorktreeChanges>({
 
 const hunk = object<Hunk>({ id: string, oldStart: number, oldLines: number, newStart: number, newLines: number });
 
+const refChange = object<RefChange>({ ref: nullable(string), message: string });
+
+const resetResult = object<ResetResult>({ branch: string, oldCommit: string, newCommit: string, mode: oneOf(resetModes) });
+
 const remoteSyncResult = object<RemoteSyncResult>({ outcome: oneOf(remoteOutcomes), message: string, status: worktreeChanges });
 
 /** The result of every method. Adding a method to `Methods` without a shape here fails the type check. */
@@ -207,6 +214,12 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "remote.fetch": remoteSyncResult,
   "remote.pull": remoteSyncResult,
   "remote.push": remoteSyncResult,
+  "ref.checkName": object<{ problem: string | null }>({ problem: nullable(string) }),
+  "branch.create": refChange,
+  "branch.switch": refChange,
+  "tag.create": refChange,
+  "branch.reset": resetResult,
+  "branch.undoReset": resetResult,
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {

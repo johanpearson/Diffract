@@ -25,8 +25,21 @@ export type LeftoverKind = (typeof leftoverKinds)[number];
  * CommitRefused: nothing was committed. The message says why, with git's own output under it for a hook or signing.
  * RemoteFailed: a fetch, pull or push could not run or did not finish, such as an unreachable remote. The message says
  * why, with git's own output under it.
+ * ChangeRefused: a branch, tag, switch or reset was not made, such as a switch that would overwrite uncommitted
+ * changes. Nothing changed. The message says why, with git's own output under it when there is some.
  */
-export const errorKinds = ["NotARepo", "GitTooOld", "GitFailed", "TimedOut", "ConfigInvalid", "IndexLocked", "ChangedSinceShown", "CommitRefused", "RemoteFailed"] as const;
+export const errorKinds = [
+  "NotARepo",
+  "GitTooOld",
+  "GitFailed",
+  "TimedOut",
+  "ConfigInvalid",
+  "IndexLocked",
+  "ChangedSinceShown",
+  "CommitRefused",
+  "RemoteFailed",
+  "ChangeRefused",
+] as const;
 export type ErrorKind = (typeof errorKinds)[number];
 
 /** What a live change refreshed. */
@@ -415,6 +428,36 @@ export interface RemoteSyncResult {
   status: WorktreeChanges;
 }
 
+export const refNameKinds = ["Branch", "Tag"] as const;
+export type RefNameKind = (typeof refNameKinds)[number];
+
+/** Soft keeps what is staged; mixed puts the changes back as unstaged. Neither touches the files. */
+export const resetModes = ["Soft", "Mixed"] as const;
+export type ResetMode = (typeof resetModes)[number];
+
+/** Result of `branch.create`, `branch.switch` and `tag.create`. */
+export interface RefChange {
+  /** The ref made or checked out, such as "refs/heads/topic". Null after checking out a detached HEAD. */
+  ref: string | null;
+  /** What happened, in plain words. */
+  message: string;
+}
+
+/** Result of `branch.reset` and `branch.undoReset`. Pass a reset's result as it is to undo it. */
+export interface ResetResult {
+  branch: string;
+  oldCommit: string;
+  newCommit: string;
+  mode: ResetMode;
+}
+
+/** Params of `branch.switch`: exactly one of a local branch, a remote-tracking branch or a full commit id. */
+export type BranchSwitchParams = { repoId: string; worktree: string } & (
+  | { branch: string; remoteBranch?: undefined; commit?: undefined }
+  | { remoteBranch: string; branch?: undefined; commit?: undefined }
+  | { commit: string; branch?: undefined; remoteBranch?: undefined }
+);
+
 /** Params of `changes.stage` and `changes.unstage`: files, or one hunk, never both. */
 export type ChangesStageParams = { repoId: string; worktree: string } & (
   | { paths: string[]; hunk?: undefined }
@@ -493,6 +536,21 @@ export interface Methods {
    * upstream. Never forces: a remote that moved on is a Rejected outcome.
    */
   "remote.push": { params: { repoId: string; worktree: string }; result: RemoteSyncResult };
+  /** Why a new branch or tag name cannot be used, by git's own rules or because it is taken. Null when it can. Only reads. */
+  "ref.checkName": { params: { repoId: string; worktree: string; kind: RefNameKind; name: string }; result: { problem: string | null } };
+  /** A new branch at a full commit id, also checked out in the worktree when `switch` is set. */
+  "branch.create": { params: { repoId: string; worktree: string; commit: string; name: string; switch: boolean }; result: RefChange };
+  /**
+   * Plain `git switch` in the worktree: to a local branch, to a new local branch following a remote-tracking one, or
+   * to a commit on a detached HEAD. Git refuses rather than overwrite uncommitted changes, as ChangeRefused.
+   */
+  "branch.switch": { params: BranchSwitchParams; result: RefChange };
+  /** An annotated tag at a full commit id. The message is the name when none is given. */
+  "tag.create": { params: { repoId: string; worktree: string; commit: string; name: string; message?: string | null }; result: RefChange };
+  /** Moves the worktree's current branch to a full commit id, soft or mixed. Files are never touched. */
+  "branch.reset": { params: { repoId: string; worktree: string; commit: string; mode: ResetMode }; result: ResetResult };
+  /** Moves the branch back, only while it is still where the reset left it. Answers with that move. */
+  "branch.undoReset": { params: { repoId: string; worktree: string; reset: ResetResult }; result: ResetResult };
 }
 
 /** Every notification the sidecar sends, with its params. */

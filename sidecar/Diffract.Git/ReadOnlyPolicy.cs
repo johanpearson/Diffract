@@ -10,6 +10,7 @@ public static class ReadOnlyPolicy
     [
         "version", "rev-parse", "status", "for-each-ref", "rev-list",
         "merge-base", "log", "fsck", "cat-file", "show-ref", "diff-tree", "diff", "var",
+        "check-ref-format",
     ];
 
     private static readonly HashSet<string> ConfigReadOptions =

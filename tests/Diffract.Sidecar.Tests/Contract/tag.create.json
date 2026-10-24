@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "ref": "refs/tags/v1.0",
+    "message": "Created tag v1.0 at e83c5163."
+  }
+}

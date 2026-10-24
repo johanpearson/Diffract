@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "branch": "claude/räksmörgås-fix",
+    "oldCommit": "e83c5163316f89bfbde7d9ab23ca2e25604af290",
+    "newCommit": "9fceb02d0ae598e95dc970b74767f19372d61af8",
+    "mode": "Mixed"
+  }
+}

@@ -70,3 +70,11 @@ public sealed class RemoteFailedException(string reason, string? gitOutput = nul
     public string Reason { get; } = reason;
     public string? GitOutput { get; } = gitOutput;
 }
+
+/// <summary>A branch, tag, switch or reset that git refused, or that Diffract did not ask for. Says why in plain words, with git's own output when there is some.</summary>
+public sealed class ChangeRefusedException(string reason, string? gitOutput = null)
+    : GitException(gitOutput is null ? reason : $"{reason}\n\n{gitOutput.Trim()}")
+{
+    public string Reason { get; } = reason;
+    public string? GitOutput { get; } = gitOutput;
+}

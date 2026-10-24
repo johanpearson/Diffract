@@ -3,6 +3,8 @@ import {
   changeKinds,
   changedFileKinds,
   remoteOutcomes,
+  refNameKinds,
+  resetModes,
   errorKinds,
   fileChangeKinds,
   fileContentKinds,
@@ -72,6 +74,8 @@ describe("contract samples from the sidecar", () => {
       fileContentKind: [...fileContentKinds],
       changedFileKind: [...changedFileKinds],
       remoteOutcome: [...remoteOutcomes],
+      refNameKind: [...refNameKinds],
+      resetMode: [...resetModes],
     });
   });
 

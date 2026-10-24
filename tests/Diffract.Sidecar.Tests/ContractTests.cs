@@ -7,6 +7,7 @@ using Diffract.Git.Changes;
 using Diffract.Git.Files;
 using Diffract.Git.History;
 using Diffract.Git.Parsing;
+using Diffract.Git.Refs;
 using Diffract.Git.Snapshot;
 using Diffract.Leftovers;
 using Diffract.Sidecar.Rpc;
@@ -91,6 +92,12 @@ public class ContractTests
             "claude/räksmörgås-fix and origin/claude/räksmörgås-fix have both moved on: 2 commits here and 1 commit there. Pull only fast-forwards for now, so nothing was changed.", Changes)),
         ["remote.push"] = () => Response(new RemoteSyncResult(RemoteOutcome.Rejected,
             "origin/claude/räksmörgås-fix has commits that claude/räksmörgås-fix lacks, so git did not push. Pull first, then push.", Changes)),
+        ["ref.checkName"] = () => Response(new RefNameCheck("There is already a branch named claude/räksmörgås-fix.")),
+        ["branch.create"] = () => Response(new RefChange("refs/heads/fix/räksmörgås", "Created branch fix/räksmörgås at e83c5163, and switched to it.")),
+        ["branch.switch"] = () => Response(new RefChange(null, "Checked out e83c5163 on a detached HEAD.")),
+        ["tag.create"] = () => Response(new RefChange("refs/tags/v1.0", "Created tag v1.0 at e83c5163.")),
+        ["branch.reset"] = () => Response(new ResetResult { Branch = "claude/räksmörgås-fix", OldCommit = Merge, NewCommit = Side, Mode = ResetMode.Mixed }),
+        ["branch.undoReset"] = () => Response(new ResetResult { Branch = "claude/räksmörgås-fix", OldCommit = Side, NewCommit = Merge, Mode = ResetMode.Mixed }),
         ["changes.file"] = () => Response(ChangesFile.From(new FileDiff(
             new FileContent(FileContentKind.Text, "one\r\ntwo\r\n"),
             new FileContent(FileContentKind.Text, "one\r\nTWO\r\nthree\r\n"),
@@ -106,6 +113,9 @@ public class ContractTests
             "Git did not commit. A hook or commit signing can stop a commit. This is what git said:", "lint failed: src/räksmörgås.cs line 3\n")),
         ["error.remote-failed"] = () => Error(new RemoteFailedException(
             "Git could not fetch from origin. Check the network, and that you can sign in. This is what git said:", "fatal: unable to access 'https://github.com/johan/shop.git/': Could not resolve host: github.com\n")),
+        ["error.change-refused"] = () => Error(new ChangeRefusedException(
+            "Git did not switch, so nothing changed. Git refuses rather than overwrite uncommitted changes. This is what git said:",
+            "error: Your local changes to the following files would be overwritten by checkout:\n\tsrc/räksmörgås.cs\n")),
         ["error.index-locked"] = () => Error(new IndexLockedException()),
         ["error.changed-since-shown"] = () => Error(new ChangedSinceShownException("src/räksmörgås.cs")),
         ["error.config-invalid"] = () => Error(new ConfigException("staleAfterDays must be at least 1.")),
@@ -277,6 +287,8 @@ public class ContractTests
         ["fileContentKind"] = Values<FileContentKind>(),
         ["changedFileKind"] = Values<ChangedFileKind>(),
         ["remoteOutcome"] = Values<RemoteOutcome>(),
+        ["refNameKind"] = Values<RefNameKind>(),
+        ["resetMode"] = Values<ResetMode>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

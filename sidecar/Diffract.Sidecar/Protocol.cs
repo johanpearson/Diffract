@@ -2,6 +2,7 @@ using Diffract.Git.Changes;
 using Diffract.Git.Files;
 using Diffract.Git.History;
 using Diffract.Git.Parsing;
+using Diffract.Git.Refs;
 using Diffract.Git.Snapshot;
 using Diffract.Leftovers;
 
@@ -97,6 +98,68 @@ internal sealed record ChangesCommitResult(string CommitId, WorktreeChanges Stat
 /// <param name="Message">What happened, in plain words.</param>
 /// <param name="Status">The worktree afterwards, with new ahead and behind counts.</param>
 internal sealed record RemoteSyncResult(RemoteOutcome Outcome, string Message, WorktreeChanges Status);
+
+/// <summary>The params of <c>ref.checkName</c>.</summary>
+internal sealed record RefCheckNameParams(string? RepoId, string? Worktree, RefNameKind? Kind, string? Name);
+
+/// <summary>The result of <c>ref.checkName</c>.</summary>
+/// <param name="Problem">Why the name cannot be used, in plain words. Null when it can.</param>
+internal sealed record RefNameCheck(string? Problem);
+
+/// <summary>The params of <c>branch.create</c>.</summary>
+internal sealed record BranchCreateParams
+{
+    public string? RepoId { get; init; }
+
+    /// <summary>The worktree to switch, when <see cref="Switch"/> is set.</summary>
+    public string? Worktree { get; init; }
+
+    /// <summary>The full id of the commit the branch starts at.</summary>
+    public string? Commit { get; init; }
+
+    public string? Name { get; init; }
+
+    /// <summary>Check the new branch out in the worktree too.</summary>
+    public bool Switch { get; init; }
+}
+
+/// <summary>The params of <c>tag.create</c>.</summary>
+internal sealed record TagCreateParams
+{
+    public string? RepoId { get; init; }
+
+    public string? Worktree { get; init; }
+
+    public string? Commit { get; init; }
+
+    public string? Name { get; init; }
+
+    /// <summary>The annotated tag's message. The name, when there is none.</summary>
+    public string? Message { get; init; }
+}
+
+/// <summary>The params of <c>branch.switch</c>: exactly one of a branch, a remote branch or a commit.</summary>
+internal sealed record BranchSwitchParams
+{
+    public string? RepoId { get; init; }
+
+    public string? Worktree { get; init; }
+
+    /// <summary>A local branch, such as "main".</summary>
+    public string? Branch { get; init; }
+
+    /// <summary>A remote-tracking branch, such as "origin/topic". A local branch that follows it is created.</summary>
+    public string? RemoteBranch { get; init; }
+
+    /// <summary>A full commit id, to check out on a detached HEAD.</summary>
+    public string? Commit { get; init; }
+}
+
+/// <summary>The params of <c>branch.reset</c>: the worktree's current branch moves to the commit.</summary>
+internal sealed record BranchResetParams(string? RepoId, string? Worktree, string? Commit, ResetMode? Mode);
+
+/// <summary>The params of <c>branch.undoReset</c>: the result of <c>branch.reset</c>, as it was.</summary>
+internal sealed record BranchUndoResetParams(string? RepoId, string? Worktree, ResetResult? Reset);
 
 /// <summary>One hunk, as <c>changes.file</c> showed it.</summary>
 internal sealed record ChangesHunkParams
