@@ -1,0 +1,9 @@
+{
+  "repoId": "1",
+  "worktree": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+  "path": "src/räksmörgås.cs",
+  "oldPath": "src/cart.cs",
+  "staged": true,
+  "headId": "8ab686eafeb1f44702738c8b0f24f2567c36da6d",
+  "indexId": "8ab686eafeb1f44702738c8b0f24f2567c36da6d"
+}

@@ -1,0 +1,13 @@
+{
+  "repoId": "1",
+  "worktree": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+  "paths": [
+    "src/räksmörgås.cs",
+    "src/cart.cs"
+  ],
+  "hunk": {
+    "path": "src/räksmörgås.cs",
+    "oldPath": "src/cart.cs",
+    "id": "5d41402abc4b2a76b9719d911017c592"
+  }
+}
