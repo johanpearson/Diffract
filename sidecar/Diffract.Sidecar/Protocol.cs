@@ -93,6 +93,11 @@ internal sealed record ChangesCommitParams
 /// <param name="Status">The worktree after the commit.</param>
 internal sealed record ChangesCommitResult(string CommitId, WorktreeChanges Status);
 
+/// <summary>The result of <c>remote.fetch</c>, <c>remote.pull</c> and <c>remote.push</c>, when git did not fail.</summary>
+/// <param name="Message">What happened, in plain words.</param>
+/// <param name="Status">The worktree afterwards, with new ahead and behind counts.</param>
+internal sealed record RemoteSyncResult(RemoteOutcome Outcome, string Message, WorktreeChanges Status);
+
 /// <summary>One hunk, as <c>changes.file</c> showed it.</summary>
 internal sealed record ChangesHunkParams
 {

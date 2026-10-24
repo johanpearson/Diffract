@@ -10,7 +10,7 @@ namespace Diffract.Sidecar;
 /// <c>changes.stage</c>, <c>changes.unstage</c> and <c>changes.commit</c> write through a changes runner, which allows nothing but
 /// <see cref="ChangesPolicy"/>. The worktree must be one in the repo's snapshot, so git only ever runs where the repo lives.
 /// </summary>
-internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runnerOptions)
+internal sealed class ChangesMethods(RepoWorktrees worktrees, GitRunnerOptions runnerOptions)
 {
     private readonly ChangesReader _reader = new(runnerOptions);
 
@@ -18,7 +18,7 @@ internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runner
     public async Task<JsonElement> StatusAsync(JsonElement? parameters, CancellationToken ct)
     {
         var status = SidecarMethods.Params<ChangesStatusParams>(parameters);
-        var worktree = WorktreeOf(status.RepoId, status.Worktree);
+        var worktree = worktrees.Resolve(status.RepoId, status.Worktree);
         return SidecarMethods.Result(await _reader.ReadStatusAsync(worktree, ct).ConfigureAwait(false));
     }
 
@@ -26,7 +26,7 @@ internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runner
     public async Task<JsonElement> FileAsync(JsonElement? parameters, CancellationToken ct)
     {
         var file = SidecarMethods.Params<ChangesFileParams>(parameters);
-        var worktree = WorktreeOf(file.RepoId, file.Worktree);
+        var worktree = worktrees.Resolve(file.RepoId, file.Worktree);
         var request = new FileDiffRequest
         {
             Path = SidecarMethods.Required(file.Path, "path"),
@@ -51,7 +51,7 @@ internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runner
     public async Task<JsonElement> CommitAsync(JsonElement? parameters, CancellationToken ct)
     {
         var commit = SidecarMethods.Params<ChangesCommitParams>(parameters);
-        var worktree = WorktreeOf(commit.RepoId, commit.Worktree);
+        var worktree = worktrees.Resolve(commit.RepoId, commit.Worktree);
         var request = new CommitRequest(SidecarMethods.Required(commit.Message, "message"), commit.Amend);
         await Checked(() => new CommitWriter(worktree, runnerOptions).CommitAsync(request, ct)).ConfigureAwait(false);
         var status = await _reader.ReadStatusAsync(worktree, ct).ConfigureAwait(false);
@@ -61,7 +61,7 @@ internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runner
     private async Task<JsonElement> ChangeAsync(JsonElement? parameters, Change change, CancellationToken ct)
     {
         var stage = SidecarMethods.Params<ChangesStageParams>(parameters);
-        var worktree = WorktreeOf(stage.RepoId, stage.Worktree);
+        var worktree = worktrees.Resolve(stage.RepoId, stage.Worktree);
         var writer = new ChangesWriter(worktree, runnerOptions);
         await Checked(() => (stage.Paths, stage.Hunk) switch
         {
@@ -98,25 +98,4 @@ internal sealed class ChangesMethods(RepoSessions repos, GitRunnerOptions runner
     private sealed record Change(
         Func<ChangesWriter, IReadOnlyList<string>, CancellationToken, Task> Files,
         Func<ChangesWriter, HunkRequest, CancellationToken, Task> Hunk);
-
-    /// <summary>
-    /// The worktree's path as the snapshot has it. A bare repo has no files, and neither has a worktree whose folder is
-    /// gone, so both are refused like a folder that is not the repo's at all.
-    /// </summary>
-    private string WorktreeOf(string? repoId, string? path)
-    {
-        var snapshot = repos.SnapshotOf(SidecarMethods.Required(repoId, "repoId"));
-        var wanted = SidecarMethods.Required(path, "worktree");
-        var worktree = Path.IsPathFullyQualified(wanted)
-            ? snapshot.Worktrees.FirstOrDefault(w => SamePath(w.Path, wanted))
-            : null;
-        return worktree is { IsBare: false, IsPrunable: false }
-            ? worktree.Path
-            : throw new RpcException(RpcErrorCodes.InvalidParams, $"Not a worktree of this repo with files to show: {wanted}");
-    }
-
-    private static bool SamePath(string a, string b) =>
-        string.Equals(Normalize(a), Normalize(b), StringComparison.OrdinalIgnoreCase);
-
-    private static string Normalize(string path) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
 }

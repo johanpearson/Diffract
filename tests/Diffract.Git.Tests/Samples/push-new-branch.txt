@@ -1,0 +1,4 @@
+To C:/remote.git
+*	refs/heads/main:refs/heads/main	[new branch]
+branch 'main' set up to track 'origin/main'.
+Done

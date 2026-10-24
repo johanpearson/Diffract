@@ -86,6 +86,11 @@ public class ContractTests
         ["changes.stage"] = () => Response(Changes),
         ["changes.unstage"] = () => Response(Changes),
         ["changes.commit"] = () => Response(new ChangesCommitResult(Side, Changes with { HeadCommit = Side, Files = [] })),
+        ["remote.fetch"] = () => Response(new RemoteSyncResult(RemoteOutcome.Done, "Fetched from origin.", Changes)),
+        ["remote.pull"] = () => Response(new RemoteSyncResult(RemoteOutcome.Diverged,
+            "claude/räksmörgås-fix and origin/claude/räksmörgås-fix have both moved on: 2 commits here and 1 commit there. Pull only fast-forwards for now, so nothing was changed.", Changes)),
+        ["remote.push"] = () => Response(new RemoteSyncResult(RemoteOutcome.Rejected,
+            "origin/claude/räksmörgås-fix has commits that claude/räksmörgås-fix lacks, so git did not push. Pull first, then push.", Changes)),
         ["changes.file"] = () => Response(ChangesFile.From(new FileDiff(
             new FileContent(FileContentKind.Text, "one\r\ntwo\r\n"),
             new FileContent(FileContentKind.Text, "one\r\nTWO\r\nthree\r\n"),
@@ -99,6 +104,8 @@ public class ContractTests
         ["error.timed-out"] = () => Error(new GitTimeoutException(["fsck", "--unreachable", "--no-reflogs"], TimeSpan.FromSeconds(30))),
         ["error.commit-refused"] = () => Error(new CommitRefusedException(
             "Git did not commit. A hook or commit signing can stop a commit. This is what git said:", "lint failed: src/räksmörgås.cs line 3\n")),
+        ["error.remote-failed"] = () => Error(new RemoteFailedException(
+            "Git could not fetch from origin. Check the network, and that you can sign in. This is what git said:", "fatal: unable to access 'https://github.com/johan/shop.git/': Could not resolve host: github.com\n")),
         ["error.index-locked"] = () => Error(new IndexLockedException()),
         ["error.changed-since-shown"] = () => Error(new ChangedSinceShownException("src/räksmörgås.cs")),
         ["error.config-invalid"] = () => Error(new ConfigException("staleAfterDays must be at least 1.")),
@@ -269,6 +276,7 @@ public class ContractTests
         ["fileChangeKind"] = Values<FileChangeKind>(),
         ["fileContentKind"] = Values<FileContentKind>(),
         ["changedFileKind"] = Values<ChangedFileKind>(),
+        ["remoteOutcome"] = Values<RemoteOutcome>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

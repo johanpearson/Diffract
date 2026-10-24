@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32009,
+    "message": "Git could not fetch from origin. Check the network, and that you can sign in. This is what git said:\n\nfatal: unable to access 'https://github.com/johan/shop.git/': Could not resolve host: github.com",
+    "data": {
+      "kind": "RemoteFailed"
+    }
+  }
+}
