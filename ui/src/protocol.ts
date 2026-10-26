@@ -467,6 +467,11 @@ export interface ResetResult {
 }
 
 /** Params of `branch.switch`: exactly one of a local branch, a remote-tracking branch or a full commit id. */
+/** A request that changes the repo can name an operation, to get git's output as `command.output` while it runs. */
+export interface Watched {
+  operation?: string;
+}
+
 export type BranchSwitchParams = { repoId: string; worktree: string } & (
   | { branch: string; remoteBranch?: undefined; commit?: undefined }
   | { remoteBranch: string; branch?: undefined; commit?: undefined }
@@ -539,33 +544,33 @@ export interface Methods {
    * repo's config. `amend` replaces the last commit, and is refused when `headOnRemote` is set.
    */
   "changes.commit": {
-    params: { repoId: string; worktree: string; message: string; amend: boolean };
+    params: { repoId: string; worktree: string; message: string; amend: boolean } & Watched;
     result: ChangesCommitResult;
   };
   /** Fetches the remote of the branch's upstream, or origin when it has none. Never prunes. Cancel the request to stop it. */
-  "remote.fetch": { params: { repoId: string; worktree: string }; result: RemoteSyncResult };
+  "remote.fetch": { params: { repoId: string; worktree: string } & Watched; result: RemoteSyncResult };
   /** Fetches, then fast-forwards the branch only when it is behind its upstream and not ahead. Never merges or rebases. */
-  "remote.pull": { params: { repoId: string; worktree: string }; result: RemoteSyncResult };
+  "remote.pull": { params: { repoId: string; worktree: string } & Watched; result: RemoteSyncResult };
   /**
    * Pushes the branch to its upstream. A branch with no upstream goes to origin under the same name and gets it as its
    * upstream. Never forces: a remote that moved on is a Rejected outcome.
    */
-  "remote.push": { params: { repoId: string; worktree: string }; result: RemoteSyncResult };
+  "remote.push": { params: { repoId: string; worktree: string } & Watched; result: RemoteSyncResult };
   /** Why a new branch or tag name cannot be used, by git's own rules or because it is taken. Null when it can. Only reads. */
   "ref.checkName": { params: { repoId: string; worktree: string; kind: RefNameKind; name: string }; result: { problem: string | null } };
   /** A new branch at a full commit id, also checked out in the worktree when `switch` is set. */
-  "branch.create": { params: { repoId: string; worktree: string; commit: string; name: string; switch: boolean }; result: RefChange };
+  "branch.create": { params: { repoId: string; worktree: string; commit: string; name: string; switch: boolean } & Watched; result: RefChange };
   /**
    * Plain `git switch` in the worktree: to a local branch, to a new local branch following a remote-tracking one, or
    * to a commit on a detached HEAD. Git refuses rather than overwrite uncommitted changes, as ChangeRefused.
    */
-  "branch.switch": { params: BranchSwitchParams; result: RefChange };
+  "branch.switch": { params: BranchSwitchParams & Watched; result: RefChange };
   /** An annotated tag at a full commit id. The message is the name when none is given. */
-  "tag.create": { params: { repoId: string; worktree: string; commit: string; name: string; message?: string | null }; result: RefChange };
+  "tag.create": { params: { repoId: string; worktree: string; commit: string; name: string; message?: string | null } & Watched; result: RefChange };
   /** Moves the worktree's current branch to a full commit id, soft or mixed. Files are never touched. */
-  "branch.reset": { params: { repoId: string; worktree: string; commit: string; mode: ResetMode }; result: ResetResult };
+  "branch.reset": { params: { repoId: string; worktree: string; commit: string; mode: ResetMode } & Watched; result: ResetResult };
   /** Moves the branch back, only while it is still where the reset left it. Answers with that move. */
-  "branch.undoReset": { params: { repoId: string; worktree: string; reset: ResetResult }; result: ResetResult };
+  "branch.undoReset": { params: { repoId: string; worktree: string; reset: ResetResult } & Watched; result: ResetResult };
 }
 
 /** Every notification the sidecar sends, with its params. */

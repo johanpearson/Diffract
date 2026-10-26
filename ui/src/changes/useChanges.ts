@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Hunk, RepoChange, WorktreeChanges } from "../protocol";
 import { messageOf } from "../model/format";
+import { useCommands } from "../commands/Commands";
 import type { RpcClient } from "../rpc";
 import { pathsOf, type Entry } from "./entries";
 
@@ -16,8 +17,8 @@ export interface Changes {
   unstage(entries: readonly Entry[]): void;
   /** Stages a hunk of an unstaged row, or unstages one of a staged row. */
   toggleHunk(entry: Entry, hunk: Hunk): void;
-  /** Resolves with null when it committed, or with why not, which the commit box shows. */
-  commit(message: string, amend: boolean): Promise<string | null>;
+  /** Runs in the command window, which says why when it did not commit. Resolves with whether it committed. */
+  commit(message: string, amend: boolean): Promise<boolean>;
   /** Shows a status that arrived with another answer, such as a pull's. */
   apply(status: WorktreeChanges): void;
 }
@@ -73,6 +74,7 @@ export function useChanges(client: RpcClient, repoId: string, worktree: string):
   );
 
   const apply = useCallback((next: WorktreeChanges) => show(++latest.current, next), [show]);
+  const commit = useCommit({ client, repoId, worktree }, { apply, read, setBusy });
 
   const act = useCallback((action: () => Promise<WorktreeChanges>) => void run(action).then((failed) => failed && setProblem(failed)), [run, setProblem]);
 
@@ -84,9 +86,43 @@ export function useChanges(client: RpcClient, repoId: string, worktree: string):
     stage: (entries) => act(() => client.call("changes.stage", { repoId, worktree, paths: pathsOf(entries) })),
     unstage: (entries) => act(() => client.call("changes.unstage", { repoId, worktree, paths: pathsOf(entries) })),
     toggleHunk: (entry, hunk) => act(() => client.call(entry.side === "unstaged" ? "changes.stage" : "changes.unstage", { repoId, worktree, hunk: hunkOf(entry, hunk) })),
-    commit: (message, amend) => run(async () => (await client.call("changes.commit", { repoId, worktree, message, amend })).status),
+    commit,
     apply,
   };
+}
+
+/**
+ * Commits in the command window, which says why when it did not. The lists then follow the commit's answer, or are
+ * read again. Resolves with whether it committed.
+ */
+function useCommit(
+  { client, repoId, worktree }: { client: RpcClient; repoId: string; worktree: string },
+  { apply, read, setBusy }: { apply(status: WorktreeChanges): void; read(): void; setBusy(busy: boolean): void },
+) {
+  const commands = useCommands();
+  return useCallback(
+    async (message: string, amend: boolean) => {
+      setBusy(true);
+      try {
+        const result = await commands.run({
+          kind: "commit",
+          title: amend ? "Amend last commit" : "Commit",
+          call: (operation) => client.call("changes.commit", { repoId, worktree, message, amend, operation }),
+          outcome: (r) => ({ message: committedText(r.commitId, message, amend), tone: "done" }),
+        });
+        if (result) apply(result.status);
+        else read();
+        return result !== null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [commands, client, repoId, worktree, apply, read, setBusy],
+  );
+}
+
+function committedText(commitId: string, message: string, amend: boolean): string {
+  return `${amend ? "Amended" : "Committed"} ${commitId.slice(0, 8)}: ${message.split("\n")[0]}`;
 }
 
 /**

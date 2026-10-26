@@ -6,8 +6,8 @@ interface Props {
   stagedCount: number;
   /** Nothing can be committed while an action runs, or until an in-use worktree's warning is accepted. */
   locked: boolean;
-  /** Resolves with null when it committed, or with why not. */
-  onCommit(message: string, amend: boolean): Promise<string | null>;
+  /** Resolves with whether it committed. */
+  onCommit(message: string, amend: boolean): Promise<boolean>;
 }
 
 /**
@@ -30,11 +30,6 @@ export function CommitBox(props: Props) {
       <button className="abtn primary" disabled={!form.canCommit} onClick={() => void form.commit()} title="Commit (Ctrl+Enter)">
         {buttonText(props.stagedCount, form.amend)}
       </button>
-      {form.refusal && (
-        <pre className="commit-refusal" role="alert">
-          {form.refusal}
-        </pre>
-      )}
     </div>
   );
 }
@@ -42,20 +37,18 @@ export function CommitBox(props: Props) {
 function useCommitForm({ status, stagedCount, locked, onCommit }: Props) {
   const [message, setMessage] = useState("");
   const [amend, setAmend] = useState(false);
-  const [refusal, setRefusal] = useState<string | null>(null);
   const amendBlocked = amendBlockedBy(status);
   const canCommit = !locked && hasSubject(message) && (stagedCount > 0 || (amend && amendBlocked === null));
 
   const commit = async () => {
     if (!canCommit) return;
-    setRefusal(null);
-    const failed = await onCommit(message, amend);
-    if (failed) return setRefusal(failed);
+    // When it did not commit, the command window says why, and the message stays for another try.
+    if (!(await onCommit(message, amend))) return;
     setMessage("");
     setAmend(false);
   };
 
-  return { message, setMessage, amend, setAmend, amendBlocked, refusal, canCommit, commit };
+  return { message, setMessage, amend, setAmend, amendBlocked, canCommit, commit };
 }
 
 /** Ctrl+Enter runs the latest `commit`, which sees the current message, wherever the focus is. */

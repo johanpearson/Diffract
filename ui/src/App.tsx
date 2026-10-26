@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { CommandsProvider } from "./commands/Commands";
 import { GitUpdateConfirmDialog, GitUpdateOffer, GitUpdateOutcome } from "./components/GitUpdatePrompts";
 import type { Filter } from "./components/LeftoversView";
 import type { View } from "./components/Tabs";
@@ -25,11 +26,22 @@ interface Props {
   clock?: () => Date;
   /** The view a repo opens on. History, unless a test is about another view. */
   initialView?: View;
+  /** How long a plain success stays in the command window. Tests shorten it. */
+  autoCloseMs?: number;
 }
 
 const systemClock = () => new Date();
 
-export function App({ host, client, clock = systemClock, initialView = "history" }: Props) {
+/** The app, with the command window every view runs git commands in. */
+export function App({ autoCloseMs, ...props }: Props) {
+  return (
+    <CommandsProvider client={props.client} autoCloseMs={autoCloseMs}>
+      <AppScreens {...props} />
+    </CommandsProvider>
+  );
+}
+
+function AppScreens({ host, client, clock = systemClock, initialView = "history" }: Omit<Props, "autoCloseMs">) {
   const [filter, setFilter] = useState<Filter>("all");
   const [view, setView] = useState<View>(initialView);
   const [notice, setNotice] = useState<string | null>(null);

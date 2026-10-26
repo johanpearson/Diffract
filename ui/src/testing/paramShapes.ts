@@ -12,6 +12,11 @@ type AllFields<U> = { [K in U extends unknown ? keyof U : never]: unknown };
 
 const inWorktree = object<Params<"changes.status">>({ repoId: string, worktree: string });
 
+/** Read by the sidecar for any request that changes the repo, so its params types do not name it. See `Watched`. */
+const watched = { operation: optional(string) };
+
+const remote = object<Params<"remote.fetch">>({ repoId: string, worktree: string, ...watched });
+
 const stage = object<AllFields<Params<"changes.stage">>>({
   repoId: string,
   worktree: string,
@@ -47,20 +52,21 @@ export const paramShapes: { [M in WithParams]: Shape } = {
   }),
   "changes.stage": stage,
   "changes.unstage": stage,
-  "changes.commit": object<Params<"changes.commit">>({ repoId: string, worktree: string, message: string, amend: boolean }),
-  "remote.fetch": inWorktree,
-  "remote.pull": inWorktree,
-  "remote.push": inWorktree,
+  "changes.commit": object<Params<"changes.commit">>({ repoId: string, worktree: string, message: string, amend: boolean, ...watched }),
+  "remote.fetch": remote,
+  "remote.pull": remote,
+  "remote.push": remote,
   "ref.checkName": object<Params<"ref.checkName">>({ repoId: string, worktree: string, kind: oneOf(refNameKinds), name: string }),
-  "branch.create": object<Params<"branch.create">>({ repoId: string, worktree: string, commit: string, name: string, switch: boolean }),
+  "branch.create": object<Params<"branch.create">>({ repoId: string, worktree: string, commit: string, name: string, switch: boolean, ...watched }),
   "branch.switch": object<AllFields<Params<"branch.switch">>>({
     repoId: string,
     worktree: string,
     branch: optional(string),
     remoteBranch: optional(string),
     commit: optional(string),
+    ...watched,
   }),
-  "tag.create": object<Params<"tag.create">>({ repoId: string, worktree: string, commit: string, name: string, message: optional(nullable(string)) }),
-  "branch.reset": object<Params<"branch.reset">>({ repoId: string, worktree: string, commit: string, mode: oneOf(resetModes) }),
-  "branch.undoReset": object<Params<"branch.undoReset">>({ repoId: string, worktree: string, reset: resetResult }),
+  "tag.create": object<Params<"tag.create">>({ repoId: string, worktree: string, commit: string, name: string, message: optional(nullable(string)), ...watched }),
+  "branch.reset": object<Params<"branch.reset">>({ repoId: string, worktree: string, commit: string, mode: oneOf(resetModes), ...watched }),
+  "branch.undoReset": object<Params<"branch.undoReset">>({ repoId: string, worktree: string, reset: resetResult, ...watched }),
 };

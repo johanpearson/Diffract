@@ -8,7 +8,7 @@ import { CommitBox } from "./CommitBox";
 import { samePath, worktreeOf } from "../model/worktrees";
 import { listsOf, type Entry, type Lists } from "./entries";
 import { FileLists } from "./FileLists";
-import { RemoteActions, RemoteNotice } from "./RemoteBar";
+import { RemoteActions } from "./RemoteBar";
 import { useChanges } from "./useChanges";
 import { useRemote } from "./useRemote";
 
@@ -54,7 +54,6 @@ function ChangesBody({ client, state, worktree, worktrees, onWorktree, storage }
       </div>
       {model.warning && <InUseWarning reason={model.warning} onAccept={model.accept} />}
       {changes.problem && <Problem message={changes.problem} onDismiss={changes.dismissProblem} />}
-      <RemoteNotice remote={model.remote} />
       {changes.status && lists ? <ChangesMain model={model} status={changes.status} lists={lists} storage={storage} /> : <Reading shown={!changes.problem} />}
     </>
   );

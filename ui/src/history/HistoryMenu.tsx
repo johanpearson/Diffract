@@ -60,7 +60,7 @@ export function HistoryMenu({ client, state, commits, refs, markers, current, ac
 function OpenDialog({ client, repoId, commits, refs, current, actions }: Omit<Props, "state" | "markers" | "menu" | "onClose"> & { repoId: string }) {
   const { dialog } = actions;
   if (dialog === null) return null;
-  const shared = { busy: actions.busy, error: actions.dialogError, onCancel: actions.close };
+  const shared = { busy: actions.busy, onCancel: actions.close };
   if (dialog.kind !== "Reset")
     return (
       <NameDialog
@@ -98,8 +98,9 @@ export function currentWorktree(state: RepoState, openedPath: string, refs: read
 }
 
 /**
- * What came of the last action, with Undo after a reset. A failure stays until dismissed. The live region is always
- * there, so what appears in it is read out.
+ * What came of copying a hash or subject. Git's own actions say what came of them in the command window. A note that
+ * all went well goes by itself; a failure stays until dismissed. The live region is always there, so what appears in
+ * it is read out.
  */
 export function RefNoteBar({ actions }: { actions: RefActions }) {
   const { note } = actions;
@@ -108,11 +109,6 @@ export function RefNoteBar({ actions }: { actions: RefActions }) {
       {note && (
         <div className={`notice ref-note ${note.tone === "error" ? "error" : "done"}`} role={note.tone === "error" ? "alert" : undefined}>
           <span>{note.text}</span>
-          {note.undo && (
-            <button className="abtn" disabled={actions.busy} onClick={actions.undo}>
-              Undo reset
-            </button>
-          )}
           <button className="abtn" onClick={actions.dismiss}>
             Dismiss
           </button>
