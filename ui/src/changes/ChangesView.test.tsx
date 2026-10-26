@@ -214,6 +214,18 @@ describe("the Changes view", () => {
     await waitFor(() => expect(rows("Unstaged")).toContain("Anew.txtStage"));
   });
 
+  it("clears a failed read once the changes can be read again, as after git was updated", async () => {
+    const sidecar = new FakeSidecar();
+    sidecar.failures.set("changes.status", { error: { code: -32003, message: String.raw`Git was not found (C:\Program Files\Git\mingw64\bin\git.exe).`, data: { kind: "GitFailed" } } });
+    setup(sidecar);
+    await screen.findByText(/^Could not read the changes: Git was not found/);
+
+    act(() => sidecar.change(sampleState.repoId, (s) => s, [{ kind: "WorktreeFiles", path: mainWorktree }]));
+
+    await ready();
+    await waitFor(() => expect(screen.queryByText(/Could not read the changes/)).toBeNull());
+  });
+
   it("ignores changes to another worktree", async () => {
     const sidecar = setup();
     await ready();

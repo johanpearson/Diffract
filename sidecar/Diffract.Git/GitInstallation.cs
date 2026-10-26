@@ -2,16 +2,23 @@ namespace Diffract.Git;
 
 /// <summary>
 /// Which git.exe to start. Git for Windows puts a launcher on PATH (<c>cmd\git.exe</c>) that starts the real git
-/// (<c>mingw64\bin\git.exe</c>) as a second process. On a busy Windows machine that second start costs 200 ms or
-/// more per call, so Diffract starts the real git itself. See docs/findings/history.md.
+/// (<c>ucrt64\bin\git.exe</c>, or <c>mingw64\bin\git.exe</c> before 2.56) as a second process. On a busy Windows
+/// machine that second start costs 200 ms or more per call, so Diffract starts the real git itself. See
+/// docs/findings/history.md.
 /// </summary>
 /// <param name="Executable">A full path, or "git" to let Windows search PATH as before.</param>
 /// <param name="PathPrefix">
-/// Folders to put in front of PATH for git, as the launcher does: <c>mingw64\bin</c> and <c>usr\bin</c>. The real git
-/// sets HOME, MSYSTEM and PLINK_PROTOCOL itself, so PATH is the only difference.
+/// Folders to put in front of PATH for git, as the launcher does: the real git's <c>bin</c> folder and <c>usr\bin</c>.
+/// The real git sets HOME, MSYSTEM and PLINK_PROTOCOL itself, so PATH is the only difference.
 /// </param>
 public sealed record GitInstallation(string Executable, string? PathPrefix)
 {
+    /// <summary>
+    /// The folders Git for Windows keeps the real git in, newest first. It moved from mingw64 to ucrt64 in 2.56, and
+    /// the build for ARM uses clangarm64.
+    /// </summary>
+    public static IReadOnlyList<string> Environments { get; } = ["ucrt64", "mingw64", "clangarm64"];
+
     /// <summary>Whatever "git" on PATH is, started the way it always was.</summary>
     public static GitInstallation OnPath { get; } = new("git", null);
 
@@ -32,17 +39,29 @@ public sealed record GitInstallation(string Executable, string? PathPrefix)
                 continue;
 
             // The first git.exe on PATH is the one "git" means, so only it is looked at.
-            // mingw64\bin before bin, since it ends in bin too.
-            var root = Path.GetFileName(folder).ToLowerInvariant() switch
-            {
-                _ when folder.EndsWith(Path.Combine("mingw64", "bin"), StringComparison.OrdinalIgnoreCase) => Path.GetDirectoryName(Path.GetDirectoryName(folder)),
-                "cmd" or "bin" => Path.GetDirectoryName(folder),
-                _ => null,
-            };
-            var real = root is null ? null : Path.Combine(root, "mingw64", "bin", "git.exe");
-            return real is not null && fileExists(real)
-                ? new GitInstallation(real, string.Join(Path.PathSeparator, Path.Combine(root!, "mingw64", "bin"), Path.Combine(root!, "usr", "bin")))
-                : OnPath;
+            var root = InstallationRoot(folder);
+            return root is null ? OnPath : RealGit(root, fileExists);
+        }
+        return OnPath;
+    }
+
+    /// <summary>Git for Windows' own folder, when <paramref name="folder"/> is one of its folders with a git.exe.</summary>
+    private static string? InstallationRoot(string folder)
+    {
+        // An environment's bin before plain bin, since it ends in bin too.
+        if (Environments.Any(env => folder.EndsWith(Path.Combine(env, "bin"), StringComparison.OrdinalIgnoreCase)))
+            return Path.GetDirectoryName(Path.GetDirectoryName(folder));
+        return Path.GetFileName(folder).ToLowerInvariant() is "cmd" or "bin" ? Path.GetDirectoryName(folder) : null;
+    }
+
+    private static GitInstallation RealGit(string root, Func<string, bool> fileExists)
+    {
+        foreach (var env in Environments)
+        {
+            var bin = Path.Combine(root, env, "bin");
+            var real = Path.Combine(bin, "git.exe");
+            if (fileExists(real))
+                return new GitInstallation(real, string.Join(Path.PathSeparator, bin, Path.Combine(root, "usr", "bin")));
         }
         return OnPath;
     }

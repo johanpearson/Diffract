@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
@@ -81,8 +82,7 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         var time = Options.TimeProvider;
         var started = time.GetTimestamp();
 
-        using var process = new Process { StartInfo = CreateStartInfo(args) };
-        process.Start();
+        using var process = Start(args);
         try
         {
             var writing = WriteInputAsync(process.StandardInput.BaseStream, command.InputBytes());
@@ -182,9 +182,44 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
     private static Task<string> StandardErrorSoFarAsync(Task<string> stderrTask) =>
         stderrTask.ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : "", CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
 
-    private ProcessStartInfo CreateStartInfo(IReadOnlyList<string> args)
+    /// <summary>
+    /// Starts git. When it cannot be started and the locator now finds git somewhere else, as after an update of Git
+    /// for Windows, that git is started instead.
+    /// </summary>
+    private Process Start(IReadOnlyList<string> args)
     {
-        var psi = new ProcessStartInfo(Options.GitExecutable)
+        var installation = Options.Installation;
+        try
+        {
+            return Start(args, installation);
+        }
+        catch (Win32Exception) when (Options.Locator is { } locator)
+        {
+            var found = locator.FindAgain();
+            if (found == installation)
+                throw;
+            return Start(args, found);
+        }
+    }
+
+    private Process Start(IReadOnlyList<string> args, GitInstallation installation)
+    {
+        var process = new Process { StartInfo = CreateStartInfo(args, installation) };
+        try
+        {
+            process.Start();
+            return process;
+        }
+        catch
+        {
+            process.Dispose();
+            throw;
+        }
+    }
+
+    private ProcessStartInfo CreateStartInfo(IReadOnlyList<string> args, GitInstallation installation)
+    {
+        var psi = new ProcessStartInfo(installation.Executable)
         {
             WorkingDirectory = WorkingDirectory,
             UseShellExecute = false,
@@ -198,7 +233,7 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
             psi.ArgumentList.Add(arg);
         foreach (var (name, value) in Options.Environment)
             psi.Environment[name] = value;
-        if (Options.PathPrefix is { } prefix)
+        if (installation.PathPrefix is { } prefix)
             psi.Environment["PATH"] = psi.Environment.TryGetValue("PATH", out var path) && !string.IsNullOrEmpty(path) ? prefix + System.IO.Path.PathSeparator + path : prefix;
 
         // Set last so options can never turn them off.

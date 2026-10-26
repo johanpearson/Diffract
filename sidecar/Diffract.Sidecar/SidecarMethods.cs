@@ -293,6 +293,8 @@ internal sealed class SidecarMethods : IDisposable
 
     public async Task<AppInfo> AppInfoAsync(CancellationToken ct)
     {
+        // Asked at start and after an update, which may have moved git, so git is looked for again first.
+        RunnerOptions.Locator?.FindAgain();
         // `git version` reads no repo, so any existing folder will do.
         var runner = new GitRunner(AppContext.BaseDirectory, RunnerOptions);
         try
@@ -302,9 +304,9 @@ internal sealed class SidecarMethods : IDisposable
                 ? new AppInfo(SidecarVersion, version.ToString(), true, null)
                 : new AppInfo(SidecarVersion, version.ToString(), false, new GitVersionTooOldException(version).Message);
         }
-        catch (Win32Exception)
+        catch (Win32Exception e)
         {
-            return new AppInfo(SidecarVersion, null, false, GitNotFound());
+            return new AppInfo(SidecarVersion, null, false, GitNotStarted(e));
         }
         catch (Exception e) when (e is GitException or FormatException)
         {
@@ -331,11 +333,16 @@ internal sealed class SidecarMethods : IDisposable
     /// </summary>
     internal RpcException? ToRpcException(Exception e) =>
         ErrorKinds.FirstOrDefault(k => k.Type.IsInstanceOfType(e)).Kind is { } kind
-            ? new RpcException(kind, e is Win32Exception ? GitNotFound() : e.Message)
+            ? new RpcException(kind, e is Win32Exception w ? GitNotStarted(w) : e.Message)
             : null;
 
-    private string GitNotFound() =>
-        $"Git was not found ({RunnerOptions.GitExecutable}). Install Git for Windows {GitVersion.Minimum} or newer.";
+    /// <summary>Why git could not be started. Only a missing file is "not found": git may also be blocked for a moment.</summary>
+    private string GitNotStarted(Win32Exception e) => e.NativeErrorCode is FileNotFound or PathNotFound
+        ? $"Git was not found ({RunnerOptions.Installation.Executable}). Install Git for Windows {GitVersion.Minimum} or newer."
+        : $"Git could not be started ({RunnerOptions.Installation.Executable}): {e.Message}";
+
+    private const int FileNotFound = 2;
+    private const int PathNotFound = 3;
 
     internal static JsonElement Result<T>(T value) => JsonSerializer.SerializeToElement(value, RpcJson.Type<T>());
 

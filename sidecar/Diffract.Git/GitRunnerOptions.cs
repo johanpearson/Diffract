@@ -21,6 +21,15 @@ public sealed record GitRunnerOptions
     /// <summary>Folders put in front of PATH for every git process. See <see cref="GitInstallation.PathPrefix"/>.</summary>
     public string? PathPrefix { get; init; }
 
+    /// <summary>
+    /// When set, git is started where the locator found it, instead of <see cref="GitExecutable"/> and
+    /// <see cref="PathPrefix"/>. A git that cannot be started is then looked for again, once, before the call fails.
+    /// </summary>
+    public GitLocator? Locator { get; init; }
+
+    /// <summary>The git the next call starts.</summary>
+    public GitInstallation Installation => Locator?.Current ?? new GitInstallation(GitExecutable, PathPrefix);
+
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     /// <summary>Called after every git process ends, however it ended. Tests use it to count calls against a budget.</summary>
