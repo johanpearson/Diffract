@@ -1,4 +1,5 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { placeMenu, type MenuPlacement } from "./menuPlacement";
 
 export interface MenuItem {
   label: string;
@@ -40,6 +41,13 @@ export function ContextMenu({ x, y, label, items, onClose }: Props) {
     if (opener.current instanceof HTMLElement) opener.current.focus();
   };
 
+  // Measured before the browser paints, so a menu opened near an edge never shows cut off first.
+  const [placement, setPlacement] = useState<MenuPlacement>({ left: x, top: y });
+  useLayoutEffect(() => {
+    const box = menu.current!.getBoundingClientRect();
+    setPlacement(placeMenu(x, y, box, { width: window.innerWidth, height: window.innerHeight }));
+  }, [x, y, items.length]);
+
   useEffect(() => {
     enabledButtons(menu.current)[0]?.focus();
     const outside = (event: MouseEvent) => {
@@ -55,7 +63,7 @@ export function ContextMenu({ x, y, label, items, onClose }: Props) {
       className="context-menu"
       role="menu"
       aria-label={label}
-      style={{ left: x, top: y }}
+      style={placement}
       onKeyDown={(event) => onMenuKey(event, enabledButtons(menu.current), close)}
     >
       {items.map((item) => (

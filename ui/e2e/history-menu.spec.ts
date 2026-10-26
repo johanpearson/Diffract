@@ -38,6 +38,23 @@ test("opens with the keyboard on the selected row, and copies its hash", async (
   expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^9fceb02d/);
 });
 
+test("stays inside the window when opened on a row at its bottom, with every item reachable", async ({ page }) => {
+  await openHistory(page);
+  const row = (await rows(page).nth(1).boundingBox())!;
+  const viewport = page.viewportSize()!;
+  await page.setViewportSize({ width: viewport.width, height: Math.ceil(row.y + row.height + 8) });
+
+  await rows(page).nth(1).click({ button: "right" });
+
+  const box = (await menu(page).boundingBox())!;
+  const height = page.viewportSize()!.height;
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(height);
+  await menu(page).getByRole("menuitem").last().click({ trial: true });
+  const last = (await menu(page).getByRole("menuitem").last().boundingBox())!;
+  expect(last.y + last.height).toBeLessThanOrEqual(height);
+});
+
 test("creates a branch without switching, then switches to it from its row", async ({ page }) => {
   await openHistory(page);
   await onRoot(page, "Create branch here…");
