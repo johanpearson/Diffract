@@ -289,6 +289,9 @@ body {
   position: fixed;
   z-index: 10;
   min-width: 180px;
+  /* Its own width, even at the window's right edge, so it can be measured and moved inside. */
+  width: max-content;
+  overflow-y: auto;
   list-style: none;
   margin: 0;
   padding: 4px;
