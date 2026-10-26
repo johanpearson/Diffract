@@ -3,6 +3,7 @@ import {
   changedFileKinds,
   remoteOutcomes,
   resetModes,
+  gitOutputKinds,
   fileChangeKinds,
   fileContentKinds,
   historyRefKinds,
@@ -27,6 +28,7 @@ import {
   type GitUpdateCheck,
   type GitUpdateResult,
   type HistoryFile,
+  type CommandOutput,
   type HistoryPage,
   type HistoryReadResult,
   type HistoryRef,
@@ -225,6 +227,7 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {
   "repo.changed": object<RepoChanged>({ changes: arrayOf(repoChange), state: repoState }),
   "history.page": object<HistoryPage>({ token: string, index: number, commits: arrayOf(commitEntry) }),
+  "command.output": object<CommandOutput>({ operation: string, kind: oneOf(gitOutputKinds), text: string }),
 };
 
 export const responseShape = (result: Shape) => object<{ jsonrpc: string; id: number; result: unknown }>({ jsonrpc: string, id: number, result });

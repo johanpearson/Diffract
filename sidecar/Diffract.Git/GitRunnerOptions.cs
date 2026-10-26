@@ -32,6 +32,13 @@ public sealed record GitRunnerOptions
 
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
+    /// <summary>
+    /// When set, gets each command as it starts and each line it writes to standard error, while it runs, for the
+    /// command window. Called from a background thread, in order. Only a <see cref="ChangesOnly"/> runner reports:
+    /// what Diffract reads to decide what to do is its own business.
+    /// </summary>
+    public Action<GitOutputLine>? OnOutput { get; init; }
+
     /// <summary>Called after every git process ends, however it ended. Tests use it to count calls against a budget.</summary>
     public Action<GitCall>? OnCall { get; init; }
 }

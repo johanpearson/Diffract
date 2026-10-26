@@ -134,6 +134,7 @@ internal static class RpcJson
 [JsonSerializable(typeof(ChangesCommitParams))]
 [JsonSerializable(typeof(ChangesCommitResult))]
 [JsonSerializable(typeof(RemoteSyncResult))]
+[JsonSerializable(typeof(CommandOutput))]
 [JsonSerializable(typeof(RefCheckNameParams))]
 [JsonSerializable(typeof(RefNameCheck))]
 [JsonSerializable(typeof(BranchCreateParams))]

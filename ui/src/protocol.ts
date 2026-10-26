@@ -435,6 +435,21 @@ export type RefNameKind = (typeof refNameKinds)[number];
 export const resetModes = ["Soft", "Mixed"] as const;
 export type ResetMode = (typeof resetModes)[number];
 
+/** Command: the command about to run. Line: a line git wrote. Progress: a progress line the next one replaces. */
+export const gitOutputKinds = ["Command", "Line", "Progress"] as const;
+export type GitOutputKind = (typeof gitOutputKinds)[number];
+
+/**
+ * `command.output`: one line of what git shows while a request runs, for the command window. Only a request given an
+ * `operation` gets them, all before its answer, and only for the commands that change something.
+ */
+export interface CommandOutput {
+  /** The id the request was given as `operation`. */
+  operation: string;
+  kind: GitOutputKind;
+  text: string;
+}
+
 /** Result of `branch.create`, `branch.switch` and `tag.create`. */
 export interface RefChange {
   /** The ref made or checked out, such as "refs/heads/topic". Null after checking out a detached HEAD. */
@@ -557,4 +572,5 @@ export interface Methods {
 export interface Notifications {
   "repo.changed": RepoChanged;
   "history.page": HistoryPage;
+  "command.output": CommandOutput;
 }

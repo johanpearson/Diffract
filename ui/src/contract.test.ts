@@ -5,6 +5,7 @@ import {
   remoteOutcomes,
   refNameKinds,
   resetModes,
+  gitOutputKinds,
   errorKinds,
   fileChangeKinds,
   fileContentKinds,
@@ -76,6 +77,7 @@ describe("contract samples from the sidecar", () => {
       remoteOutcome: [...remoteOutcomes],
       refNameKind: [...refNameKinds],
       resetMode: [...resetModes],
+      gitOutputKind: [...gitOutputKinds],
     });
   });
 

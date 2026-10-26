@@ -10,7 +10,7 @@ namespace Diffract.Sidecar;
 /// <c>changes.stage</c>, <c>changes.unstage</c> and <c>changes.commit</c> write through a changes runner, which allows nothing but
 /// <see cref="ChangesPolicy"/>. The worktree must be one in the repo's snapshot, so git only ever runs where the repo lives.
 /// </summary>
-internal sealed class ChangesMethods(RepoWorktrees worktrees, GitRunnerOptions runnerOptions)
+internal sealed class ChangesMethods(RepoWorktrees worktrees, GitRunnerOptions runnerOptions, CommandOutputs outputs)
 {
     private readonly ChangesReader _reader = new(runnerOptions);
 
@@ -53,7 +53,7 @@ internal sealed class ChangesMethods(RepoWorktrees worktrees, GitRunnerOptions r
         var commit = SidecarMethods.Params<ChangesCommitParams>(parameters);
         var worktree = worktrees.Resolve(commit.RepoId, commit.Worktree);
         var request = new CommitRequest(SidecarMethods.Required(commit.Message, "message"), commit.Amend);
-        await Checked(() => new CommitWriter(worktree, runnerOptions).CommitAsync(request, ct)).ConfigureAwait(false);
+        await Checked(() => new CommitWriter(worktree, outputs.For(runnerOptions, parameters)).CommitAsync(request, ct)).ConfigureAwait(false);
         var status = await _reader.ReadStatusAsync(worktree, ct).ConfigureAwait(false);
         return SidecarMethods.Result(new ChangesCommitResult(status.HeadCommit!, status));
     }

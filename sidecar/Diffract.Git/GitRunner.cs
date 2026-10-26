@@ -82,6 +82,7 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         var time = Options.TimeProvider;
         var started = time.GetTimestamp();
 
+        Watcher?.Invoke(GitOutputLine.CommandOf(args));
         using var process = Start(args);
         try
         {
@@ -104,7 +105,7 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         using var timeout = new CancellationTokenSource(Options.Timeout, Options.TimeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
         var stdout = process.StandardOutput.BaseStream;
-        var stderrTask = process.StandardError.ReadToEndAsync(linked.Token);
+        var stderrTask = ReadErrorAsync(process.StandardError, linked.Token);
 
         try
         {
@@ -173,6 +174,30 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         {
             // Git stopped reading: it ended, or was stopped. Its exit code, or the caller, says why.
         }
+    }
+
+    /// <summary>Who sees the commands run: only for changes, see <see cref="GitRunnerOptions.OnOutput"/>.</summary>
+    private Action<GitOutputLine>? Watcher => Options.ChangesOnly ? Options.OnOutput : null;
+
+    /// <summary>All of standard error, and each line passed on as it arrives when someone is watching.</summary>
+    private async Task<string> ReadErrorAsync(StreamReader stderr, CancellationToken ct)
+    {
+        if (Watcher is not { } onOutput)
+            return await stderr.ReadToEndAsync(ct).ConfigureAwait(false);
+
+        var all = new StringBuilder();
+        var splitter = new GitOutputSplitter();
+        var buffer = new char[4096];
+        int read;
+        while ((read = await stderr.ReadAsync(buffer.AsMemory(), ct).ConfigureAwait(false)) > 0)
+        {
+            all.Append(buffer, 0, read);
+            foreach (var line in splitter.Feed(buffer.AsSpan(0, read)))
+                onOutput(line);
+        }
+        foreach (var line in splitter.Flush())
+            onOutput(line);
+        return all.ToString();
     }
 
     /// <summary>A non-zero exit code that the caller did not allow. A stopped process has none and never failed.</summary>

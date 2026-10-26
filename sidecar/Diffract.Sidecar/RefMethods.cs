@@ -10,7 +10,7 @@ namespace Diffract.Sidecar;
 /// mixed, with undo. They write through a changes runner, which allows nothing but <see cref="ChangesPolicy"/>.
 /// <c>ref.checkName</c> only reads. The repo's watcher reports what moved as <c>repo.changed</c>.
 /// </summary>
-internal sealed class RefMethods(RepoWorktrees worktrees, GitRunnerOptions runnerOptions)
+internal sealed class RefMethods(RepoWorktrees worktrees, GitRunnerOptions runnerOptions, CommandOutputs outputs)
 {
     /// <summary>Why a new branch or tag name cannot be used, before anything runs. Two reads.</summary>
     public async Task<JsonElement> CheckNameAsync(JsonElement? parameters, CancellationToken ct)
@@ -24,25 +24,25 @@ internal sealed class RefMethods(RepoWorktrees worktrees, GitRunnerOptions runne
     public Task<JsonElement> CreateBranchAsync(JsonElement? parameters, CancellationToken ct)
     {
         var create = SidecarMethods.Params<BranchCreateParams>(parameters);
-        return RunAsync(create.RepoId, create.Worktree, w => w.CreateBranchAsync(new NewRef(Name(create.Name), Commit(create.Commit)), create.Switch, ct));
+        return RunAsync(parameters, create.RepoId, create.Worktree, w => w.CreateBranchAsync(new NewRef(Name(create.Name), Commit(create.Commit)), create.Switch, ct));
     }
 
     public Task<JsonElement> CreateTagAsync(JsonElement? parameters, CancellationToken ct)
     {
         var create = SidecarMethods.Params<TagCreateParams>(parameters);
-        return RunAsync(create.RepoId, create.Worktree, w => w.CreateTagAsync(new NewRef(Name(create.Name), Commit(create.Commit)), create.Message, ct));
+        return RunAsync(parameters, create.RepoId, create.Worktree, w => w.CreateTagAsync(new NewRef(Name(create.Name), Commit(create.Commit)), create.Message, ct));
     }
 
     public Task<JsonElement> SwitchAsync(JsonElement? parameters, CancellationToken ct)
     {
         var target = SidecarMethods.Params<BranchSwitchParams>(parameters);
-        return RunAsync(target.RepoId, target.Worktree, w => w.SwitchAsync(TargetOf(target), ct));
+        return RunAsync(parameters, target.RepoId, target.Worktree, w => w.SwitchAsync(TargetOf(target), ct));
     }
 
     public async Task<JsonElement> ResetAsync(JsonElement? parameters, CancellationToken ct)
     {
         var reset = SidecarMethods.Params<BranchResetParams>(parameters);
-        var writer = new ResetWriter(worktrees.Resolve(reset.RepoId, reset.Worktree), runnerOptions);
+        var writer = new ResetWriter(worktrees.Resolve(reset.RepoId, reset.Worktree), outputs.For(runnerOptions, parameters));
         var mode = reset.Mode ?? throw new RpcException(RpcErrorCodes.InvalidParams, "'mode' is required");
         return SidecarMethods.Result(await Checked(() => writer.ResetAsync(Commit(reset.Commit), mode, ct)).ConfigureAwait(false));
     }
@@ -51,14 +51,14 @@ internal sealed class RefMethods(RepoWorktrees worktrees, GitRunnerOptions runne
     public async Task<JsonElement> UndoResetAsync(JsonElement? parameters, CancellationToken ct)
     {
         var undo = SidecarMethods.Params<BranchUndoResetParams>(parameters);
-        var writer = new ResetWriter(worktrees.Resolve(undo.RepoId, undo.Worktree), runnerOptions);
+        var writer = new ResetWriter(worktrees.Resolve(undo.RepoId, undo.Worktree), outputs.For(runnerOptions, parameters));
         var reset = undo.Reset ?? throw new RpcException(RpcErrorCodes.InvalidParams, "'reset' is required");
         return SidecarMethods.Result(await Checked(() => writer.UndoAsync(reset, ct)).ConfigureAwait(false));
     }
 
-    private async Task<JsonElement> RunAsync(string? repoId, string? worktree, Func<RefWriter, Task<RefChange>> run)
+    private async Task<JsonElement> RunAsync(JsonElement? parameters, string? repoId, string? worktree, Func<RefWriter, Task<RefChange>> run)
     {
-        var writer = new RefWriter(worktrees.Resolve(repoId, worktree), runnerOptions);
+        var writer = new RefWriter(worktrees.Resolve(repoId, worktree), outputs.For(runnerOptions, parameters));
         return SidecarMethods.Result(await Checked(() => run(writer)).ConfigureAwait(false));
     }
 

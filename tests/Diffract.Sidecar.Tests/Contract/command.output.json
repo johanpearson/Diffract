@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "method": "command.output",
+  "params": {
+    "operation": "op-1",
+    "kind": "Progress",
+    "text": "Receiving objects:  40% (2/5)"
+  }
+}

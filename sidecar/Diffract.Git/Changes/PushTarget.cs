@@ -7,9 +7,9 @@ internal sealed record PushTarget(BranchTracking Tracking, string Remote, bool I
     /// <summary>Such as "origin/main".</summary>
     public string Name => $"{Remote}/{Tracking.Branch}";
 
-    public IReadOnlyList<string> Arguments => IsNew
-        ? ["push", "--porcelain", "--set-upstream", Remote, Tracking.Branch]
-        : ["push", "--porcelain", Remote, Tracking.Branch];
+    /// <param name="progress">Asks git to report progress, for someone watching the command run.</param>
+    public IReadOnlyList<string> Arguments(bool progress) =>
+        ["push", "--porcelain", .. (progress ? ["--progress"] : Array.Empty<string>()), .. (IsNew ? ["--set-upstream"] : Array.Empty<string>()), Remote, Tracking.Branch];
 }
 
 /// <summary>The plain words for what a pull or push did.</summary>
