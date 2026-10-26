@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Hunk, RepoChange, WorktreeChanges } from "../protocol";
+import type { Hunk, WorktreeChanges } from "../protocol";
 import { messageOf } from "../model/format";
+import { readStatus } from "../model/statusReads";
+import { concerns } from "../model/worktrees";
 import { useCommands } from "../commands/Commands";
 import type { RpcClient } from "../rpc";
 import { pathsOf, type Entry } from "./entries";
@@ -44,8 +46,7 @@ export function useChanges(client: RpcClient, repoId: string, worktree: string):
 
   const read = useCallback(() => {
     const seq = ++latest.current;
-    client
-      .call("changes.status", { repoId, worktree })
+    readStatus(client, repoId, worktree)
       .then((next) => show(seq, next))
       .catch((error: unknown) => seq === latest.current && setReadProblem(`Could not read the changes: ${messageOf(error)}`));
   }, [client, repoId, worktree, show, setReadProblem]);
@@ -143,15 +144,3 @@ function hunkOf(entry: Entry, hunk: Hunk) {
   return { path: entry.file.path, oldPath: entry.side === "staged" ? entry.file.oldPath : null, id: hunk.id };
 }
 
-/**
- * A change to this worktree's files or index, to refs (the upstream may have moved), or one that rebuilt everything.
- * Other worktrees' changes do not concern it.
- */
-function concerns(changes: readonly RepoChange[], worktree: string): boolean {
-  return changes.some((c) => c.path === null ? c.kind !== "WorktreeList" : samePath(c.path, worktree));
-}
-
-function samePath(a: string, b: string): boolean {
-  const normalize = (p: string) => p.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
-  return normalize(a) === normalize(b);
-}

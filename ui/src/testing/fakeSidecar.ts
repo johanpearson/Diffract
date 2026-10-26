@@ -197,9 +197,12 @@ export class FakeSidecar {
   /** Every fetch, pull and push asked for, as "remote.pull C:\\src\\shop". */
   readonly remoteAsked: string[] = [];
 
-  private remote(method: "remote.fetch" | "remote.pull" | "remote.push", params: { worktree: string }) {
+  private remote(method: "remote.fetch" | "remote.pull" | "remote.push", params: { repoId: string; worktree: string }) {
     this.remoteAsked.push(`${method} ${params.worktree}`);
-    return this.worktree(params.worktree).remote(method.slice("remote.".length) as "fetch" | "pull" | "push");
+    const answer = this.worktree(params.worktree).remote(method.slice("remote.".length) as "fetch" | "pull" | "push");
+    // Remote-tracking refs moved, so the watcher reports it after the answer.
+    queueMicrotask(() => this.change(params.repoId, (s) => s));
+    return answer;
   }
 
   private newCommits = 0;
@@ -367,7 +370,7 @@ export class FakeSidecar {
       case "remote.fetch":
       case "remote.pull":
       case "remote.push":
-        return this.remote(method, params as { worktree: string });
+        return this.remote(method, params as { repoId: string; worktree: string });
       case "ref.checkName":
       case "branch.create":
       case "branch.switch":
