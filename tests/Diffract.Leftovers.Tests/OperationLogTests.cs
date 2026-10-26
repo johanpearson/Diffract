@@ -10,7 +10,9 @@ public class OperationLogTests : IDisposable
     private OperationLog Log => new(_temp.Combine("oplog"));
 
     private static CleanupStarted Started(string id, string repo = @"C:\src\repo") =>
-        new(id, repo, FixtureRepoBuilder.DefaultNow, null, ["LocalBranch topic"]);
+        new(id, repo, FixtureRepoBuilder.DefaultNow, null, [Topic]);
+
+    private static readonly LoggedLeftover Topic = new(LeftoverKind.LocalBranch, "topic", null);
 
     private static StepLogged Step(string id, int step) => new(
         id,
@@ -29,7 +31,7 @@ public class OperationLogTests : IDisposable
 
         var started = cleanup.Started;
         Assert.Equal(("a", @"C:\src\repo", FixtureRepoBuilder.DefaultNow, (string?)null), (started.CleanupId, started.RepoPath, started.At, started.Undoes));
-        Assert.Equal(["LocalBranch topic"], started.Leftovers);
+        Assert.Equal([Topic], started.Leftovers);
         var step = Assert.Single(cleanup.Steps);
         Assert.Equal((Step("a", 0).Result, Step("a", 0).UndoNote), (step.Result, step.UndoNote));
         Assert.Equal(Step("a", 0).Undo!.Input, step.Undo!.Input);

@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32011,
+    "message": "Everything in this cleanup that can be undone is undone already.",
+    "data": {
+      "kind": "CleanupRefused"
+    }
+  }
+}

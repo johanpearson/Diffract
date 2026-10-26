@@ -18,8 +18,11 @@ internal sealed record PendingStep
     /// <summary>The step in the plan, whose undo the log keeps once it is done. Null for an undo, which is not undone.</summary>
     public CleanupStep? Planned { get; init; }
 
-    /// <summary>For an undo of a step nothing in git takes back: what to say instead, such as "Restore it from the Recycle Bin."</summary>
-    public string? NotUndoable { get; init; }
+    /// <summary>
+    /// Why it is not run on purpose: the user left it out, or, for an undo, nothing in git takes it back ("Restore it
+    /// from the Recycle Bin."). Unlike a skip, it does not stop the rest of its leftover.
+    /// </summary>
+    public string? NotRun { get; init; }
 
     public StepResult As(StepOutcome outcome, string? reason) => Result with { Outcome = outcome, Reason = reason };
 }

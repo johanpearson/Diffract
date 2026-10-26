@@ -27,6 +27,8 @@ export type LeftoverKind = (typeof leftoverKinds)[number];
  * why, with git's own output under it.
  * ChangeRefused: a branch, tag, switch or reset was not made, such as a switch that would overwrite uncommitted
  * changes. Nothing changed. The message says why, with git's own output under it when there is some.
+ * CleanupRefused: a cleanup or undo did not start, such as a plan already applied, another cleanup running, or a
+ * cleanup already undone. Nothing changed. The message says why.
  */
 export const errorKinds = [
   "NotARepo",
@@ -39,6 +41,7 @@ export const errorKinds = [
   "CommitRefused",
   "RemoteFailed",
   "ChangeRefused",
+  "CleanupRefused",
 ] as const;
 export type ErrorKind = (typeof errorKinds)[number];
 
@@ -466,6 +469,90 @@ export interface ResetResult {
   mode: ResetMode;
 }
 
+/** What a cleanup step does. The dialog words and groups steps by it. */
+export const stepKinds = [
+  "Backup",
+  "RemoveWorktree",
+  "DeleteBranch",
+  "DeleteRemoteBranch",
+  "DropStash",
+  "DeleteRefs",
+  "DeleteTag",
+  "RecycleFolder",
+] as const;
+export type StepKind = (typeof stepKinds)[number];
+
+/** Skipped: not run, as what it expected changed, an earlier step of its leftover did not run, or it was left out. Failed: git or Windows refused it. */
+export const stepOutcomes = ["Done", "Skipped", "Failed"] as const;
+export type StepOutcome = (typeof stepOutcomes)[number];
+
+/** A leftover as the repo state lists it: its kind, name and path pick it out. */
+export interface SelectedLeftover {
+  kind: LeftoverKind;
+  name: string;
+  path: string | null;
+}
+
+/** One step of a cleanup, in plain English, as the confirm dialog lists it. */
+export interface StepView {
+  kind: StepKind;
+  description: string;
+  /** False: say it cannot be undone, with `undoNote` when there is one. */
+  undoable: boolean;
+  /** A limit on undo, or what to do instead, such as "Restore it from the Recycle Bin." */
+  undoNote: string | null;
+  /** Has its own checkbox, ticked by default. Send its place in `leaveOut` when unticked. */
+  optional: boolean;
+}
+
+export interface LeftoverPlanView {
+  kind: LeftoverKind;
+  name: string;
+  path: string | null;
+  /** Why nothing is planned for it, such as "In use". Null when it has steps. */
+  refused: string | null;
+  steps: StepView[];
+}
+
+/** Result of `cleanup.plan`: what the dialog shows, and the id to apply exactly that by. */
+export interface CleanupPlanView {
+  planId: string;
+  leftovers: LeftoverPlanView[];
+}
+
+/** A step by its place: its leftover's place in the plan, then its own place among that leftover's steps. */
+export interface StepRef {
+  leftover: number;
+  step: number;
+}
+
+/** What happened to one step. An undo's step has the place of the step it takes back. */
+export interface StepResult extends StepRef {
+  kind: StepKind;
+  description: string;
+  outcome: StepOutcome;
+  /** Why it was skipped or failed. Null when done. */
+  reason: string | null;
+}
+
+/** Result of `cleanup.apply` and `cleanup.undo`, in the order the steps ran. */
+export interface CleanupResult {
+  cleanupId: string;
+  steps: StepResult[];
+}
+
+/** A past cleanup or undo, from the operation log. */
+export interface PastCleanup {
+  cleanupId: string;
+  at: string;
+  /** For an undo, the cleanup it took back. */
+  undoes: string | null;
+  leftovers: SelectedLeftover[];
+  steps: StepResult[];
+  /** Offer "Undo": it did something git can take back that is not taken back yet. Never true for an undo. */
+  canUndo: boolean;
+}
+
 /** Params of `branch.switch`: exactly one of a local branch, a remote-tracking branch or a full commit id. */
 /** A request that changes the repo can name an operation, to get git's output as `command.output` while it runs. */
 export interface Watched {
@@ -571,6 +658,17 @@ export interface Methods {
   "branch.reset": { params: { repoId: string; worktree: string; commit: string; mode: ResetMode } & Watched; result: ResetResult };
   /** Moves the branch back, only while it is still where the reset left it. Answers with that move. */
   "branch.undoReset": { params: { repoId: string; worktree: string; reset: ResetResult } & Watched; result: ResetResult };
+  /** Plans removing the selected leftovers, from the repo's latest snapshot. Starts no git. Refused until the scan has listed the leftovers. */
+  "cleanup.plan": { params: { repoId: string; leftovers: SelectedLeftover[] }; result: CleanupPlanView };
+  /**
+   * Runs the plan with that id, once, checking each step right before it runs. Live refresh pauses meanwhile, and one
+   * `repo.changed` with the repo as it is afterwards arrives before the answer.
+   */
+  "cleanup.apply": { params: { repoId: string; planId: string; leaveOut?: StepRef[] | null } & Watched; result: CleanupResult };
+  /** Past cleanups and undos from the operation log, newest first. Starts no git. */
+  "cleanup.history": { params: { repoId: string }; result: PastCleanup[] };
+  /** Takes back what a cleanup did and is not taken back yet, in reverse order, with the same checks. */
+  "cleanup.undo": { params: { repoId: string; cleanupId: string } & Watched; result: CleanupResult };
 }
 
 /** Every notification the sidecar sends, with its params. */

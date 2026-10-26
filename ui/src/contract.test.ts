@@ -13,6 +13,8 @@ import {
   gitUpdateStatuses,
   historyRefKinds,
   leftoverKinds,
+  stepKinds,
+  stepOutcomes,
   terminalKinds,
   verdicts,
   type HistoryPage,
@@ -78,6 +80,8 @@ describe("contract samples from the sidecar", () => {
       refNameKind: [...refNameKinds],
       resetMode: [...resetModes],
       gitOutputKind: [...gitOutputKinds],
+      stepKind: [...stepKinds],
+      stepOutcome: [...stepOutcomes],
     });
   });
 

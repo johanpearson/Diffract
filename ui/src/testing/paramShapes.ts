@@ -1,5 +1,5 @@
 import { refNameKinds, resetModes, terminalKinds, type Methods } from "../protocol";
-import { resetResult } from "./protocolShapes";
+import { resetResult, selectedLeftover, stepRef } from "./protocolShapes";
 import { arrayOf, boolean, nullable, object, oneOf, optional, string, type Shape } from "./shapes";
 
 /** The methods that take params. */
@@ -69,4 +69,8 @@ export const paramShapes: { [M in WithParams]: Shape } = {
   "tag.create": object<Params<"tag.create">>({ repoId: string, worktree: string, commit: string, name: string, message: optional(nullable(string)), ...watched }),
   "branch.reset": object<Params<"branch.reset">>({ repoId: string, worktree: string, commit: string, mode: oneOf(resetModes), ...watched }),
   "branch.undoReset": object<Params<"branch.undoReset">>({ repoId: string, worktree: string, reset: resetResult, ...watched }),
+  "cleanup.plan": object<Params<"cleanup.plan">>({ repoId: string, leftovers: arrayOf(selectedLeftover) }),
+  "cleanup.apply": object<Params<"cleanup.apply">>({ repoId: string, planId: string, leaveOut: optional(nullable(arrayOf(stepRef))), ...watched }),
+  "cleanup.history": object<Params<"cleanup.history">>({ repoId: string }),
+  "cleanup.undo": object<Params<"cleanup.undo">>({ repoId: string, cleanupId: string, ...watched }),
 };
