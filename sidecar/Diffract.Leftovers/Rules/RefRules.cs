@@ -91,7 +91,7 @@ public sealed class CheckpointSessionRule : ILeftoverRule
     /// The pattern's fixed part plus the next segment, for example
     /// <c>refs/copilot/checkpoints/&lt;session&gt;</c> for <c>refs/copilot/checkpoints/**</c>.
     /// </summary>
-    private static string? SessionOf(DiffractConfig config, string fullName)
+    internal static string? SessionOf(DiffractConfig config, string fullName)
     {
         foreach (var pattern in config.CheckpointRefPatterns)
         {

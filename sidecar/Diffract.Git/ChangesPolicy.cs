@@ -64,11 +64,7 @@ public static class ChangesPolicy
     {
         PathSlot => value.Length > 0,
         CommitSlot => ObjectId.IsValid(value),
-        RemoteSlot or RefSlot => IsPlainName(value),
+        RemoteSlot or RefSlot => PolicySlots.IsPlainName(value),
         _ => slot == value,
     };
-
-    /// <summary>Not an option, not a forced refspec such as "+main", not "src:dst" or ":main", and no whitespace.</summary>
-    private static bool IsPlainName(string value) =>
-        value.Length > 0 && value[0] is not ('-' or '+') && !value.Any(c => c == ':' || char.IsWhiteSpace(c));
 }

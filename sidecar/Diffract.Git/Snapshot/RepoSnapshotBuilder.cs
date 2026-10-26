@@ -376,7 +376,10 @@ public sealed partial class RepoSnapshotBuilder
                     TargetId: r.TargetId,
                     CreatedAt: r.CreatorDate,
                     IsMergedIntoMain: isMerged,
-                    CommitsAtRisk: isMerged ? 0 : risk.TryGetValue(r.Name, out var n) ? n : null);
+                    CommitsAtRisk: isMerged ? 0 : risk.TryGetValue(r.Name, out var n) ? n : null)
+                {
+                    ObjectId = r.ObjectId,
+                };
             })
             .ToList();
 

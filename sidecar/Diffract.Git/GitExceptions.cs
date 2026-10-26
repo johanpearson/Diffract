@@ -24,6 +24,13 @@ public sealed class ReadOnlyViolationException(IReadOnlyList<string> arguments, 
     public string Reason { get; } = reason;
 }
 
+public sealed class CleanupPolicyViolationException(IReadOnlyList<string> arguments, string reason)
+    : GitException($"git {string.Join(' ', arguments)} is not an allowed cleanup step: {reason}")
+{
+    public IReadOnlyList<string> Arguments { get; } = arguments;
+    public string Reason { get; } = reason;
+}
+
 public sealed class ChangesPolicyViolationException(IReadOnlyList<string> arguments, string reason)
     : GitException($"git {string.Join(' ', arguments)} is not an allowed change: {reason}")
 {
