@@ -24,6 +24,7 @@ import type {
 } from "../protocol";
 import { sampleWorktrees, type FakeWorktree } from "./fakeChanges";
 import { answerRefs } from "./fakeRefs";
+import { FakeCleanups } from "./fakeCleanup";
 import { detailsOf, generateHistory, sampleFiles } from "./fakeHistory";
 import { FakeTransport } from "./fakeTransport";
 
@@ -193,6 +194,9 @@ export class FakeSidecar {
 
   /** Every ref.checkName, branch.* and tag.create asked for, with its params, in order. */
   readonly refsAsked: { method: string; params: unknown }[] = [];
+
+  /** Plans, applies and undoes cleanups against the repos' leftovers. Tests set `skips` and read `asked` and `history`. */
+  readonly cleanups = new FakeCleanups();
 
   /** Every fetch, pull and push asked for, as "remote.pull C:\\src\\shop". */
   readonly remoteAsked: string[] = [];
@@ -379,6 +383,11 @@ export class FakeSidecar {
       case "branch.undoReset":
         this.refsAsked.push({ method, params });
         return answerRefs(this, method, params as Parameters<typeof answerRefs>[2]);
+      case "cleanup.plan":
+      case "cleanup.apply":
+      case "cleanup.history":
+      case "cleanup.undo":
+        return this.cleanups.answer(this, method, params);
     }
   }
 }

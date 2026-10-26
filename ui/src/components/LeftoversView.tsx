@@ -1,6 +1,11 @@
 import { verdicts, type Leftover, type RepoState, type Verdict } from "../protocol";
 import { formatAtRisk, kindLabels, verdictLabels } from "../model/format";
 import type { Row } from "../model/rows";
+import { CleanupDialog } from "../cleanup/CleanupDialog";
+import { CleanupResultPanel } from "../cleanup/CleanupResultPanel";
+import { PastCleanups } from "../cleanup/PastCleanups";
+import { selectable } from "../cleanup/selection";
+import type { Cleanup } from "../cleanup/useCleanup";
 import { StatusLine } from "./StatusLine";
 
 export type Filter = Verdict | "all";
@@ -20,29 +25,55 @@ interface Props {
   refreshing: boolean;
   /** Why Refresh cannot be used right now, or null when it can. */
   refreshBlocked?: string | null;
+  cleanup: Cleanup;
   now: Date;
 }
 
-/** The read-only "Worktrees and agents" view: counts, filter chips and one row per leftover. */
+/** The "Worktrees and agents" view: counts, filter chips, one row per leftover to select, and cleaning them up. */
 export function LeftoversView(props: Props) {
-  const { state, refreshing, refreshBlocked = null, onRefresh, now } = props;
+  const { state, cleanup, now } = props;
   return (
     <section className="view" aria-labelledby="view-title">
-      <div className="bar">
-        <h1 id="view-title">Worktrees and agents</h1>
-        <span className="grow" />
-        <button
-          className="abtn"
-          onClick={onRefresh}
-          disabled={refreshing || refreshBlocked !== null}
-          title={refreshBlocked ?? "Also counts unreachable commits, which takes a few seconds"}
-        >
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
-      </div>
+      <Bar {...props} />
+      {cleanup.shown && (
+        <CleanupResultPanel
+          shown={cleanup.shown}
+          canUndo={!cleanup.shown.undo && cleanup.history.some((c) => c.cleanupId === cleanup.shown!.result.cleanupId && c.canUndo)}
+          busy={cleanup.busy}
+          onUndo={() => cleanup.undo(cleanup.shown!.result.cleanupId)}
+          onDismiss={cleanup.dismiss}
+        />
+      )}
       <ScanResult {...props} />
+      <PastCleanups history={cleanup.history} busy={cleanup.busy} onUndo={cleanup.undo} now={now} />
       <StatusLine state={state} now={now} />
+      {cleanup.plan && <CleanupDialog plan={cleanup.plan} onConfirm={cleanup.confirm} onCancel={cleanup.cancel} />}
     </section>
+  );
+}
+
+function Bar({ state, refreshing, refreshBlocked = null, onRefresh, cleanup }: Props) {
+  const count = cleanup.selected.length;
+  const scanned = !state.scanning && state.scanProblem === null;
+  return (
+    <div className="bar">
+      <h1 id="view-title">Worktrees and agents</h1>
+      <span className="grow" />
+      <button
+        className="abtn"
+        onClick={onRefresh}
+        disabled={refreshing || refreshBlocked !== null}
+        title={refreshBlocked ?? "Also counts unreachable commits, which takes a few seconds"}
+      >
+        {refreshing ? "Refreshing…" : "Refresh"}
+      </button>
+      <button className="abtn" onClick={cleanup.selectMergedBranches} disabled={!scanned} title="Ticks every local branch that is merged or whose upstream is gone, and nothing else">
+        Select all merged branches
+      </button>
+      <button className="abtn primary" onClick={cleanup.start} disabled={count === 0 || cleanup.planning || cleanup.busy}>
+        {count === 0 ? "Clean up selected" : `Clean up ${count} selected`}
+      </button>
+    </div>
   );
 }
 
@@ -99,13 +130,13 @@ function Chips({ filter, onFilter }: Pick<Props, "filter" | "onFilter">) {
   );
 }
 
-function LeftoverList({ rows, filter, onOpenFolder, onOpenTerminal, terminalName }: Omit<Props, "state">) {
+function LeftoverList({ rows, filter, onOpenFolder, onOpenTerminal, terminalName, cleanup }: Omit<Props, "state">) {
   const shown = rows.filter((row) => filter === "all" || row.leftover.verdict === filter);
   if (shown.length === 0) return <p className="empty">{rows.length === 0 ? "Nothing here. Agents left your repo tidy." : "Nothing with this verdict."}</p>;
   return (
     <ul className="items" aria-label="Leftovers">
       {shown.map((row) => (
-        <LeftoverRow key={row.key} row={row} onOpenFolder={onOpenFolder} onOpenTerminal={onOpenTerminal} terminalName={terminalName} />
+        <LeftoverRow key={row.key} row={row} onOpenFolder={onOpenFolder} onOpenTerminal={onOpenTerminal} terminalName={terminalName} cleanup={cleanup} />
       ))}
     </ul>
   );
@@ -116,12 +147,14 @@ interface RowProps {
   onOpenFolder(path: string): void;
   onOpenTerminal(path: string): void;
   terminalName: string | null;
+  cleanup: Cleanup;
 }
 
-function LeftoverRow({ row, onOpenFolder, onOpenTerminal, terminalName }: RowProps) {
+function LeftoverRow({ row, onOpenFolder, onOpenTerminal, terminalName, cleanup }: RowProps) {
   const l = row.leftover;
   return (
-    <li className={`item${row.flash ? ` flash-${row.flash}` : ""}`} data-flash={row.flash ?? undefined} aria-label={l.name}>
+    <li className={`item selectable${row.flash ? ` flash-${row.flash}` : ""}`} data-flash={row.flash ?? undefined} aria-label={l.name}>
+      <Pick row={row} cleanup={cleanup} />
       <div className="item-main">
         <div>
           <span className="nm">{l.name}</span>
@@ -149,6 +182,20 @@ function LeftoverRow({ row, onOpenFolder, onOpenTerminal, terminalName }: RowPro
         </span>
       </div>
     </li>
+  );
+}
+
+/** The row's checkbox. "In use" is never offered, so it gets an empty space instead, keeping the rows lined up. */
+function Pick({ row, cleanup }: { row: Row; cleanup: Cleanup }) {
+  if (!selectable(row)) return <span className="pick" />;
+  return (
+    <input
+      className="pick"
+      type="checkbox"
+      checked={cleanup.isSelected(row.key)}
+      onChange={() => cleanup.toggle(row.key)}
+      aria-label={`Select ${row.leftover.name}`}
+    />
   );
 }
 

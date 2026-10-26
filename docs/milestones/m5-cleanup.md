@@ -1,6 +1,6 @@
 # Milestone 5: safe cleanup with backup tags and undo, stashes, and pruning remote branches
 
-**Status:** in progress. Phases 0 to 3 are done; phase 4, the view, is next.
+**Status:** in progress. Phases 0 to 4 are done; phase 5, old backup tags and orphaned commits, is next.
 **Estimate:** 1 to 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan cleans up the agent leftovers in his busiest repos from the installed app, nothing he did not choose is touched, and every removal he tries to undo comes back.
 
