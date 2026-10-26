@@ -14,6 +14,7 @@ Decisions in the brief are locked. If you think one is wrong, say so in the PR d
 
 - **Never run a git command that writes against a repo you did not create yourself.** Real repos on Johan's machine are read-only for you. Writing is only allowed inside fixture repos created in a temp directory by the test suite or the fixture command.
 - Never delete, prune, reset, checkout, stash, tag, push or fetch in a real repo. Not even "just to test".
+- One exception, for this repo only (Diffract itself), so you can start each task from the latest `main` without asking Johan: you may run `git fetch origin`, then `git switch main` and `git pull --ff-only origin main`, when the working tree is clean. Nothing else: no other branch is pulled or reset, nothing is pruned, and if the pull cannot fast-forward, stop and ask Johan. Johan allowed this on 2026-10-26.
 - In milestone 1, `GitRunner` must enforce this: when created in read-only mode it rejects any subcommand that is not on an explicit allowlist, and a test proves it.
 - If a task seems to require writing to a real repo, stop and ask Johan.
 
