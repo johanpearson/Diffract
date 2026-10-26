@@ -124,44 +124,61 @@ interface Shown {
 }
 
 /**
- * A button above each change in an editor. A view zone makes room for it as a thin empty line; the button itself is a
- * content widget in that room, because zones lie under the text layer and never get the mouse.
+ * A button above each change in an editor. A view zone makes room for it as a thin empty line. The button itself is
+ * an overlay widget that follows its zone, because zones lie under the text layer and never get the mouse.
+ *
+ * The zone comes first among the zones above the change. In the inline layout the removed lines are zones there too,
+ * and a button placed just above the changed line would cover them and lose its clicks to the editor.
  */
 class ActionZones {
   private zoneIds: string[] = [];
-  private widgets: monaco.editor.IContentWidget[] = [];
+  private widgets: monaco.editor.IOverlayWidget[] = [];
 
   constructor(private readonly editor: monaco.editor.ICodeEditor) {}
 
   set(actions: readonly ChangeAction[]): void {
-    this.widgets.forEach((w) => this.editor.removeContentWidget(w));
+    this.widgets.forEach((w) => this.editor.removeOverlayWidget(w));
+    this.widgets = actions.map((action, index) => actionWidget(action, index));
     this.editor.changeViewZones((zones) => {
       this.zoneIds.forEach((id) => zones.removeZone(id));
-      this.zoneIds = actions.map((action) => zones.addZone({ afterLineNumber: Math.max(action.line - 1, 0), heightInPx: ZoneHeight, domNode: document.createElement("div") }));
+      this.zoneIds = actions.map((action, index) => zones.addZone(actionZone(action, this.widgets[index]!.getDomNode(), this.editor)));
     });
-    this.widgets = actions.map((action, index) => actionWidget(action, index));
-    this.widgets.forEach((w) => this.editor.addContentWidget(w));
+    this.widgets.forEach((w) => this.editor.addOverlayWidget(w));
   }
 }
 
 const ZoneHeight = 26;
 
+/** Before Monaco's own zones on the same line, which have no ordinal and sort as 10000: so above the removed lines. */
+const ActionZoneOrdinal = 0;
+
 let widgetIds = 0;
 
-/** Sits just above the change's first line: in the room its zone made. */
-function actionWidget(action: ChangeAction, index: number): monaco.editor.IContentWidget {
+/** The room above a change, which moves its button along with it as the editor scrolls. */
+function actionZone(action: ChangeAction, button: HTMLElement, editor: monaco.editor.ICodeEditor): monaco.editor.IViewZone {
+  return {
+    afterLineNumber: Math.max(action.line - 1, 0),
+    heightInPx: ZoneHeight,
+    ordinal: ActionZoneOrdinal,
+    domNode: document.createElement("div"),
+    onDomNodeTop: (top) => {
+      button.style.top = `${top}px`;
+      button.style.left = `${editor.getLayoutInfo().contentLeft}px`;
+    },
+  };
+}
+
+/** Placed by its zone, so Monaco is given no position for it. */
+function actionWidget(action: ChangeAction, index: number): monaco.editor.IOverlayWidget {
   const id = `diffract.change-action.${++widgetIds}.${index}`;
   const node = actionNode(action);
-  return {
-    getId: () => id,
-    getDomNode: () => node,
-    getPosition: () => ({ position: { lineNumber: action.line, column: 1 }, preference: [monaco.editor.ContentWidgetPositionPreference.ABOVE] }),
-  };
+  return { getId: () => id, getDomNode: () => node, getPosition: () => null };
 }
 
 function actionNode(action: ChangeAction): HTMLElement {
   const zone = document.createElement("div");
   zone.className = "change-action";
+  zone.style.height = `${ZoneHeight}px`;
   const button = document.createElement("button");
   button.className = "abtn small";
   button.textContent = action.label;

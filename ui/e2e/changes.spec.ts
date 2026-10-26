@@ -114,3 +114,28 @@ test("a fetch can be cancelled from the bar", async ({ page }) => {
   await expect(remote.getByRole("button", { name: "Fetch" })).toBeEnabled();
   await expect(page.getByRole("alert").filter({ hasText: /fetch|cancel/i })).toHaveCount(0);
 });
+
+for (const layout of ["Side by side", "Inline"]) {
+  test(`Stage hunk sits in its own room above the change, ${layout.toLowerCase()}`, async ({ page }) => {
+    await openChanges(page);
+    const diff = page.getByRole("region", { name: "Diff of src/Cart.cs" });
+    await diff.getByRole("group", { name: "Diff layout" }).getByRole("button", { name: layout }).click();
+    await expect(diff.locator(".monaco-diff-editor")).toBeVisible();
+    const button = diff.getByTitle("Stage the change at line 9");
+    await expect(button).toBeVisible();
+
+    // No line of code in the editor the button is in, removed lines included, lies under it. A pixel is rounding.
+    const box = (await button.boundingBox())!;
+    const lines = await diff.locator(".editor.modified .view-line").evaluateAll((els) =>
+      els.filter((el) => el.textContent!.trim() !== "").map((el) => ({ text: el.textContent, ...el.getBoundingClientRect().toJSON() as DOMRect })),
+    );
+    const overlap = (a0: number, a1: number, b0: number, b1: number) => Math.min(a1, b1) - Math.max(a0, b0);
+    const covered = lines.filter((r) => overlap(r.top, r.bottom, box.y, box.y + box.height) > 1 && overlap(r.left, r.right, box.x, box.x + box.width) > 1);
+    expect(lines.length).toBeGreaterThan(0);
+    expect(covered.map((r) => r.text)).toEqual([]);
+
+    // A plain click: Playwright fails it if anything else would take the click.
+    await button.click();
+    await expect(rows(page, "Staged")).toHaveText([/README\.md/, /src\/Cart\.cs/]);
+  });
+}
