@@ -12,36 +12,29 @@ internal static class WorktreeSteps
     /// removed: git can otherwise remove part of it and stop.
     /// </summary>
     public static IReadOnlyList<CleanupStep> Worktree(WorktreeInfo worktree, int? commitsAtRisk, BackupTags backups) =>
-    [
-        .. Backup(worktree, commitsAtRisk, backups),
-        new CleanupStep
+        Steps(worktree, commitsAtRisk, backups, new CleanupStep
         {
             Kind = StepKind.RemoveWorktree,
             Description = $"Remove worktree {worktree.Path}",
             Command = Remove(worktree),
             Expects = [new Expectation.NoFilesInUse(worktree.Path), new Expectation.WorktreeClean(worktree.Path), .. BranchAt(worktree)],
             Undo = Readd(worktree),
-        },
-        .. BranchStep(worktree),
-    ];
+            UndoExpects = [new Expectation.PathAbsent(worktree.Path), .. ReaddOn(worktree)],
+        });
 
     /// <summary>
     /// Its folder is gone, so only git's record of it goes, with <c>worktree remove</c>: <c>worktree prune</c> would
     /// take every such worktree, not this one. Undo can bring back the branch, not the folder.
     /// </summary>
     public static IReadOnlyList<CleanupStep> Prunable(WorktreeInfo worktree, int? commitsAtRisk, BackupTags backups) =>
-    [
-        .. Backup(worktree, commitsAtRisk, backups),
-        new CleanupStep
+        Steps(worktree, commitsAtRisk, backups, new CleanupStep
         {
             Kind = StepKind.RemoveWorktree,
             Description = $"Forget worktree {worktree.Path}, whose folder is gone",
             Command = Remove(worktree),
             Expects = [.. BranchAt(worktree)],
             UndoNote = "The folder was already gone, so undo brings back the branch, not the folder.",
-        },
-        .. BranchStep(worktree),
-    ];
+        });
 
     /// <summary>Windows itself is the undo: the folder can be restored from the Recycle Bin.</summary>
     public static IReadOnlyList<CleanupStep> Folder(string path) =>
@@ -56,9 +49,16 @@ internal static class WorktreeSteps
         },
     ];
 
-    private static IEnumerable<CleanupStep> Backup(WorktreeInfo worktree, int? commitsAtRisk, BackupTags backups) =>
+    private static IReadOnlyList<CleanupStep> Steps(WorktreeInfo worktree, int? commitsAtRisk, BackupTags backups, CleanupStep remove) =>
+    [
+        .. Backup(worktree, commitsAtRisk, backups, remove),
+        remove,
+        .. BranchStep(worktree),
+    ];
+
+    private static IEnumerable<CleanupStep> Backup(WorktreeInfo worktree, int? commitsAtRisk, BackupTags backups, CleanupStep remove) =>
         commitsAtRisk is > 0 and var count && worktree.Head is { } head
-            ? [backups.Step(new BackupOf("worktree", worktree.Branch ?? Path.GetFileName(worktree.Path), head, $"worktree {worktree.Path}", count))]
+            ? [backups.Step(new BackupOf("worktree", worktree.Branch ?? Path.GetFileName(worktree.Path), head, $"worktree {worktree.Path}", count), remove)]
             : [];
 
     private static GitCommandLine Remove(WorktreeInfo worktree) => new(["worktree", "remove", worktree.Path], []);
@@ -71,6 +71,11 @@ internal static class WorktreeSteps
         ? new GitCommandLine(["worktree", "add", worktree.Path, at], [])
         : null;
 
+    /// <summary>What the worktree is added on again: its branch where it was, or, when detached, its commit.</summary>
+    private static IEnumerable<Expectation> ReaddOn(WorktreeInfo worktree) => worktree.Branch is null && worktree.Head is { } head
+        ? [new Expectation.ObjectExists(head)]
+        : BranchAt(worktree);
+
     private static IEnumerable<CleanupStep> BranchStep(WorktreeInfo worktree) => worktree is { Branch: { } branch, Head: { } head }
         ?
         [
@@ -81,6 +86,7 @@ internal static class WorktreeSteps
                 Command = new GitCommandLine(["branch", "-D", branch], []),
                 Expects = [new Expectation.RefAt($"refs/heads/{branch}", head)],
                 Undo = new GitCommandLine(["branch", branch, head], []),
+                UndoExpects = RefSteps.CanRecreate(($"refs/heads/{branch}", head)),
                 Optional = true,
             },
         ]

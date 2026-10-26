@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Diffract.Git;
 
 namespace Diffract.Leftovers.Cleanup;
@@ -25,11 +26,33 @@ public enum StepKind
     RecycleFolder,
 }
 
-/// <summary>What must still be true right before a step runs. When it is not, the step and the rest of its leftover are skipped.</summary>
+/// <summary>
+/// What must still be true right before a step, or its undo, runs. When it is not, the step and the rest of its
+/// leftover are skipped. Kept in the operation log with each undo, so it is stored by name.
+/// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonDerivedType(typeof(RefAt), "refAt")]
+[JsonDerivedType(typeof(RefAbsent), "refAbsent")]
+[JsonDerivedType(typeof(TagOn), "tagOn")]
+[JsonDerivedType(typeof(ObjectExists), "objectExists")]
+[JsonDerivedType(typeof(WorktreeClean), "worktreeClean")]
+[JsonDerivedType(typeof(NoFilesInUse), "noFilesInUse")]
+[JsonDerivedType(typeof(PathAbsent), "pathAbsent")]
+[JsonDerivedType(typeof(StashPresent), "stashPresent")]
+[JsonDerivedType(typeof(StashAbsent), "stashAbsent")]
 public abstract record Expectation
 {
     /// <summary>A ref still holds this object.</summary>
     public sealed record RefAt(string FullName, string ObjectId) : Expectation;
+
+    /// <summary>No ref has this name, so one can be made with it again.</summary>
+    public sealed record RefAbsent(string FullName) : Expectation;
+
+    /// <summary>A tag still points at this commit, such as a backup tag before its undo removes it.</summary>
+    public sealed record TagOn(string FullName, string CommitId) : Expectation;
+
+    /// <summary>Git still has the object, so a ref can point at it again.</summary>
+    public sealed record ObjectExists(string ObjectId) : Expectation;
 
     /// <summary>The worktree has no changed or untracked files and is not locked.</summary>
     public sealed record WorktreeClean(string Path) : Expectation;
@@ -37,8 +60,14 @@ public abstract record Expectation
     /// <summary>No program has a file open in the folder: it can be renamed away and back. See docs/findings/cleanup.md.</summary>
     public sealed record NoFilesInUse(string Path) : Expectation;
 
+    /// <summary>Nothing is at the path, so a worktree can be added there again.</summary>
+    public sealed record PathAbsent(string Path) : Expectation;
+
     /// <summary>A stash with this commit is still in the list.</summary>
     public sealed record StashPresent(string CommitId) : Expectation;
+
+    /// <summary>No stash in the list has this commit, so storing it again does not make a second one.</summary>
+    public sealed record StashAbsent(string CommitId) : Expectation;
 }
 
 /// <summary>One step of a cleanup: what it does, what must still be true first, and what takes it back.</summary>
@@ -56,6 +85,9 @@ public sealed record CleanupStep
 
     /// <summary>What takes it back, or null when nothing in git can.</summary>
     public GitCommandLine? Undo { get; init; }
+
+    /// <summary>What must be true right before <see cref="Undo"/> runs.</summary>
+    public IReadOnlyList<Expectation> UndoExpects { get; init; } = [];
 
     /// <summary>Said in the dialog when undo has a limit, or is up to Windows rather than git.</summary>
     public string? UndoNote { get; init; }

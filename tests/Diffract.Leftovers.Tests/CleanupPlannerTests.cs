@@ -33,8 +33,20 @@ public class CleanupPlannerTests(ScenarioSnapshots snapshots)
         Expectation.WorktreeClean e => $"clean {e.Path}",
         Expectation.NoFilesInUse e => $"free {e.Path}",
         Expectation.StashPresent e => $"stash {e.CommitId}",
+        Expectation.RefAbsent e => $"no {e.FullName}",
+        Expectation.TagOn e => $"{e.FullName} on {e.CommitId}",
+        Expectation.ObjectExists e => $"has {e.ObjectId}",
+        Expectation.PathAbsent e => $"nothing at {e.Path}",
+        Expectation.StashAbsent e => $"no stash {e.CommitId}",
         _ => expectation.ToString(),
     };
+
+    /// <summary>What each step's undo expects, as text, in step order.</summary>
+    private static async Task<List<string>> UndoExpectsAsync(Task<(RepoSnapshot Repo, CleanupPlan Plan)> planning)
+    {
+        var (_, plan) = await planning;
+        return [.. Assert.Single(plan.Leftovers).Steps.Select(s => string.Join("; ", s.UndoExpects.Select(ExpectText)))];
+    }
 
     /// <summary>Classifies the scenario, selects every leftover, and plans them all.</summary>
     private async Task<(RepoSnapshot Repo, CleanupPlan Plan)> PlanAsync(string scenario, Func<RepoSnapshot, RepoSnapshot>? change = null)
@@ -95,7 +107,7 @@ public class CleanupPlannerTests(ScenarioSnapshots snapshots)
         var w = repo.Worktrees.Single(w => w.Branch == "claude/refactor-cart");
         var tag = $"archive/worktree/claude/refactor-cart-{Date}";
 
-        Assert.Equal(new Step("Backup", $"tag -a {tag} {w.Head} -F - < {BackupMessage($"worktree {w.Path}", 2)}", $"tag -d {tag}"), steps[0]);
+        Assert.Equal(new Step("Backup", $"tag -a {tag} {w.Head} -F - < {BackupMessage($"worktree {w.Path}", 2)}", $"tag -d {tag}", steps[1].Expects), steps[0]);
         Assert.Equal(["Backup", "RemoveWorktree", "DeleteBranch"], steps.Select(s => s.Kind));
     }
 
@@ -120,7 +132,7 @@ public class CleanupPlannerTests(ScenarioSnapshots snapshots)
 
         Assert.Equal(
         [
-            new("Backup", $"tag -a {tag} {tip} -F - < {BackupMessage("branch copilot/add-logging", 3)}", $"tag -d {tag}"),
+            new("Backup", $"tag -a {tag} {tip} -F - < {BackupMessage("branch copilot/add-logging", 3)}", $"tag -d {tag}", $"refs/heads/copilot/add-logging at {tip}"),
             new("DeleteBranch", "branch -D copilot/add-logging", $"branch copilot/add-logging {tip}", $"refs/heads/copilot/add-logging at {tip}"),
         ], steps);
     }
@@ -155,7 +167,7 @@ public class CleanupPlannerTests(ScenarioSnapshots snapshots)
 
         Assert.Equal(
         [
-            new("Backup", $"tag -a {tag} {stash.CommitId} -F - < {BackupMessage($"stash \"{stash.Message}\"", 1)}", $"tag -d {tag}"),
+            new("Backup", $"tag -a {tag} {stash.CommitId} -F - < {BackupMessage($"stash \"{stash.Message}\"", 1)}", $"tag -d {tag}", $"stash {stash.CommitId}"),
             new("DropStash", "stash drop stash@{0}", $"stash store -m {stash.Message} {stash.CommitId}", $"stash {stash.CommitId}", "Undo puts it back on top of the list."),
         ], steps);
     }
@@ -212,6 +224,48 @@ public class CleanupPlannerTests(ScenarioSnapshots snapshots)
 
         foreach (var command in plan.Leftovers.SelectMany(l => l.Steps).SelectMany(s => new[] { s.Command, s.Undo }).OfType<GitCommandLine>())
             Assert.True(CleanupPolicy.IsAllowed(command, out var reason), $"{Text(command)}: {reason}");
+    }
+
+    [Fact]
+    public async Task Undoing_a_deleted_branch_expects_its_name_free_and_its_commit_kept_and_the_backup_goes_only_while_it_is_on_that_commit()
+    {
+        var repo = await snapshots.GetAsync("AgentBranchUnmerged");
+        var tip = repo.Branches.Single(b => b.Name == "copilot/add-logging").TargetId;
+
+        var undo = await UndoExpectsAsync(PlanAsync("AgentBranchUnmerged"));
+
+        Assert.Equal([$"refs/tags/archive/branch/copilot/add-logging-{Date} on {tip}", $"no refs/heads/copilot/add-logging; has {tip}"], undo);
+    }
+
+    [Fact]
+    public async Task Undoing_a_removed_worktree_expects_nothing_at_its_path_and_its_branch_back_where_it_was()
+    {
+        var repo = await snapshots.GetAsync("MergedWorktree");
+        var w = repo.Worktrees.Single(w => w.Branch == "feature/done");
+
+        var undo = await UndoExpectsAsync(PlanAsync("MergedWorktree"));
+
+        Assert.Equal([$"nothing at {w.Path}; refs/heads/feature/done at {w.Head}", $"no refs/heads/feature/done; has {w.Head}"], undo);
+    }
+
+    [Fact]
+    public async Task Undoing_a_dropped_stash_expects_it_not_in_the_list_and_its_commit_kept()
+    {
+        var stash = Assert.Single((await snapshots.GetAsync("ToolStash")).Stashes);
+
+        var undo = await UndoExpectsAsync(PlanAsync("ToolStash"));
+
+        Assert.Equal($"no stash {stash.CommitId}; has {stash.CommitId}", undo[1]);
+    }
+
+    [Fact]
+    public async Task Undoing_a_checkpoint_session_expects_every_name_free_and_every_commit_kept()
+    {
+        var refs = (await snapshots.GetAsync("StaleCheckpointSession")).OtherRefs.Where(r => r.FullName.Contains("3f2b8c1e", StringComparison.Ordinal)).ToList();
+
+        var undo = await UndoExpectsAsync(PlanAsync("StaleCheckpointSession"));
+
+        Assert.Equal(string.Join("; ", [.. refs.Select(r => $"no {r.FullName}"), .. refs.Select(r => $"has {r.TargetId}")]), Assert.Single(undo));
     }
 
     [Fact]
