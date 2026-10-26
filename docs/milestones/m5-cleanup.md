@@ -90,6 +90,8 @@ Any row can be hidden with "Hide", and the summary counts leave it out. A hidden
 - Undo reads a cleanup from the log and runs its undo steps in reverse order, with the same checks.
 - Tests: every kind is removed and then undone in a fixture repo, and the repo ends where it started (refs, worktrees, stashes). Then the awkward paths: a branch that moved after planning, a worktree that turned dirty, a locked file, an undo after git already removed the commits. A call budget per step, as in milestones 1 and 2.
 
+**Done** 2026-10-26, in #66. A backup tag is now made only when the removal it is for would run, so a leftover that changed gets no stray tag. An undo that stopped part way can be run again and does only what is left. Leaving out a step the dialog makes optional, such as a worktree's branch, comes with the protocol in phase 3.
+
 ## Phase 3: protocol
 
 | Method | Params | Result |
