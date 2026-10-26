@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** in progress. Phases 0 to 6 are done; phase 7, protocol and contract samples, is next.
+**Status:** in progress. Phases 0 to 7 are done; phase 8, the real-world check, is under way.
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -68,6 +68,8 @@ Steps 2 to 4 were checked on 2026-10-22, in `docs/findings/changes.md`. Every ca
 Johan accepted all these proposals on 2026-10-22, in #43. Decision 11 came from his question there about a right-click menu like Git Extensions has.
 
 1. **Which worktree.** Proposal: Changes shows the worktree the repo was opened from, with a picker for the other worktrees. A worktree that is "In use" by an agent shows a warning before anything is staged in it.
+
+   **Changed** by Johan on 2026-10-26, after his first day of use: Diffract is for a person working on branches, and worktrees come second. Changes leads with the current branch. The worktree picker stays, but out of the way. See phase 8.
 2. **Hunks or lines.** Proposal: whole files and single hunks in this milestone. Staging single lines comes later.
 3. **Where the diff lives.** Proposal: the same read-only Monaco diff editor as history, with Stage hunk or Unstage hunk on each change. Side by side or inline follows the choice already remembered from history.
 4. **Discarding changes.** Proposal: not in this milestone. It throws work away, so it needs the backup and undo from milestone 5 first. It moves to milestone 5 as "Discard, with undo".
@@ -184,10 +186,32 @@ When git or Diffract refuses, the error's `data.kind` says why, and its message 
 | `RemoteFailed` | -32009 | a fetch, pull or push could not run or finish, such as an unreachable remote |
 | `ChangeRefused` | -32010 | a branch, tag, switch or reset was not made, such as a switch over uncommitted changes |
 
+**Done** 2026-10-24, in #51.
+
 ## Phase 8: real-world check
 
 1. Johan installs the CI build and does a day of his own work with it: stage, commit, pull and push in his own repos.
 2. Every wrong, slow or surprising thing becomes a test and a fix.
+
+### What the first day found
+
+Johan's notes from 2026-10-26, each fixed in its own PR, with tests:
+
+1. **Right-click menus were cut off** near the bottom of the window. They now open upwards there, and to the left near the right edge. Done in #52.
+2. **"Git was not found" after updating git** from Diffract, until a restart. Git for Windows 2.56 moved git to a new folder. Diffract now looks for git again when it cannot start it. Done in #53.
+3. **A sidebar like Git Extensions has.** Today it lists only worktrees, which is confusing. It becomes collapsible sections, each remembered open or closed:
+   - **Branches**, the local ones, open by default. The current one is marked.
+   - **Remotes**, with each remote's branches under it.
+   - **Tags.**
+   - **Worktrees**, closed by default, with its menu from milestone 2. Agent cleanup lands here in milestone 5.
+
+   Clicking a branch, remote branch or tag selects its commit in History and scrolls to it. Double-clicking a branch, or "Switch to" in its right-click menu, switches to it with `git switch`, which refuses rather than overwrite uncommitted work, as in decision 10. For a remote branch it creates the local branch that tracks it.
+4. **Fetch, Pull and Push in the top bar**, on every view, with ahead and behind counts. Until now they were only in Changes. They act on the current branch of the worktree the repo was opened from, as decisions 6 and 7 say.
+5. **A command window** for everything that runs git and takes more than a moment: fetch, pull, push, commit, switch, reset, and creating a branch or tag. It shows the command, git's output as it arrives, and the result in plain words.
+   - It closes by itself about 1.5 seconds after a command succeeds. When git fails or warns, it stays open with the whole output until closed.
+   - Each kind of command has its own short animation while it runs: arrows coming down for fetch, a branch moving forward for pull, arrows going up for push, a new dot on the line for commit, a branch swinging over for switch. With Windows' "reduce motion" setting on, it shows a still icon instead.
+   - Staging and unstaging stay instant and show no window.
+   - To show git's progress while it runs, fetch and push get `--progress` on the changes allowlist, and the sidecar sends git's output lines to the UI as they arrive.
 
 **Checkpoint:** Johan signs off, and dogfooding starts.
 
