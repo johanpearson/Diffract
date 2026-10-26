@@ -63,7 +63,11 @@ public sealed record TagInfo(
     string TargetId,
     DateTimeOffset? CreatedAt,
     bool IsMergedIntoMain,
-    int? CommitsAtRisk);
+    int? CommitsAtRisk)
+{
+    /// <summary>What the tag ref itself holds: the tag object of an annotated tag, the commit of a lightweight one.</summary>
+    public string? ObjectId { get; init; }
+}
 
 /// <summary>A folder that looks like what is left of a worktree, but that git does not know.</summary>
 /// <param name="HoldsNoFiles">No files at any depth, and no links. Removing it loses nothing.</param>

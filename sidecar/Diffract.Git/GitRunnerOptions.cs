@@ -11,6 +11,12 @@ public sealed record GitRunnerOptions
     /// </summary>
     public bool ChangesOnly { get; init; }
 
+    /// <summary>
+    /// When true, only the commands in <see cref="CleanupPolicy"/> run, whatever the other two say: what a cleanup and
+    /// its undo change, and nothing else.
+    /// </summary>
+    public bool CleanupOnly { get; init; }
+
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>Extra environment variables for every git process. Tests use this to isolate git config.</summary>
@@ -34,7 +40,8 @@ public sealed record GitRunnerOptions
 
     /// <summary>
     /// When set, gets each command as it starts and each line it writes to standard error, while it runs, for the
-    /// command window. Called from a background thread, in order. Only a <see cref="ChangesOnly"/> runner reports:
+    /// command window. Called from a background thread, in order. Only a <see cref="ChangesOnly"/> or
+    /// <see cref="CleanupOnly"/> runner reports:
     /// what Diffract reads to decide what to do is its own business.
     /// </summary>
     public Action<GitOutputLine>? OnOutput { get; init; }

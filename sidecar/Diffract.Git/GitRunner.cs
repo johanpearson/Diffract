@@ -76,7 +76,7 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
     private async Task<GitStreamResult> StreamAsync(GitCommandLine command, GitOutputReader read, IReadOnlyCollection<int> allowedExitCodes, CancellationToken ct)
     {
         var args = command.Arguments;
-        CheckPolicy(args);
+        CheckPolicy(command);
 
         ct.ThrowIfCancellationRequested();
         var time = Options.TimeProvider;
@@ -137,15 +137,25 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
     }
 
     /// <summary>
-    /// A changes runner allows only <see cref="ChangesPolicy"/>, reads included, so it can never be used for anything
-    /// else. A read-only runner allows only <see cref="ReadOnlyPolicy"/>.
+    /// A cleanup runner allows only <see cref="CleanupPolicy"/>, and a changes runner only <see cref="ChangesPolicy"/>,
+    /// reads included, so neither can ever be used for anything else. A read-only runner allows only
+    /// <see cref="ReadOnlyPolicy"/>.
     /// </summary>
-    private void CheckPolicy(IReadOnlyList<string> args)
+    private void CheckPolicy(GitCommandLine command)
     {
-        if (Options.ChangesOnly)
+        var args = command.Arguments;
+        if (Options.CleanupOnly)
+            CheckCleanup(command);
+        else if (Options.ChangesOnly)
             CheckChange(args);
         else if (Options.ReadOnly)
             CheckRead(args);
+    }
+
+    private static void CheckCleanup(GitCommandLine command)
+    {
+        if (!CleanupPolicy.IsAllowed(command, out var reason))
+            throw new CleanupPolicyViolationException(command.Arguments, reason);
     }
 
     private static void CheckChange(IReadOnlyList<string> args)
@@ -177,7 +187,7 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
     }
 
     /// <summary>Who sees the commands run: only for changes, see <see cref="GitRunnerOptions.OnOutput"/>.</summary>
-    private Action<GitOutputLine>? Watcher => Options.ChangesOnly ? Options.OnOutput : null;
+    private Action<GitOutputLine>? Watcher => Options.ChangesOnly || Options.CleanupOnly ? Options.OnOutput : null;
 
     /// <summary>All of standard error, and each line passed on as it arrives when someone is watching.</summary>
     private async Task<string> ReadErrorAsync(StreamReader stderr, CancellationToken ct)

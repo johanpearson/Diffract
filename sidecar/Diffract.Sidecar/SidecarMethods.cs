@@ -62,6 +62,7 @@ internal sealed class SidecarMethods : IDisposable
         (typeof(GitTimeoutException), ErrorKind.TimedOut),
         (typeof(ReadOnlyViolationException), null),
         (typeof(ChangesPolicyViolationException), null),
+        (typeof(CleanupPolicyViolationException), null),
         (typeof(IndexLockedException), ErrorKind.IndexLocked),
         (typeof(ChangedSinceShownException), ErrorKind.ChangedSinceShown),
         (typeof(CommitRefusedException), ErrorKind.CommitRefused),
