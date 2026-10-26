@@ -479,6 +479,8 @@ export const stepKinds = [
   "DeleteRefs",
   "DeleteTag",
   "RecycleFolder",
+  /** "Keep these": a commit is made to hold several orphaned commits, and tagged. Nothing is removed. */
+  "KeepCommits",
 ] as const;
 export type StepKind = (typeof stepKinds)[number];
 

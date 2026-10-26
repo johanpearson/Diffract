@@ -56,6 +56,7 @@ internal sealed class StepChecks(string repoPath, GitRunnerOptions git, IFolderO
     {
         Expectation.RefAt e => e.FullName,
         Expectation.RefAbsent e => e.FullName,
+        Expectation.RefPresent e => e.FullName,
         Expectation.TagOn e => e.FullName,
         _ => null,
     };
@@ -72,6 +73,7 @@ internal sealed class StepChecks(string repoPath, GitRunnerOptions git, IFolderO
             : now.Id != e.ObjectId ? $"{Display(e.FullName)} moved: it is at {Short(now.Id)} now, not {Short(e.ObjectId)}."
             : null,
         Expectation.RefAbsent e when refs.ContainsKey(e.FullName) => $"{Display(e.FullName)} is there again, so it was left as it is.",
+        Expectation.RefPresent e when !refs.ContainsKey(e.FullName) => $"{Display(e.FullName)} is gone.",
         Expectation.TagOn e when !refs.TryGetValue(e.FullName, out var now) || now.Commit != e.CommitId => $"{Display(e.FullName)} no longer points at {Short(e.CommitId)}.",
         _ => null,
     };

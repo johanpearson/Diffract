@@ -161,17 +161,39 @@ public sealed class CleanupMethodsTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Keeping_orphaned_commits_counts_them_again_so_their_rows_go_and_undo_brings_them_back()
+    {
+        await OpenAsync("OrphanedCommit");
+        var plan = await PlanAsync(Selected("OrphanedCommit", "1 commit"), Selected("OrphanedCommit", "2 commits"));
+        _notifications.Clear();
+
+        var kept = Result(await RequestAsync("cleanup.apply", new { repoId = "1", planId = plan.GetProperty("planId").GetString() }));
+
+        Assert.Equal(["Backup Done", "KeepCommits Done"], Outcomes(kept));
+        // The fixture dates the new tags in January 2026, so here they are listed as old backup tags.
+        Assert.DoesNotContain(LastState().GetProperty("leftovers").EnumerateArray(), l => l.GetProperty("kind").GetString() == "OrphanedCommit");
+
+        Result(await RequestAsync("cleanup.undo", new { repoId = "1", cleanupId = kept.GetProperty("cleanupId").GetString() }));
+
+        Assert.Equal(["1 commit", "2 commits"], LastState().GetProperty("leftovers").EnumerateArray().Select(l => l.GetProperty("name").GetString()).Order());
+    }
+
+    /// <summary>The state in the last repo.changed.</summary>
+    private JsonElement LastState() =>
+        _notifications.Last(n => n.GetProperty("method").GetString() == "repo.changed").GetProperty("params").GetProperty("state");
+
+    [Fact]
     public async Task One_cleanup_runs_at_a_time_per_repo()
     {
         await OpenAsync("Clean");
         var hold = new TaskCompletionSource<int>();
-        var first = _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), _ => hold.Task);
+        var first = _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), false, _ => hold.Task);
 
-        var second = await Assert.ThrowsAsync<CleanupLogException>(() => _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), _ => Task.FromResult(0)));
+        var second = await Assert.ThrowsAsync<CleanupLogException>(() => _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), false, _ => Task.FromResult(0)));
         hold.SetResult(1);
 
         Assert.Equal("A cleanup is already running in this repo. Wait for it to finish.", second.Message);
         Assert.Equal(1, await first);
-        Assert.Equal(0, await _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), _ => Task.FromResult(0)));
+        Assert.Equal(0, await _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), false, _ => Task.FromResult(0)));
     }
 }

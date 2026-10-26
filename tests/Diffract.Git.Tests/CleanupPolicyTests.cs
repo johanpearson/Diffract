@@ -28,7 +28,11 @@ public class CleanupPolicyTests
         "stash|drop|stash@{12}",
         $"stash|store|-m|-starts with a dash|{Commit}",
         "update-ref|--stdin",
+        "mktree",
+        $"commit-tree|{EmptyTree}|-p|{Commit}|-p|{Other}|-F|-",
     ];
+
+    private const string EmptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
     [Theory]
     [MemberData(nameof(AllowedCommands))]
@@ -66,6 +70,14 @@ public class CleanupPolicyTests
     [InlineData("stash", "store", "-m", "", Commit)]
     [InlineData("update-ref", "-d", "refs/heads/main")]
     [InlineData("update-ref", "refs/heads/main", Commit)]
+    // A holder commit only by full ids, with at least one parent, its message from standard input.
+    [InlineData("commit-tree", EmptyTree, "-F", "-")]
+    [InlineData("commit-tree", "HEAD^{tree}", "-p", Commit, "-F", "-")]
+    [InlineData("commit-tree", EmptyTree, "-p", "HEAD", "-F", "-")]
+    [InlineData("commit-tree", EmptyTree, "-p", Commit, "-m", "x")]
+    [InlineData("commit-tree", EmptyTree, "-p", Commit, "-S", "-F", "-")]
+    [InlineData("commit-tree", EmptyTree, "-p", Commit, Other, "-F", "-")]
+    [InlineData("commit", "-m", "x")]
     // Never part of a cleanup.
     [InlineData("push", "origin", "--delete", "x")]
     [InlineData("fetch", "--prune", "origin")]
@@ -81,6 +93,15 @@ public class CleanupPolicyTests
     public void Rejects_anything_else(params string[] args)
     {
         Assert.False(Allowed(Line(args)));
+    }
+
+    [Fact]
+    public void Mktree_may_only_write_the_empty_tree()
+    {
+        Assert.True(Allowed(Line("mktree")));
+        Assert.False(CleanupPolicy.IsAllowed(new GitCommandLine(["mktree"], [$"100644 blob {Commit}\tfile.txt"]), out var reason));
+        Assert.Equal("mktree may only write the empty tree", reason);
+        Assert.False(Allowed(Line("mktree", "--missing")));
     }
 
     [Fact]

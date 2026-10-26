@@ -108,7 +108,8 @@
     "DropStash",
     "DeleteRefs",
     "DeleteTag",
-    "RecycleFolder"
+    "RecycleFolder",
+    "KeepCommits"
   ],
   "stepOutcome": [
     "Done",

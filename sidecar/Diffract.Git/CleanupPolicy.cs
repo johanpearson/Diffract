@@ -22,10 +22,19 @@ public static class CleanupPolicy
         ["stash", "drop", CommandPart.StashEntry],
         ["stash", "store", "-m", CommandPart.Message, CommandPart.Object],
         ["update-ref", "--stdin"],
+        // With no input, writes git's empty tree, which a commit holding orphaned commits uses. Checked below.
+        ["mktree"],
     ];
 
+    /// <summary>
+    /// A commit that holds orphaned commits as its parents, so one backup tag keeps them all. It only writes an object,
+    /// never a ref: nothing points at it until the tag does.
+    /// </summary>
+    private static readonly string[] HolderShape = ["commit-tree", "<tree>", "-p", "<object>", "[-p <object>]...", "-F", "-"];
+
     /// <summary>Every allowed command, with a placeholder such as "&lt;object&gt;" for each value.</summary>
-    public static IReadOnlyList<IReadOnlyList<string>> AllowedShapes { get; } = [.. Shapes.Select(shape => shape.Select(part => part.Text).ToList())];
+    public static IReadOnlyList<IReadOnlyList<string>> AllowedShapes { get; } =
+        [.. Shapes.Select(shape => shape.Select(part => part.Text).ToList()), HolderShape];
 
     public static bool IsAllowed(GitCommandLine command, out string reason)
     {
@@ -35,12 +44,20 @@ public static class CleanupPolicy
 
     private static string? Refusal(GitCommandLine command)
     {
-        if (!Shapes.Any(shape => Matches(shape, command.Arguments)))
+        if (!Shapes.Any(shape => Matches(shape, command.Arguments)) && !IsHolder(command.Arguments))
             return "it is not on the cleanup allowlist";
         if (command.Arguments[0] == "update-ref" && UpdateRefInput.FirstUnsafe(Encoding.UTF8.GetString(command.InputBytes())) is { } line)
             return $"update-ref may only create refs or delete them from an expected value, not \"{line}\"";
+        if (command.Arguments[0] == "mktree" && command.InputBytes().Length > 0)
+            return "mktree may only write the empty tree";
         return null;
     }
+
+    /// <summary>"commit-tree &lt;tree&gt;", one or more "-p &lt;object&gt;", then "-F -", with full ids only.</summary>
+    private static bool IsHolder(IReadOnlyList<string> args) =>
+        args.ToArray() is ["commit-tree", var tree, .. var middle, "-F", "-"] && ObjectId.IsValid(tree)
+        && middle.Length >= 2 && middle.Length % 2 == 0
+        && middle.Chunk(2).All(pair => pair[0] == "-p" && ObjectId.IsValid(pair[1]));
 
     private static bool Matches(CommandPart[] shape, IReadOnlyList<string> args) =>
         shape.Length == args.Count && shape.Zip(args).All(pair => pair.First.Accepts(pair.Second));

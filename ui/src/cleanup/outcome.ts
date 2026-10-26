@@ -17,6 +17,14 @@ export function plannedCount(plan: CleanupPlanView): number {
   return plan.leftovers.filter((l) => l.refused === null).length;
 }
 
+/** Every planned leftover is orphaned commits, which "Keep these" only keeps: nothing is removed. */
+export function keepsOnly(plan: CleanupPlanView): boolean {
+  const planned = plan.leftovers.filter((l) => l.refused === null);
+  return planned.length > 0 && planned.every((l) => l.kind === "OrphanedCommit");
+}
+
+const keeps = (s: StepResult) => s.kind === "Backup" || s.kind === "KeepCommits";
+
 /** What a cleanup or undo did, grouped as the result shows it. */
 export interface CleanupSummary {
   /** Done, apart from backups: removed by a cleanup, put back by an undo. */
@@ -30,8 +38,8 @@ export interface CleanupSummary {
 export function summarize(result: CleanupResult, undo: boolean): CleanupSummary {
   const done = result.steps.filter((s) => s.outcome === "Done");
   return {
-    done: done.filter((s) => undo || s.kind !== "Backup"),
-    backups: undo ? [] : done.filter((s) => s.kind === "Backup"),
+    done: done.filter((s) => undo || !keeps(s)),
+    backups: undo ? [] : done.filter(keeps),
     notDone: result.steps.filter((s) => s.outcome !== "Done"),
   };
 }

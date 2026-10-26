@@ -1,5 +1,6 @@
 using Diffract.Git;
 using Diffract.Git.Snapshot;
+using Diffract.Leftovers.Rules;
 
 namespace Diffract.Leftovers.Cleanup;
 
@@ -33,6 +34,36 @@ internal sealed class BackupTags(RepoSnapshot repo, DateTimeOffset now)
             UndoExpects = [new Expectation.TagOn($"refs/tags/{tag}", backup.Commit)],
         };
     }
+
+    /// <summary>
+    /// "Keep these": one tag on the orphaned commits, so git no longer deletes them in its next cleanup (decision 3).
+    /// One commit is tagged as it is. Several get a commit made to hold them all, with no files of its own.
+    /// Nothing is removed, so undo only takes the tag away again.
+    /// </summary>
+    public CleanupStep Keep(IReadOnlyList<UnreachableCommit> commits)
+    {
+        var newest = commits.MaxBy(c => c.CommittedAt)!;
+        var tag = Unique($"archive/orphaned/{newest.Id[..12]}-{now:yyyy-MM-dd}");
+        var them = commits.Count == 1 ? "1 commit" : $"{commits.Count} commits";
+        var message = $"Kept by Diffract: {them} that {(commits.Count == 1 ? "was" : "were")} on no branch, tag, stash or reflog.";
+        var step = new CleanupStep
+        {
+            Kind = StepKind.Backup,
+            Description = $"Keep {them} under a backup tag {tag}",
+            Expects = [.. commits.Select(c => new Expectation.ObjectExists(c.Id))],
+            Undo = new GitCommandLine(["tag", "-d", tag], []),
+            UndoNote = commits.Count == 1 ? "Undo takes the tag away, and git may then delete the commit again." : "Undo takes the tag away, and git may then delete the commits again.",
+        };
+        return commits.Count == 1
+            ? step with { Command = new GitCommandLine(["tag", "-a", tag, newest.Id, "-F", "-"], [message]), UndoExpects = [new Expectation.TagOn($"refs/tags/{tag}", newest.Id)] }
+            : step with { Kind = StepKind.KeepCommits, Command = Holder(commits), Keep = new KeepTag(tag, message), UndoExpects = [new Expectation.RefPresent($"refs/tags/{tag}")] };
+    }
+
+    /// <summary>A commit with every orphaned commit as a parent and git's empty tree, which every repo has.</summary>
+    private static GitCommandLine Holder(IReadOnlyList<UnreachableCommit> commits) =>
+        new(["commit-tree", EmptyTree, .. commits.SelectMany(c => new[] { "-p", c.Id }), "-F", "-"], [OrphanedCommitRule.HolderSubject]);
+
+    private const string EmptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
     private string Unique(string wanted)
     {

@@ -116,16 +116,31 @@ public sealed class CheckpointSessionRule : ILeftoverRule
 /// </summary>
 public sealed class OrphanedCommitRule : ILeftoverRule
 {
+    /// <summary>
+    /// The subject of the commit "Keep these" makes to hold several orphaned commits under one tag. Once that tag is
+    /// removed it is unreachable itself, but it is Diffract's own and holds nothing, so it is never a row.
+    /// </summary>
+    public const string HolderSubject = "Diffract kept these commits";
+
     public IEnumerable<Leftover> Evaluate(RepoSnapshot repo, DiffractConfig config, TimeProvider time) =>
+        Rows(repo, config).Select(row => row.Leftover);
+
+    /// <summary>Each row with the commits in it, so "Keep these" keeps exactly what the row counts.</summary>
+    public static IEnumerable<(Leftover Leftover, IReadOnlyList<UnreachableCommit> Commits)> Rows(RepoSnapshot repo, DiffractConfig config) =>
         from commit in repo.UnreachableCommits
+        where !commit.Subject.StartsWith(HolderSubject, StringComparison.Ordinal)
         group commit by (Checkpoint: IsCheckpoint(config, commit), Agent: Attribution.ForCommit(config, commit)) into rowGroup
-        let count = rowGroup.Count()
-        let them = count == 1 ? "it" : "them"
-        select rowGroup.Key.Checkpoint
-            ? new Leftover(LeftoverKind.OrphanedCommit, Describe.Count(count, "checkpoint commit"), null, rowGroup.Key.Agent,
+        select (Row(rowGroup.Key.Checkpoint, rowGroup.Key.Agent, rowGroup.Count()), (IReadOnlyList<UnreachableCommit>)[.. rowGroup]);
+
+    private static Leftover Row(bool checkpoint, string? agent, int count)
+    {
+        var them = count == 1 ? "it" : "them";
+        return checkpoint
+            ? new Leftover(LeftoverKind.OrphanedCommit, Describe.Count(count, "checkpoint commit"), null, agent,
                 Verdict.SafeToRemove, count, $"Checkpoints an agent tool made and then dropped; git may delete {them} in its next cleanup")
-            : new Leftover(LeftoverKind.OrphanedCommit, Describe.Count(count, "commit"), null, rowGroup.Key.Agent,
+            : new Leftover(LeftoverKind.OrphanedCommit, Describe.Count(count, "commit"), null, agent,
                 Verdict.NeedsReview, count, $"Not on any branch, tag, stash or reflog, so git may delete {them} in its next cleanup");
+    }
 
     private static bool IsCheckpoint(DiffractConfig config, UnreachableCommit commit) =>
         config.CheckpointCommitPrefixes.Any(p => commit.Subject.StartsWith(p, StringComparison.Ordinal));

@@ -26,6 +26,7 @@ public static class CleanupPlanner
         [LeftoverKind.Stash] = Stash,
         [LeftoverKind.CheckpointSession] = CheckpointSession,
         [LeftoverKind.BackupTag] = BackupTag,
+        [LeftoverKind.OrphanedCommit] = OrphanedCommits,
     };
 
     public static CleanupPlan Plan(RepoSnapshot repo, IReadOnlyList<Leftover> selected, DiffractConfig config, TimeProvider time)
@@ -39,7 +40,7 @@ public static class CleanupPlanner
         if (leftover.Verdict == Verdict.InUse)
             return LeftoverPlan.Refuse(leftover, "In use, so it is never cleaned up.");
         if (!Planners.TryGetValue(leftover.Kind, out var planner))
-            return LeftoverPlan.Refuse(leftover, "Keeping orphaned commits comes later in this milestone, in phase 5.");
+            return LeftoverPlan.Refuse(leftover, "Diffract cannot clean this up yet.");
         return planner(context, leftover) is { } steps
             ? new LeftoverPlan(leftover, steps)
             : LeftoverPlan.Refuse(leftover, "It is no longer there. Refresh to see the repo as it is now.");
@@ -72,6 +73,12 @@ public static class CleanupPlanner
 
     private static IReadOnlyList<CleanupStep>? BackupTag(Context c, Leftover leftover) =>
         c.Repo.Tags.FirstOrDefault(t => t.Name == leftover.Name) is { } tag ? RefSteps.OldBackupTag(tag) : null;
+
+    /// <summary>"Keep these": the commits of the row with the same name and agent, as the rule groups them.</summary>
+    private static IReadOnlyList<CleanupStep>? OrphanedCommits(Context c, Leftover leftover) =>
+        OrphanedCommitRule.Rows(c.Repo, c.Config).FirstOrDefault(r => r.Leftover.Name == leftover.Name && r.Leftover.Agent == leftover.Agent) is { Commits.Count: > 0 } row
+            ? [c.Backups.Keep(row.Commits)]
+            : null;
 
     private static WorktreeInfo? WorktreeAt(RepoSnapshot repo, Leftover leftover) =>
         repo.Worktrees.FirstOrDefault(w => !w.IsMain && Same(w.Path, leftover.Path));

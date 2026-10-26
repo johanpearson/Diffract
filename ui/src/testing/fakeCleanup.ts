@@ -154,6 +154,12 @@ function stepsOf(leftover: Leftover): StepView[] {
       return [...backup(leftover), step("RemoveWorktree", `Remove worktree ${leftover.path}`), step("DeleteBranch", `Delete branch ${leftover.name}`, { optional: true })];
     case "LocalBranch":
       return [...backup(leftover), step("DeleteBranch", `Delete branch ${leftover.name}`)];
+    case "OrphanedCommit":
+      return [
+        step(leftover.commitsAtRisk === 1 ? "Backup" : "KeepCommits", `Keep ${leftover.name} under a backup tag archive/orphaned/5f3c9b8d2e1a-2026-10-21`, {
+          undoNote: "Undo takes the tag away, and git may then delete the commits again.",
+        }),
+      ];
     default:
       return [step("DeleteRefs", `Delete ${leftover.name}`, { undoNote: "Undo works while git still has the commits." })];
   }
