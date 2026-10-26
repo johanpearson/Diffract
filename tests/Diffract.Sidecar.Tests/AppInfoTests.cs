@@ -49,6 +49,33 @@ public sealed class AppInfoTests : IDisposable
     }
 
     [Fact]
+    public async Task Git_that_moved_since_the_start_is_found_again()
+    {
+        // As after Git for Windows 2.56, which moved the real git from mingw64 to ucrt64 while Diffract ran.
+        var gone = new GitInstallation(_temp.Combine("mingw64", "bin", "git.exe"), null);
+        var finds = 0;
+        var locator = new GitLocator(() => finds++ == 0 ? gone : GitInstallation.ForThisMachine());
+        var methods = new SidecarMethods(new GitRunnerOptions { Environment = IsolatedGit.Environment(_temp), Locator = locator });
+
+        var info = await methods.AppInfoAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(info.GitSupported, info.GitProblem);
+        Assert.Equal(GitInstallation.ForThisMachine(), locator.Current);
+    }
+
+    [Fact]
+    public async Task Git_that_is_there_but_cannot_start_is_not_called_missing()
+    {
+        var notAProgram = _temp.Combine("git.exe");
+        File.WriteAllText(notAProgram, "not a program");
+
+        var info = await Methods(notAProgram).AppInfoAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(info.GitSupported);
+        Assert.StartsWith($"Git could not be started ({notAProgram}): ", info.GitProblem);
+    }
+
+    [Fact]
     public async Task App_info_over_the_protocol_uses_camel_case()
     {
         var result = await Methods().Dispatch("app.info", null, TestContext.Current.CancellationToken);

@@ -55,6 +55,8 @@ What the launcher does differently, checked by printing the environment git hand
 
 **Decided** by Johan on 2026-10-21: Diffract starts the real git. It looks at the first `git.exe` on PATH, as Windows would. When that is Git for Windows' launcher (`cmd\git.exe` or `bin\git.exe`) or the real git, it starts `mingw64\bin\git.exe` and puts `mingw64\bin` and `usr\bin` in front of PATH, which makes the environment match the launcher's. Anything else on PATH, such as a package manager's shim, is started as before.
 
+**Changed** on 2026-10-26: Git for Windows 2.56 moved the real git from `mingw64\bin` to `ucrt64\bin` and removed `mingw64`. Updating git from Diffract then left it starting a git that no longer existed, and it said "Git was not found" until restarted. Diffract now looks in `ucrt64`, `mingw64` and `clangarm64` (the ARM build), in that order. When git cannot be started, it looks for git again once before the call fails, so it carries on after any update, from Diffract or not.
+
 Opening Repo A through the sidecar took 6.5 to 14 seconds both before and after the change, on a laptop busy enough that a single git start took over a second. Differences of a few hundred milliseconds disappear in that noise, so the end-to-end gain is not proven yet. Phase 7 checks it on Johan's laptop.
 
 ## Through the sidecar

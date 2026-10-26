@@ -28,6 +28,29 @@ public sealed class GitInstallationTests : IDisposable
         Assert.Equal(new GitInstallation(RealGit, Prefix), found);
     }
 
+    [Theory]
+    [InlineData(Git + @"\cmd")]
+    [InlineData(Git + @"\ucrt64\bin")]
+    public void Starts_the_real_git_in_ucrt64_as_Git_for_Windows_2_56_installs_it(string entry)
+    {
+        // 2.56 moved the real git from mingw64 to ucrt64, and removed mingw64.
+        const string ucrt = Git + @"\ucrt64\bin";
+
+        var found = Find(entry, Path.Combine(entry, "git.exe"), ucrt + @"\git.exe");
+
+        Assert.Equal(new GitInstallation(ucrt + @"\git.exe", ucrt + ";" + Git + @"\usr\bin"), found);
+    }
+
+    [Fact]
+    public void Starts_the_real_git_in_clangarm64_on_ARM()
+    {
+        const string arm = Git + @"\clangarm64\bin";
+
+        var found = Find(Git + @"\cmd", Git + @"\cmd\git.exe", arm + @"\git.exe");
+
+        Assert.Equal(new GitInstallation(arm + @"\git.exe", arm + ";" + Git + @"\usr\bin"), found);
+    }
+
     [Fact]
     public void Only_the_first_git_on_PATH_counts_as_Windows_would_pick_it()
     {
