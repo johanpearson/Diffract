@@ -1,6 +1,6 @@
 # Milestone 5: safe cleanup with backup tags and undo, stashes, and pruning remote branches
 
-**Status:** in progress. Phase 0 step 1, checking the commands against fixture repos, was done on 2026-10-26 in `docs/findings/cleanup.md`. Johan's acceptance of the changes it led to is the checkpoint before phase 1.
+**Status:** in progress. Phases 0 and 1 are done; phase 2, applying and the operation log, is next.
 **Estimate:** 1 to 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan cleans up the agent leftovers in his busiest repos from the installed app, nothing he did not choose is touched, and every removal he tries to undo comes back.
 
@@ -54,7 +54,9 @@ Checked on 2026-10-26, in `docs/findings/cleanup.md`. These are proposals until 
 1. Settle the table above. Check every command against fixture repos first, including the awkward cases: a prunable worktree when others are prunable too, a stash that moved down the list, a worktree with a locked file on Windows, paths with spaces and å ä ö.
 2. Write down the decisions below in this doc.
 
-**Checkpoint:** Johan decides the open questions below before any code that writes is written. Decided on 2026-10-21; the command check in step 1 is still to do.
+**Checkpoint:** Johan decides the open questions below before any code that writes is written. Decided on 2026-10-21.
+
+**Done** 2026-10-26, in #63. Johan accepted the four changes the command check led to.
 
 ### Decisions
 
@@ -78,6 +80,8 @@ Any row can be hidden with "Hide", and the summary counts leave it out. A hidden
 - `CleanupPolicy`: the write allowlist above. A test per command proves it is allowed, and that everything else is rejected before a process starts, as `ReadOnlyPolicy` does today.
 - `CleanupPlanner`: a pure function from a snapshot, the selected leftovers and the config to a `CleanupPlan`. One step list per leftover, each step with its command, its expectations, its backup and its undo.
 - Tests: one fixture scenario per leftover kind, as in milestone 1. The plan for each kind matches the table. Nothing "In use" is ever planned, and a plan for a clean repo is empty.
+
+**Done** 2026-10-26, in #64. Orphaned commits are not planned yet: keeping several under one tag needs a commit made to hold them, which comes with "Keep these" in phase 5. A tag's own object is now in the snapshot, so undoing the removal of an old backup tag puts back the tag itself, message included.
 
 ## Phase 2: applying and the operation log
 
