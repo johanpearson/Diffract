@@ -1,0 +1,60 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "planId": "3f9a1c2b7d4e",
+    "leftovers": [
+      {
+        "kind": "Worktree",
+        "name": "claude/räksmörgås-fix",
+        "path": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+        "refused": null,
+        "steps": [
+          {
+            "kind": "Backup",
+            "description": "Keep a backup tag archive/worktree/claude/räksmörgås-fix-2026-10-21 for 2 commits that exist nowhere else",
+            "undoable": true,
+            "undoNote": null,
+            "optional": false
+          },
+          {
+            "kind": "RemoveWorktree",
+            "description": "Remove worktree C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+            "undoable": true,
+            "undoNote": null,
+            "optional": false
+          },
+          {
+            "kind": "DeleteBranch",
+            "description": "Delete branch claude/räksmörgås-fix",
+            "undoable": true,
+            "undoNote": null,
+            "optional": true
+          }
+        ]
+      },
+      {
+        "kind": "LeftoverFolder",
+        "name": "old-task",
+        "path": "C:\\src\\shop\\.claude\\worktrees\\old-task",
+        "refused": null,
+        "steps": [
+          {
+            "kind": "RecycleFolder",
+            "description": "Move folder C:\\src\\shop\\.claude\\worktrees\\old-task to the Recycle Bin",
+            "undoable": false,
+            "undoNote": "Restore it from the Recycle Bin.",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "kind": "LocalBranch",
+        "name": "copilot/fix-login",
+        "path": null,
+        "refused": "In use, so it is never cleaned up.",
+        "steps": []
+      }
+    ]
+  }
+}

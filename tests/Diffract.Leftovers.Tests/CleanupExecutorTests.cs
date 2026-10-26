@@ -170,9 +170,54 @@ public class CleanupExecutorTests
         var logged = Assert.Single(fixture.Log.History(fixture.RepoPath));
 
         Assert.Equal((applied.CleanupId, null), (logged.Started.CleanupId, logged.Started.Undoes));
-        Assert.Equal(["LocalBranch copilot/add-logging"], logged.Started.Leftovers);
+        Assert.Equal([new LoggedLeftover(LeftoverKind.LocalBranch, "copilot/add-logging", null)], logged.Started.Leftovers);
         Assert.Equal(applied.Steps, logged.Steps.Select(s => s.Result));
         Assert.Equal(["tag -d", "branch copilot/add-logging"], logged.Steps.Select(s => string.Join(' ', s.Undo!.Arguments.Take(2))));
+    }
+
+    [Fact]
+    public async Task A_worktrees_branch_left_out_is_kept_and_undo_adds_the_worktree_back_on_it()
+    {
+        using var fixture = await CleanupFixture.BuildAsync("MergedWorktree");
+        var before = await fixture.StateAsync();
+        var executor = fixture.Executor();
+
+        var applied = await executor.ApplyAsync(await fixture.PlanAsync(), [new StepRef(0, 1)], None);
+
+        Assert.Equal(["RemoveWorktree Done", "DeleteBranch Skipped Left out, as chosen."], Outcomes(applied));
+        Assert.NotEmpty(await fixture.GitAsync("rev-parse", "refs/heads/feature/done"));
+        AllDone(await executor.UndoAsync(applied.CleanupId, None));
+        Assert.Equal(before, await fixture.StateAsync());
+    }
+
+    [Fact]
+    public async Task Only_a_step_with_its_own_checkbox_can_be_left_out()
+    {
+        using var fixture = await CleanupFixture.BuildAsync("MergedWorktree");
+        var before = await fixture.StateAsync();
+        var plan = await fixture.PlanAsync();
+
+        var refused = await Assert.ThrowsAsync<ArgumentException>(() => fixture.Executor().ApplyAsync(plan, [new StepRef(0, 0)], None));
+
+        Assert.StartsWith("Step 0 of leftover 0 cannot be left out: only a step with its own checkbox can.", refused.Message);
+        Assert.Empty(fixture.Log.History(fixture.RepoPath));
+        Assert.Equal(before, await fixture.StateAsync());
+    }
+
+    [Fact]
+    public async Task The_history_lists_the_newest_first_and_says_what_can_still_be_undone()
+    {
+        using var fixture = await CleanupFixture.BuildAsync("AgentBranchMerged");
+        var executor = fixture.Executor();
+        var applied = await executor.ApplyAsync(await fixture.PlanAsync(), None);
+        var waiting = Assert.Single(executor.History());
+
+        var undone = await executor.UndoAsync(applied.CleanupId, None);
+        var history = executor.History();
+
+        Assert.True(waiting.CanUndo);
+        Assert.Equal([(undone.CleanupId, applied.CleanupId, false), (applied.CleanupId, null, false)], history.Select(c => (c.CleanupId, c.Undoes, c.CanUndo)));
+        Assert.Equal(applied.Steps, history[1].Steps);
     }
 
     /// <summary>A refused leftover is not in the result: the dialog already said why.</summary>

@@ -1,0 +1,33 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "cleanupId": "7c0e5b9d2f41",
+    "steps": [
+      {
+        "leftover": 0,
+        "step": 2,
+        "kind": "DeleteBranch",
+        "description": "Undo: Delete branch claude/räksmörgås-fix",
+        "outcome": "Done",
+        "reason": null
+      },
+      {
+        "leftover": 0,
+        "step": 1,
+        "kind": "RemoveWorktree",
+        "description": "Undo: Remove worktree C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+        "outcome": "Skipped",
+        "reason": "Something is at C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix now, so the worktree is not added there again."
+      },
+      {
+        "leftover": 0,
+        "step": 0,
+        "kind": "Backup",
+        "description": "Undo: Keep a backup tag archive/worktree/claude/räksmörgås-fix-2026-10-21 for 2 commits that exist nowhere else",
+        "outcome": "Skipped",
+        "reason": "Skipped, as an earlier step for the same leftover did not run."
+      }
+    ]
+  }
+}

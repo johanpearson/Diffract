@@ -12,9 +12,15 @@ namespace Diffract.Leftovers.Cleanup;
 public abstract record LogLine(string CleanupId);
 
 /// <param name="Undoes">For an undo, the cleanup it takes back. Null for a cleanup.</param>
-/// <param name="Leftovers">What was selected, as "Kind name", so the history can say what a cleanup was about.</param>
-public sealed record CleanupStarted(string CleanupId, string RepoPath, DateTimeOffset At, string? Undoes, IReadOnlyList<string> Leftovers)
+/// <param name="Leftovers">What was selected, so the history can say what a cleanup was about.</param>
+public sealed record CleanupStarted(string CleanupId, string RepoPath, DateTimeOffset At, string? Undoes, IReadOnlyList<LoggedLeftover> Leftovers)
     : LogLine(CleanupId);
+
+/// <summary>A leftover as the log and the history name it.</summary>
+public sealed record LoggedLeftover(LeftoverKind Kind, string Name, string? Path)
+{
+    public static LoggedLeftover Of(Leftover leftover) => new(leftover.Kind, leftover.Name, leftover.Path);
+}
 
 /// <summary>A step that ran, or was skipped, with what takes it back when it was done.</summary>
 public sealed record StepLogged(string CleanupId, StepResult Result, LoggedCommand? Undo, IReadOnlyList<Expectation> UndoExpects, string? UndoNote)

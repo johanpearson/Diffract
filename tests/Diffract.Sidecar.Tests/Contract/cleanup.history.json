@@ -1,0 +1,58 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": [
+    {
+      "cleanupId": "a1b2c3d4e5f6",
+      "at": "2026-10-21T09:30:00+02:00",
+      "undoes": null,
+      "leftovers": [
+        {
+          "kind": "Worktree",
+          "name": "claude/räksmörgås-fix",
+          "path": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix"
+        },
+        {
+          "kind": "LeftoverFolder",
+          "name": "old-task",
+          "path": "C:\\src\\shop\\.claude\\worktrees\\old-task"
+        }
+      ],
+      "steps": [
+        {
+          "leftover": 0,
+          "step": 0,
+          "kind": "Backup",
+          "description": "Keep a backup tag archive/worktree/claude/räksmörgås-fix-2026-10-21 for 2 commits that exist nowhere else",
+          "outcome": "Done",
+          "reason": null
+        },
+        {
+          "leftover": 0,
+          "step": 1,
+          "kind": "RemoveWorktree",
+          "description": "Remove worktree C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+          "outcome": "Done",
+          "reason": null
+        },
+        {
+          "leftover": 0,
+          "step": 2,
+          "kind": "DeleteBranch",
+          "description": "Delete branch claude/räksmörgås-fix",
+          "outcome": "Done",
+          "reason": null
+        },
+        {
+          "leftover": 1,
+          "step": 0,
+          "kind": "RecycleFolder",
+          "description": "Move folder C:\\src\\shop\\.claude\\worktrees\\old-task to the Recycle Bin",
+          "outcome": "Failed",
+          "reason": "Windows did not move C:\\src\\shop\\.claude\\worktrees\\old-task to the Recycle Bin (error 32). A program may be using files in it."
+        }
+      ],
+      "canUndo": true
+    }
+  ]
+}

@@ -10,6 +10,7 @@ using Diffract.Git.Parsing;
 using Diffract.Git.Refs;
 using Diffract.Git.Snapshot;
 using Diffract.Leftovers;
+using Diffract.Leftovers.Cleanup;
 using Diffract.Sidecar.Rpc;
 
 namespace Diffract.Sidecar.Tests;
@@ -106,6 +107,23 @@ public class ContractTests
                 new Hunk { Id = "5d41402abc4b2a76b9719d911017c592", OldStart = 2, OldLines = 1, NewStart = 2, NewLines = 1 },
                 new Hunk { Id = "7d793037a0760186574b0282f2f435e7", OldStart = 2, OldLines = 0, NewStart = 3, NewLines = 1 },
             ]))),
+        ["cleanup.plan"] = () => Response(CleanupPlan),
+        ["cleanup.apply"] = () => Response(Applied),
+        ["cleanup.undo"] = () => Response(new CleanupResult("7c0e5b9d2f41",
+        [
+            new StepResult(0, 2, StepKind.DeleteBranch, "Undo: Delete branch claude/räksmörgås-fix", StepOutcome.Done, null),
+            new StepResult(0, 1, StepKind.RemoveWorktree, $"Undo: Remove worktree {AgentWorktree}", StepOutcome.Skipped,
+                $"Something is at {AgentWorktree} now, so the worktree is not added there again."),
+            new StepResult(0, 0, StepKind.Backup, "Undo: Keep a backup tag archive/worktree/claude/räksmörgås-fix-2026-10-21 for 2 commits that exist nowhere else",
+                StepOutcome.Skipped, "Skipped, as an earlier step for the same leftover did not run."),
+        ])),
+        ["cleanup.history"] = () => Response<IReadOnlyList<PastCleanup>>(
+        [
+            new PastCleanup(Applied.CleanupId, Now, null,
+                [new LoggedLeftover(LeftoverKind.Worktree, "claude/räksmörgås-fix", AgentWorktree), new LoggedLeftover(LeftoverKind.LeftoverFolder, "old-task", OldTask)],
+                Applied.Steps, CanUndo: true),
+        ]),
+        ["error.cleanup-refused"] = () => Error(new CleanupLogException("Everything in this cleanup that can be undone is undone already.")),
         ["error.not-a-repo"] = () => Error(new NotAGitRepositoryException(@"C:\Users\johan\Downloads")),
         ["error.git-too-old"] = () => Error(new GitVersionTooOldException(new GitVersion(2, 39, 5))),
         ["error.git-failed"] = () => Error(new GitCommandException(["status", "--porcelain=v2", "-z"], 128, "fatal: unable to read tree\n")),
@@ -124,6 +142,32 @@ public class ContractTests
         ["error.invalid-params"] = () => Line(RpcResponse.Failure(Id, RpcErrorCodes.InvalidParams, "'path' is required")),
         ["enums"] = Enums,
     };
+
+    private const string OldTask = @"C:\src\shop\.claude\worktrees\old-task";
+    private const string BackupTag = "archive/worktree/claude/räksmörgås-fix-2026-10-21";
+
+    /// <summary>A worktree with a backup and its branch as a step of its own, a folder for the Recycle Bin, and a leftover in use.</summary>
+    private static CleanupPlanView CleanupPlan => new("3f9a1c2b7d4e",
+    [
+        new LeftoverPlanView(LeftoverKind.Worktree, "claude/räksmörgås-fix", AgentWorktree, null,
+        [
+            new StepView(StepKind.Backup, $"Keep a backup tag {BackupTag} for 2 commits that exist nowhere else", Undoable: true, null, Optional: false),
+            new StepView(StepKind.RemoveWorktree, $"Remove worktree {AgentWorktree}", Undoable: true, null, Optional: false),
+            new StepView(StepKind.DeleteBranch, "Delete branch claude/räksmörgås-fix", Undoable: true, null, Optional: true),
+        ]),
+        new LeftoverPlanView(LeftoverKind.LeftoverFolder, "old-task", OldTask, null,
+            [new StepView(StepKind.RecycleFolder, $"Move folder {OldTask} to the Recycle Bin", Undoable: false, "Restore it from the Recycle Bin.", Optional: false)]),
+        new LeftoverPlanView(LeftoverKind.LocalBranch, "copilot/fix-login", null, "In use, so it is never cleaned up.", []),
+    ]);
+
+    private static CleanupResult Applied => new("a1b2c3d4e5f6",
+    [
+        new StepResult(0, 0, StepKind.Backup, $"Keep a backup tag {BackupTag} for 2 commits that exist nowhere else", StepOutcome.Done, null),
+        new StepResult(0, 1, StepKind.RemoveWorktree, $"Remove worktree {AgentWorktree}", StepOutcome.Done, null),
+        new StepResult(0, 2, StepKind.DeleteBranch, "Delete branch claude/räksmörgås-fix", StepOutcome.Done, null),
+        new StepResult(1, 0, StepKind.RecycleFolder, $"Move folder {OldTask} to the Recycle Bin", StepOutcome.Failed,
+            $"Windows did not move {OldTask} to the Recycle Bin (error 32). A program may be using files in it."),
+    ]);
 
     private static IReadOnlyList<GitInUse> InUse =>
         [new("CodeScene cs-ide tool for windows", "Visual Studio Code", 2), new("Git Bash", null, 3)];
@@ -291,6 +335,8 @@ public class ContractTests
         ["refNameKind"] = Values<RefNameKind>(),
         ["resetMode"] = Values<ResetMode>(),
         ["gitOutputKind"] = Values<GitOutputKind>(),
+        ["stepKind"] = Values<StepKind>(),
+        ["stepOutcome"] = Values<StepOutcome>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

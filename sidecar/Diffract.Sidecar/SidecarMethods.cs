@@ -4,6 +4,7 @@ using System.Text.Json;
 using Diffract.Git;
 using Diffract.Git.History;
 using Diffract.Leftovers;
+using Diffract.Leftovers.Cleanup;
 using Diffract.Sidecar.Rpc;
 
 namespace Diffract.Sidecar;
@@ -35,6 +36,12 @@ internal sealed record SidecarDependencies
 
     /// <summary>The processes on this machine, for who is using git. Tests describe their own.</summary>
     public IProcessTable Running { get; init; } = new ProcessTable();
+
+    /// <summary>Where cleanups are logged, so they can be undone. Diffract's own folder; tests use a temp folder.</summary>
+    public string OperationLogFolder { get; init; } = OperationLog.DefaultFolder;
+
+    /// <summary>Checks and moves leftover folders. Tests may open a file at the worst moment.</summary>
+    public IFolderOperations Folders { get; init; } = WindowsFolders.Instance;
 }
 
 /// <summary>Answers one method: reads its params and returns its result, or throws <see cref="RpcException"/>.</summary>
@@ -43,12 +50,13 @@ internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, Cance
 /// <summary>
 /// The methods the sidecar answers. Every git call goes through a read-only runner, apart from the changes the user
 /// asks for, such as staging, committing, pushing or creating a branch, which go through a changes runner that allows
-/// nothing but <see cref="ChangesPolicy"/>.
+/// nothing but <see cref="ChangesPolicy"/>, and cleanups, which go through the cleanup executor's runner that allows
+/// nothing but <see cref="CleanupPolicy"/>.
 /// </summary>
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit", "remote.fetch", "remote.pull", "remote.push", "ref.checkName", "branch.create", "branch.switch", "tag.create", "branch.reset", "branch.undoReset"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit", "remote.fetch", "remote.pull", "remote.push", "ref.checkName", "branch.create", "branch.switch", "tag.create", "branch.reset", "branch.undoReset", "cleanup.plan", "cleanup.apply", "cleanup.history", "cleanup.undo"];
 
     /// <summary>
     /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only or changes
@@ -68,6 +76,7 @@ internal sealed class SidecarMethods : IDisposable
         (typeof(CommitRefusedException), ErrorKind.CommitRefused),
         (typeof(RemoteFailedException), ErrorKind.RemoteFailed),
         (typeof(ChangeRefusedException), ErrorKind.ChangeRefused),
+        (typeof(CleanupLogException), ErrorKind.CleanupRefused),
         (typeof(GitException), ErrorKind.GitFailed),
         (typeof(Win32Exception), ErrorKind.GitFailed),
         (typeof(ConfigException), ErrorKind.ConfigInvalid),
@@ -83,6 +92,7 @@ internal sealed class SidecarMethods : IDisposable
     private readonly ChangesMethods _changes;
     private readonly RemoteMethods _remote;
     private readonly RefMethods _refs;
+    private readonly CleanupMethods _cleanup;
     private readonly DiffractConfig _config;
     private readonly Func<string, JsonElement, Task> _notify;
     private readonly Dictionary<string, MethodHandler> _handlers;
@@ -112,6 +122,7 @@ internal sealed class SidecarMethods : IDisposable
         _changes = new ChangesMethods(worktrees, RunnerOptions, outputs);
         _remote = new RemoteMethods(worktrees, RunnerOptions, outputs);
         _refs = new RefMethods(worktrees, RunnerOptions, outputs);
+        _cleanup = new CleanupMethods(_repos, RunnerOptions, outputs, new CleanupSetup(d.Config, new OperationLog(d.OperationLogFolder), d.Folders));
         _handlers = new Dictionary<string, MethodHandler>
         {
             ["app.info"] = async (_, ct) => Result(await AppInfoAsync(ct).ConfigureAwait(false)),
@@ -137,6 +148,10 @@ internal sealed class SidecarMethods : IDisposable
             ["tag.create"] = _refs.CreateTagAsync,
             ["branch.reset"] = _refs.ResetAsync,
             ["branch.undoReset"] = _refs.UndoResetAsync,
+            ["cleanup.plan"] = _cleanup.PlanAsync,
+            ["cleanup.apply"] = _cleanup.ApplyAsync,
+            ["cleanup.history"] = _cleanup.HistoryAsync,
+            ["cleanup.undo"] = _cleanup.UndoAsync,
             ["system.openFolder"] = OpenFolder,
             ["system.listTerminals"] = (_, _) => Task.FromResult(Result(_terminal.List())),
             ["system.openTerminal"] = OpenTerminal,
@@ -187,7 +202,9 @@ internal sealed class SidecarMethods : IDisposable
 
     private Task<JsonElement> CloseRepo(JsonElement? parameters, CancellationToken ct)
     {
-        _repos.Close(Required(Params<RepoCloseParams>(parameters).RepoId, "repoId"));
+        var repoId = Required(Params<RepoCloseParams>(parameters).RepoId, "repoId");
+        _repos.Close(repoId);
+        _cleanup.Forget(repoId);
         return Task.FromResult(RpcResponse.NullResult);
     }
 

@@ -12,8 +12,18 @@ import {
   gitUpdateOutcomes,
   gitUpdateStatuses,
   leftoverKinds,
+  stepKinds,
+  stepOutcomes,
   verdicts,
   type AppInfo,
+  type CleanupPlanView,
+  type CleanupResult,
+  type LeftoverPlanView,
+  type PastCleanup,
+  type SelectedLeftover,
+  type StepRef,
+  type StepResult,
+  type StepView,
   type ChangedFile,
   type ChangesCommitResult,
   type RemoteSyncResult,
@@ -179,6 +189,23 @@ export const resetResult = object<ResetResult>({ branch: string, oldCommit: stri
 
 const remoteSyncResult = object<RemoteSyncResult>({ outcome: oneOf(remoteOutcomes), message: string, status: worktreeChanges });
 
+export const selectedLeftover = object<SelectedLeftover>({ kind: oneOf(leftoverKinds), name: string, path: nullable(string) });
+
+export const stepRef = object<StepRef>({ leftover: number, step: number });
+
+const stepView = object<StepView>({ kind: oneOf(stepKinds), description: string, undoable: boolean, undoNote: nullable(string), optional: boolean });
+
+const stepResult = object<StepResult>({
+  leftover: number,
+  step: number,
+  kind: oneOf(stepKinds),
+  description: string,
+  outcome: oneOf(stepOutcomes),
+  reason: nullable(string),
+});
+
+const cleanupResult = object<CleanupResult>({ cleanupId: string, steps: arrayOf(stepResult) });
+
 /** The result of every method. Adding a method to `Methods` without a shape here fails the type check. */
 export const resultShapes: { [M in keyof Methods]: Shape } = {
   "app.info": appInfo,
@@ -222,6 +249,24 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "tag.create": refChange,
   "branch.reset": resetResult,
   "branch.undoReset": resetResult,
+  "cleanup.plan": object<CleanupPlanView>({
+    planId: string,
+    leftovers: arrayOf(
+      object<LeftoverPlanView>({ kind: oneOf(leftoverKinds), name: string, path: nullable(string), refused: nullable(string), steps: arrayOf(stepView) }),
+    ),
+  }),
+  "cleanup.apply": cleanupResult,
+  "cleanup.history": arrayOf(
+    object<PastCleanup>({
+      cleanupId: string,
+      at: date,
+      undoes: nullable(string),
+      leftovers: arrayOf(selectedLeftover),
+      steps: arrayOf(stepResult),
+      canUndo: boolean,
+    }),
+  ),
+  "cleanup.undo": cleanupResult,
 };
 
 export const notificationShapes: { [N in keyof Notifications]: Shape } = {

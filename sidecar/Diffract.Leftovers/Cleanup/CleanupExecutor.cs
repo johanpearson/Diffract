@@ -12,8 +12,16 @@ public sealed record CleanupOptions
     public IFolderOperations Folders { get; init; } = WindowsFolders.Instance;
 }
 
-/// <summary>A cleanup that cannot be undone as asked, such as one the log does not have. Says why in plain words.</summary>
+/// <summary>A cleanup that cannot be applied or undone as asked, such as one the log does not have. Says why in plain words.</summary>
 public sealed class CleanupLogException(string message) : Exception(message);
+
+/// <summary>A step by its place in a plan: its leftover's place, then its own place among that leftover's steps.</summary>
+public sealed record StepRef(int Leftover, int Step);
+
+/// <summary>A past cleanup or undo, as the history lists it.</summary>
+/// <param name="CanUndo">A cleanup that did something git can take back and is not taken back yet. Never an undo.</param>
+public sealed record PastCleanup(
+    string CleanupId, DateTimeOffset At, string? Undoes, IReadOnlyList<LoggedLeftover> Leftovers, IReadOnlyList<StepResult> Steps, bool CanUndo);
 
 /// <summary>
 /// Applies a plan, and undoes what the log says a cleanup did. Every step is checked right before it runs, run through
@@ -23,16 +31,24 @@ public sealed class CleanupLogException(string message) : Exception(message);
 public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
 {
     private const string EarlierStepDidNotRun = "Skipped, as an earlier step for the same leftover did not run.";
+    private const string LeftOutByUser = "Left out, as chosen.";
 
     private readonly StepChecks _checks = new(repoPath, options.Git, options.Folders);
 
-    public Task<CleanupResult> ApplyAsync(CleanupPlan plan, CancellationToken ct)
+    public Task<CleanupResult> ApplyAsync(CleanupPlan plan, CancellationToken ct) => ApplyAsync(plan, [], ct);
+
+    /// <param name="leaveOut">Optional steps the user unticked, such as deleting a removed worktree's branch.</param>
+    public Task<CleanupResult> ApplyAsync(CleanupPlan plan, IReadOnlyCollection<StepRef> leaveOut, CancellationToken ct)
     {
+        var steps = plan.Leftovers.SelectMany((l, i) => l.Steps.Select((step, j) => (Ref: new StepRef(i, j), Step: step))).ToList();
+        if (leaveOut.FirstOrDefault(r => !steps.Any(s => s.Ref == r && s.Step.Optional)) is { } wrong)
+            throw new ArgumentException($"Step {wrong.Step} of leftover {wrong.Leftover} cannot be left out: only a step with its own checkbox can.", nameof(leaveOut));
+
         var leftovers = plan.Leftovers
             .Select((leftover, i) => (Plan: leftover, Index: i))
             .Where(p => p.Plan.Refused is null)
-            .Select(p => (IReadOnlyList<PendingStep>)[.. p.Plan.Steps.Select((step, j) => FromPlan(p.Index, j, step))]);
-        return RunAsync(Start(null, [.. plan.Leftovers.Select(l => $"{l.Leftover.Kind} {l.Leftover.Name}")]), leftovers, ct);
+            .Select(p => (IReadOnlyList<PendingStep>)[.. p.Plan.Steps.Select((step, j) => FromPlan(new StepRef(p.Index, j), step, leaveOut))]);
+        return RunAsync(Start(null, [.. plan.Leftovers.Select(l => LoggedLeftover.Of(l.Leftover))]), leftovers, ct);
     }
 
     /// <summary>
@@ -48,15 +64,33 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
             throw new CleanupLogException("An undo cannot be undone. Clean up again instead.");
         if (!cleanup.Steps.Any(s => IsDone(s) && s.Undo is not null))
             throw new CleanupLogException(NothingUndoable(cleanup));
-
-        var undone = history.Where(c => c.Started.Undoes == cleanupId).SelectMany(c => c.Steps).Where(IsDone).Select(Key).ToHashSet();
-        List<StepLogged> left = [.. cleanup.Steps.Where(s => IsDone(s) && !undone.Contains(Key(s)))];
+        var left = StillToUndo(history, cleanup);
         if (!left.Any(s => s.Undo is not null))
             throw new CleanupLogException("Everything in this cleanup that can be undone is undone already.");
 
         var leftovers = left.GroupBy(s => s.Result.Leftover).OrderByDescending(g => g.Key)
             .Select(g => (IReadOnlyList<PendingStep>)[.. g.Reverse().Select(FromLog)]);
         return RunAsync(Start(cleanupId, cleanup.Started.Leftovers), leftovers, ct);
+    }
+
+    /// <summary>Every cleanup and undo of the repo, newest first.</summary>
+    public IReadOnlyList<PastCleanup> History()
+    {
+        var history = options.Log.History(repoPath);
+        return
+        [
+            .. history.Reverse().Select(c => new PastCleanup(
+                c.Started.CleanupId, c.Started.At, c.Started.Undoes, c.Started.Leftovers, [.. c.Steps.Select(s => s.Result)],
+                c.Started.Undoes is null && StillToUndo(history, c).Any(s => s.Undo is not null))),
+        ];
+    }
+
+    /// <summary>The cleanup's done steps that no undo of it has taken back yet.</summary>
+    private static List<StepLogged> StillToUndo(IReadOnlyList<LoggedCleanup> history, LoggedCleanup cleanup)
+    {
+        var id = cleanup.Started.CleanupId;
+        var undone = history.Where(c => c.Started.Undoes == id).SelectMany(c => c.Steps).Where(IsDone).Select(Key).ToHashSet();
+        return [.. cleanup.Steps.Where(s => IsDone(s) && !undone.Contains(Key(s)))];
     }
 
     private static string NothingUndoable(LoggedCleanup cleanup) =>
@@ -66,18 +100,19 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
 
     private static bool IsDone(StepLogged step) => step.Result.Outcome == StepOutcome.Done;
 
-    private static (int, int) Key(StepLogged step) => (step.Result.Leftover, step.Result.Step);
+    private static StepRef Key(StepLogged step) => new(step.Result.Leftover, step.Result.Step);
 
-    private CleanupStarted Start(string? undoes, IReadOnlyList<string> leftovers) =>
+    private CleanupStarted Start(string? undoes, IReadOnlyList<LoggedLeftover> leftovers) =>
         new(Guid.NewGuid().ToString("N")[..12], repoPath, options.Git.TimeProvider.GetUtcNow(), undoes, leftovers);
 
-    private static PendingStep FromPlan(int leftover, int index, CleanupStep step) => new()
+    private static PendingStep FromPlan(StepRef at, CleanupStep step, IReadOnlyCollection<StepRef> leaveOut) => new()
     {
-        Result = new StepResult(leftover, index, step.Kind, step.Description, StepOutcome.Done, null),
+        Result = new StepResult(at.Leftover, at.Step, step.Kind, step.Description, StepOutcome.Done, null),
         Command = step.Command,
         Expects = step.Expects,
         Folder = step.Folder,
         Planned = step,
+        NotRun = leaveOut.Contains(at) ? LeftOutByUser : null,
     };
 
     private static PendingStep FromLog(StepLogged step)
@@ -85,7 +120,7 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
         var result = step.Result with { Description = $"Undo: {step.Result.Description}" };
         return step.Undo is { } undo
             ? new PendingStep { Result = result, Command = new GitCommandLine(undo.Arguments, undo.Input), Expects = step.UndoExpects }
-            : new PendingStep { Result = result, NotUndoable = step.UndoNote ?? "This step cannot be undone." };
+            : new PendingStep { Result = result, NotRun = step.UndoNote ?? "This step cannot be undone." };
     }
 
     private async Task<CleanupResult> RunAsync(CleanupStarted started, IEnumerable<IReadOnlyList<PendingStep>> leftovers, CancellationToken ct)
@@ -98,7 +133,7 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
         return new CleanupResult(started.CleanupId, results);
     }
 
-    /// <summary>A step that cannot be undone is said so, and does not stop the undo of the leftover's other steps.</summary>
+    /// <summary>A step not run on purpose, left out or not undoable, does not stop the leftover's other steps.</summary>
     private async Task<List<StepResult>> RunLeftoverAsync(string cleanupId, IReadOnlyList<PendingStep> steps, StepRunner runner, CancellationToken ct)
     {
         List<StepResult> results = [];
@@ -108,7 +143,7 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
             var result = stopped ? step.As(StepOutcome.Skipped, EarlierStepDidNotRun) : await RunOneAsync(step, runner, ct).ConfigureAwait(false);
             Log(cleanupId, step, result);
             results.Add(result);
-            stopped |= result.Outcome != StepOutcome.Done && step.NotUndoable is null;
+            stopped |= result.Outcome != StepOutcome.Done && step.NotRun is null;
         }
 
         return results;
@@ -116,11 +151,11 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
 
     private async Task<StepResult> RunOneAsync(PendingStep step, StepRunner runner, CancellationToken ct)
     {
-        if (step.NotUndoable is { } note)
-            return step.As(StepOutcome.Skipped, note);
-        var check = await _checks.CheckAsync(step.Expects, ct).ConfigureAwait(false);
-        if (check.Broken is { } why)
+        if (step.NotRun is { } why)
             return step.As(StepOutcome.Skipped, why);
+        var check = await _checks.CheckAsync(step.Expects, ct).ConfigureAwait(false);
+        if (check.Broken is { } broken)
+            return step.As(StepOutcome.Skipped, broken);
         var failed = await runner.RunAsync(step, check, ct).ConfigureAwait(false);
         return failed is null ? step.As(StepOutcome.Done, null) : step.As(StepOutcome.Failed, failed);
     }

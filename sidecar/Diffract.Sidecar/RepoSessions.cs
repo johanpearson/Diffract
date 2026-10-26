@@ -4,6 +4,7 @@ using Diffract.Git;
 using Diffract.Git.Snapshot;
 using Diffract.Git.Watching;
 using Diffract.Leftovers;
+using Diffract.Leftovers.Cleanup;
 using Diffract.Sidecar.Rpc;
 
 namespace Diffract.Sidecar;
@@ -110,7 +111,51 @@ internal sealed class RepoSessions(
     public RepoSnapshot SnapshotOf(string repoId) =>
         Get(repoId).Snapshot ?? throw new InvalidOperationException("The repo is still being opened.");
 
-    private RepoSession Get(string repoId) =>
+    /// <summary>The latest full snapshot and its leftovers, as the UI lists them. Refused before the scan after opening has finished.</summary>
+    public (RepoSnapshot Snapshot, IReadOnlyList<Leftover> Leftovers) LeftoversOf(RepoSession session) =>
+        session is { Scanned: true, Snapshot: { } snapshot }
+            ? (snapshot, new LeftoverClassifier().Classify(snapshot, config, time))
+            : throw new CleanupLogException("The repo is still being scanned. Clean up once its leftovers are listed.");
+
+    /// <summary>
+    /// Runs a cleanup or its undo with the repo's live refresh paused, so Diffract does not read the repo half changed,
+    /// then catches up with one full refresh, sent as <c>repo.changed</c> before this returns. One at a time per repo.
+    /// </summary>
+    public async Task<T> CleanUpAsync<T>(RepoSession session, Func<string, Task<T>> run)
+    {
+        if (!session.TryStartCleanup())
+            throw new CleanupLogException("A cleanup is already running in this repo. Wait for it to finish.");
+        try
+        {
+            return await run(session.RepoRoot).ConfigureAwait(false);
+        }
+        finally
+        {
+            session.EndCleanup();
+            await CatchUpAsync(session).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>A failure is logged, not thrown: the cleanup's own result matters more, and the next change tries again.</summary>
+    private async Task CatchUpAsync(RepoSession session)
+    {
+        try
+        {
+            var state = await RefreshAsync(session.Id, includeUnreachable: false, session.Closing).ConfigureAwait(false);
+            await notify(new RepoChanged([new RepoChange(ChangeKind.Everything, null)], state)).ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            await log.WriteLineAsync($"Refresh of {session.RepoRoot} after a cleanup failed: {e.Message}").ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Closed meanwhile: nobody is listening.
+        }
+    }
+
+    /// <summary>The open repo with that id. The cleanup methods hold on to it for the length of a request.</summary>
+    public RepoSession Get(string repoId) =>
         _byId.TryGetValue(repoId, out var session)
             ? session
             : throw new RpcException(RpcErrorCodes.InvalidParams, $"No open repo has the id '{repoId}'. Open it first with repo.open.");
@@ -155,9 +200,9 @@ internal sealed class RepoSessions(
 
     private async Task LiveRefreshAsync(RepoSession session, ChangeSet changes)
     {
-        if (paused?.Invoke() == true)
+        if (paused?.Invoke() == true || session.IsCleaningUp)
         {
-            await log.WriteLineAsync($"Live refresh of {session.RepoRoot} ({changes}) skipped while git is being updated.").ConfigureAwait(false);
+            await log.WriteLineAsync($"Live refresh of {session.RepoRoot} ({changes}) skipped while git is being updated or the repo cleaned up.").ConfigureAwait(false);
             return;
         }
 
@@ -215,7 +260,7 @@ internal sealed class RepoSessions(
         return RepoState.From(session.Id, snapshot, leftovers, new ScanStatus(session.UnreachableCountedAt, scanning, session.ScanProblem));
     }
 
-    private sealed class RepoSession(string id, string repoRoot) : IDisposable
+    internal sealed class RepoSession(string id, string repoRoot) : IDisposable
     {
         private readonly CancellationTokenSource _closing = new();
         private RepoWatcher? _watcher;
@@ -225,6 +270,16 @@ internal sealed class RepoSessions(
         public string RepoRoot { get; } = repoRoot;
 
         public SemaphoreSlim Refreshing { get; } = new(1, 1);
+
+        /// <summary>1 while a cleanup or undo runs, which pauses live refresh.</summary>
+        private int _cleaningUp;
+
+        public bool IsCleaningUp => Volatile.Read(ref _cleaningUp) == 1;
+
+        /// <summary>False when one is running already.</summary>
+        public bool TryStartCleanup() => Interlocked.Exchange(ref _cleaningUp, 1) == 0;
+
+        public void EndCleanup() => Volatile.Write(ref _cleaningUp, 0);
 
         public RefreshScheduler? Scheduler { get; set; }
 

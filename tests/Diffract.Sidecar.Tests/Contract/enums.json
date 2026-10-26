@@ -25,7 +25,8 @@
     "ChangedSinceShown",
     "CommitRefused",
     "RemoteFailed",
-    "ChangeRefused"
+    "ChangeRefused",
+    "CleanupRefused"
   ],
   "changeKind": [
     "WorktreeFiles",
@@ -98,5 +99,20 @@
     "Command",
     "Line",
     "Progress"
+  ],
+  "stepKind": [
+    "Backup",
+    "RemoveWorktree",
+    "DeleteBranch",
+    "DeleteRemoteBranch",
+    "DropStash",
+    "DeleteRefs",
+    "DeleteTag",
+    "RecycleFolder"
+  ],
+  "stepOutcome": [
+    "Done",
+    "Skipped",
+    "Failed"
   ]
 }
