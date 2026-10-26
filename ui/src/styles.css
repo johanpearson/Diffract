@@ -606,6 +606,17 @@ body {
   transition: opacity 0.3s, transform 0.3s, background-color 0.6s;
 }
 
+/* A checkbox, or the same space for a row that is never offered, so every row lines up. */
+.item.selectable {
+  grid-template-columns: auto 1fr auto;
+}
+
+.pick {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+}
+
 .item.flash-added,
 .item.flash-changed {
   background: var(--sel);
@@ -780,6 +791,99 @@ body {
 
 .dialog .panel-actions {
   justify-content: flex-end;
+}
+
+.cleanup-dialog {
+  max-width: 640px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.cleanup-plan {
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+
+.cleanup-leftover + .cleanup-leftover {
+  margin-top: 10px;
+}
+
+.dialog .cleanup-steps {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.dialog .cleanup-step + .cleanup-step {
+  margin-top: 2px;
+}
+
+.cleanup-step.backup {
+  color: var(--ok);
+}
+
+.cleanup-step .chk {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.undo-note {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.undo-note.final {
+  color: var(--amber);
+}
+
+.dialog .refused {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.cleanup-result,
+.past-cleanups {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.cleanup-result h2,
+.past-cleanups h2 {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+
+.result-group h3 {
+  font-size: 12.5px;
+  margin: 8px 0 2px;
+  color: var(--ink-2);
+}
+
+.result-group ul,
+.past-cleanups > ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.result-group .why {
+  display: block;
+}
+
+.past-cleanups > ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.past-cleanup + .past-cleanup {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
 
 .in-use {
@@ -1800,9 +1904,23 @@ body {
   100% { transform: rotate(10deg) translateY(4px); }
 }
 
+.anim-fade {
+  fill: var(--amber);
+}
+
+.is-running .anim-fade {
+  animation: anim-fade 1.4s ease-in-out infinite;
+}
+
+@keyframes anim-fade {
+  0%, 20% { opacity: 1; transform: none; }
+  80%, 100% { opacity: 0; transform: translateY(-8px); }
+}
+
 /* Once it has ended, the drops are gone and the rest shows where things landed. */
 .command-animation:not(.is-running) .anim-drop,
-.command-animation:not(.is-running) .anim-rise {
+.command-animation:not(.is-running) .anim-rise,
+.command-animation.anim-cleanup:not(.is-running) .anim-fade {
   opacity: 0;
 }
 

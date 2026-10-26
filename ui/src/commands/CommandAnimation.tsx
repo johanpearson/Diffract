@@ -83,6 +83,13 @@ const pictures: Record<CommandKind, ReactNode> = {
       <path className="anim-swing" d="M26 10h12l4 6-4 6H26z" />
     </>
   ),
+  // Leftover commits at the end of a line fade away, while the line itself stays.
+  cleanup: (
+    <>
+      <Line y={30} xs={[12, 26]} />
+      <Dots className="anim-fade" xs={[40, 54]} y={30} />
+    </>
+  ),
   // HEAD slides back to an earlier commit.
   reset: (
     <>

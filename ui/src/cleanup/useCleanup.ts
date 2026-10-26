@@ -1,0 +1,150 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCommands } from "../commands/Commands";
+import { messageOf } from "../model/format";
+import type { Row } from "../model/rows";
+import type { CleanupPlanView, CleanupResult, PastCleanup, StepRef } from "../protocol";
+import type { RpcClient } from "../rpc";
+import { needsAttention, outcomeLine, plannedCount, summarize } from "./outcome";
+import { selectedRows, toSelected, withMergedBranches } from "./selection";
+
+/** The last cleanup or undo, as the result shows it. */
+export interface Shown {
+  result: CleanupResult;
+  undo: boolean;
+}
+
+export interface Cleanup {
+  /** The rows ticked now. A ticked row that went away or into use is not among them. */
+  selected: Row[];
+  isSelected(key: string): boolean;
+  toggle(key: string): void;
+  selectMergedBranches(): void;
+  /** Plans the selection and opens the confirm dialog. */
+  start(): void;
+  planning: boolean;
+  /** The plan the dialog shows. Null when it is closed. */
+  plan: CleanupPlanView | null;
+  cancel(): void;
+  /** Applies the plan the dialog shows, and nothing else, without the steps left out. */
+  confirm(leaveOut: StepRef[]): void;
+  shown: Shown | null;
+  dismiss(): void;
+  /** Past cleanups, newest first. */
+  history: PastCleanup[];
+  undo(cleanupId: string): void;
+  /** A cleanup or undo is running. */
+  busy: boolean;
+}
+
+/**
+ * Selecting leftovers, the confirm dialog, and applying and undoing in the command window. The sidecar answers an
+ * apply or an undo only after it has sent the repo as it is afterwards, so the rows have already changed by then.
+ */
+export function useCleanup(client: RpcClient, repoId: string, rows: Row[], showNotice: (message: string) => void): Cleanup {
+  const commands = useCommands();
+  const selection = useSelection(rows);
+  const { selected, clear } = selection;
+  const [planning, setPlanning] = useState(false);
+  const [plan, setPlan] = useState<CleanupPlanView | null>(null);
+  const [shown, setShown] = useState<Shown | null>(null);
+  const [history, loadHistory] = usePastCleanups(client, repoId, showNotice);
+  const [busy, setBusy] = useState(false);
+
+  const start = useCallback(async () => {
+    setPlanning(true);
+    try {
+      setPlan(await client.call("cleanup.plan", { repoId, leftovers: selected.map((row) => toSelected(row.leftover)) }));
+    } catch (error) {
+      showNotice(`Could not plan the cleanup: ${messageOf(error)}`);
+    } finally {
+      setPlanning(false);
+    }
+  }, [client, repoId, selected, showNotice]);
+
+  /** Runs an apply or an undo in the command window, then shows what it did and reads the history again. */
+  const run = useCallback(
+    async (title: string, undo: boolean, leftOut: StepRef[], call: (operation: string) => Promise<CleanupResult>) => {
+      setBusy(true);
+      try {
+        const result = await commands.run({
+          kind: "cleanup",
+          title,
+          call,
+          outcome: (r) => ({ message: outcomeLine(summarize(r, undo), undo), tone: needsAttention(r, leftOut) ? "warning" : "done" }),
+        });
+        if (result) setShown({ result, undo });
+        if (result && !undo) clear();
+      } finally {
+        setBusy(false);
+        loadHistory();
+      }
+    },
+    [commands, loadHistory, clear],
+  );
+
+  const confirm = useCallback(
+    (leaveOut: StepRef[]) => {
+      if (!plan) return;
+      setPlan(null);
+      const title = `Clean up ${count(plannedCount(plan))}`;
+      void run(title, false, leaveOut, (operation) => client.call("cleanup.apply", { repoId, planId: plan.planId, leaveOut, operation }));
+    },
+    [client, plan, repoId, run],
+  );
+
+  const undo = useCallback(
+    (cleanupId: string) => void run("Undo the cleanup", true, [], (operation) => client.call("cleanup.undo", { repoId, cleanupId, operation })),
+    [client, repoId, run],
+  );
+
+  return {
+    selected,
+    isSelected: selection.isSelected,
+    toggle: selection.toggle,
+    selectMergedBranches: selection.selectMergedBranches,
+    start: () => void start(),
+    planning,
+    plan,
+    cancel: () => setPlan(null),
+    confirm,
+    shown,
+    dismiss: () => setShown(null),
+    history,
+    undo,
+    busy,
+  };
+}
+
+/** The ticked rows. A row that went away or into use drops out of `selected` by itself. */
+function useSelection(rows: Row[]) {
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
+  const selected = useMemo(() => selectedRows(rows, ticked), [rows, ticked]);
+  const clear = useCallback(() => setTicked(new Set()), []);
+  return {
+    selected,
+    clear,
+    isSelected: (key: string) => ticked.has(key),
+    toggle: (key: string) => setTicked((before) => toggled(before, key)),
+    selectMergedBranches: () => setTicked((before) => withMergedBranches(rows, before)),
+  };
+}
+
+/** The operation log, read when the view opens and again after each cleanup or undo. */
+function usePastCleanups(client: RpcClient, repoId: string, showNotice: (message: string) => void): [PastCleanup[], () => void] {
+  const [history, setHistory] = useState<PastCleanup[]>([]);
+  const load = useCallback(() => {
+    client.call("cleanup.history", { repoId }).then(setHistory, (error: unknown) => showNotice(`Could not read past cleanups: ${messageOf(error)}`));
+  }, [client, repoId, showNotice]);
+  useEffect(load, [load]);
+  return [history, load];
+}
+
+function toggled(set: ReadonlySet<string>, key: string): Set<string> {
+  const next = new Set(set);
+  if (!next.delete(key)) next.add(key);
+  return next;
+}
+
+function count(n: number): string {
+  return n === 1 ? "1 leftover" : `${n} leftovers`;
+}

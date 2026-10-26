@@ -41,7 +41,7 @@ test("filters by verdict", async ({ page }) => {
 
   await expect(leftovers(page).getByRole("listitem")).toHaveCount(1);
   await expect(row(page, "copilot/fix-login")).toBeVisible();
-  await page.getByRole("button", { name: "All" }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
   await expect(leftovers(page).getByRole("listitem")).toHaveCount(3);
 });
 

@@ -12,6 +12,7 @@ import { tabId, Tabs, type View } from "./Tabs";
 import type { SwitchTo } from "../history/commitMenu";
 import { HistoryView } from "../history/HistoryView";
 import { ChangesView } from "../changes/ChangesView";
+import { useCleanup } from "../cleanup/useCleanup";
 
 /** What the screens need besides the screen itself. */
 export interface ScreenProps {
@@ -164,11 +165,18 @@ function refreshBlocked(updatingGit: boolean, scanning: boolean): string | null 
   return scanning ? "Wait until the scan has finished" : null;
 }
 
-function Leftovers({ repo, git, terminals, filter, onFilter, onOpenFolder, now }: ScreenProps) {
-  if (repo.screen.kind !== "ready") return null;
+function Leftovers(props: ScreenProps) {
+  if (props.repo.screen.kind !== "ready") return null;
+  return <LeftoversScreen key={props.repo.screen.state.repoId} {...props} state={props.repo.screen.state} />;
+}
+
+/** One repo's leftovers. Its key is the repo, so a selection or a result never carries over to another repo. */
+function LeftoversScreen({ repo, git, terminals, filter, onFilter, onOpenFolder, now, state }: ScreenProps & { state: RepoState }) {
+  const cleanup = useCleanup(repo.session.client, state.repoId, repo.rows, repo.session.showNotice);
   return (
     <LeftoversView
-      state={repo.screen.state}
+      state={state}
+      cleanup={cleanup}
       rows={repo.rows}
       filter={filter}
       onFilter={onFilter}
@@ -177,7 +185,7 @@ function Leftovers({ repo, git, terminals, filter, onFilter, onOpenFolder, now }
       terminalName={terminals.current?.name ?? null}
       onRefresh={() => void repo.refresh()}
       refreshing={repo.refreshing}
-      refreshBlocked={refreshBlocked(git.running, repo.screen.state.scanning)}
+      refreshBlocked={refreshBlocked(git.running, state.scanning)}
       now={now}
     />
   );
