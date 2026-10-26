@@ -9,7 +9,7 @@ namespace Diffract.Sidecar;
 /// nothing but <see cref="ChangesPolicy"/>, and answer with what happened and the new status. Cancelling the request
 /// stops git.
 /// </summary>
-internal sealed class RemoteMethods(RepoWorktrees worktrees, GitRunnerOptions runnerOptions)
+internal sealed class RemoteMethods(RepoWorktrees worktrees, GitRunnerOptions runnerOptions, CommandOutputs outputs)
 {
     private readonly ChangesReader _reader = new(runnerOptions);
 
@@ -26,7 +26,7 @@ internal sealed class RemoteMethods(RepoWorktrees worktrees, GitRunnerOptions ru
     {
         var request = SidecarMethods.Params<ChangesStatusParams>(parameters);
         var worktree = worktrees.Resolve(request.RepoId, request.Worktree);
-        var result = await run(new RemoteSync(worktree, runnerOptions), ct).ConfigureAwait(false);
+        var result = await run(new RemoteSync(worktree, outputs.For(runnerOptions, parameters)), ct).ConfigureAwait(false);
         var status = await _reader.ReadStatusAsync(worktree, ct).ConfigureAwait(false);
         return SidecarMethods.Result(new RemoteSyncResult(result.Outcome, result.Message, status));
     }

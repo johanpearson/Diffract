@@ -37,9 +37,9 @@ A first proposal, to settle in phase 0.
 | Unstage files | `git restore --staged`, paths as above. Before the first commit, when there is no HEAD to restore from: `git rm --cached -q`, which keeps the files on disk |
 | Stage or unstage a hunk | `git apply --cached --unidiff-zero` (with `--reverse` to unstage), the patch on standard input |
 | Commit | `git commit -F -`, the message on standard input; `--amend` only as in decision 5 |
-| Fetch | `git fetch <remote>`, never `--prune` from here (that is a setting in milestone 6) |
+| Fetch | `git fetch <remote>`, never `--prune` from here (that is a setting in milestone 6). With `--progress` when the command window shows it (phase 8) |
 | Pull | `git fetch <remote>`, then `git merge --ff-only <upstream>` only when the branch is behind and not ahead, see decision 6 |
-| Push | `git push --porcelain <remote> <branch>`, with `--set-upstream` on a branch's first push |
+| Push | `git push --porcelain <remote> <branch>`, with `--set-upstream` on a branch's first push, and `--progress` as for fetch |
 | Create a branch | `git branch <name> <commit>` |
 | Switch | `git switch <branch>`, `git switch -c <name> <commit>`, `git switch --track <remote>/<branch>`, `git switch --detach <commit>`, never `--discard-changes` or `--force` |
 | Create a tag | `git tag -a <name> <commit> -F -` |

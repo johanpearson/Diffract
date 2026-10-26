@@ -89,6 +89,39 @@ public sealed class RemoteMethodsTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task A_named_operation_gets_git_output_as_notifications_before_its_answer()
+    {
+        var repos = await OpenAsync(r => PushedElsewhereAsync(r.Theirs));
+
+        _host.Send(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 50, method = "remote.fetch", @params = new { repoId = "1", worktree = repos.Repo.Path, operation = "op-7" } }));
+        var outputs = new List<JsonElement>();
+        JsonElement message;
+        while (!(message = await _host.NextJsonAsync()).TryGetProperty("id", out _))
+            if (message.GetProperty("method").GetString() == "command.output")
+                outputs.Add(message.GetProperty("params"));
+
+        Assert.Equal("Done", Result(message).GetProperty("outcome").GetString());
+        Assert.All(outputs, o => Assert.Equal("op-7", o.GetProperty("operation").GetString()));
+        Assert.Equal(("Command", "git fetch --progress origin"), (outputs[0].GetProperty("kind").GetString(), outputs[0].GetProperty("text").GetString()));
+        Assert.Contains(outputs, o => o.GetProperty("kind").GetString() == "Line" && o.GetProperty("text").GetString()!.StartsWith("From ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Without_an_operation_nothing_is_sent_and_git_reports_no_progress()
+    {
+        var repos = await OpenAsync(r => PushedElsewhereAsync(r.Theirs));
+
+        _host.Send(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 51, method = "remote.fetch", @params = new { repoId = "1", worktree = repos.Repo.Path } }));
+        var methods = new List<string?>();
+        JsonElement message;
+        while (!(message = await _host.NextJsonAsync()).TryGetProperty("id", out _))
+            methods.Add(message.GetProperty("method").GetString());
+
+        Assert.Equal("Done", Result(message).GetProperty("outcome").GetString());
+        Assert.DoesNotContain("command.output", methods);
+    }
+
+    [Fact]
     public async Task Pull_on_a_diverged_branch_answers_diverged_with_both_counts()
     {
         var repos = await OpenAsync(async r =>

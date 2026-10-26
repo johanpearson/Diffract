@@ -54,6 +54,7 @@ public class ContractTests
         ["repo.changed"] = () => Notification("repo.changed", new RepoChanged(
             [new RepoChange(ChangeKind.WorktreeFiles, AgentWorktree), new RepoChange(ChangeKind.Refs, null)],
             State("1"))),
+        ["command.output"] = () => Notification(CommandOutputs.Method, new CommandOutput("op-1", GitOutputKind.Progress, "Receiving objects:  40% (2/5)")),
         ["history.read"] = () => Response(new HistoryReadResult(Commits: 1203, Pages: 3, Tips: [Merge, Side])),
         ["history.update"] = () => Response(new HistoryUpdateResult(
             [new CommitEntry(Side, [Merge], "Claude", "noreply@anthropic.com", Now.AddMinutes(-1), Now.AddMinutes(-1), "Fix the flaky login test")],
@@ -289,6 +290,7 @@ public class ContractTests
         ["remoteOutcome"] = Values<RemoteOutcome>(),
         ["refNameKind"] = Values<RefNameKind>(),
         ["resetMode"] = Values<ResetMode>(),
+        ["gitOutputKind"] = Values<GitOutputKind>(),
     }.ToJsonString();
 
     private static JsonArray Values<T>() where T : struct, Enum =>

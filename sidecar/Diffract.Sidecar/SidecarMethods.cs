@@ -107,9 +107,10 @@ internal sealed class SidecarMethods : IDisposable
             d.Log,
             paused: () => _updater.IsRunning);
         var worktrees = new RepoWorktrees(_repos);
-        _changes = new ChangesMethods(worktrees, RunnerOptions);
-        _remote = new RemoteMethods(worktrees, RunnerOptions);
-        _refs = new RefMethods(worktrees, RunnerOptions);
+        var outputs = new CommandOutputs(_notify);
+        _changes = new ChangesMethods(worktrees, RunnerOptions, outputs);
+        _remote = new RemoteMethods(worktrees, RunnerOptions, outputs);
+        _refs = new RefMethods(worktrees, RunnerOptions, outputs);
         _handlers = new Dictionary<string, MethodHandler>
         {
             ["app.info"] = async (_, ct) => Result(await AppInfoAsync(ct).ConfigureAwait(false)),

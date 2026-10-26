@@ -61,6 +61,28 @@ public sealed class RemoteSyncTests : IDisposable
     }
 
     [Fact]
+    public async Task Watched_fetch_and_push_ask_for_progress_and_pass_on_what_git_says()
+    {
+        var (mine, theirs, remote) = await SharedAsync();
+        await PushedElsewhereAsync(theirs);
+        var seen = new ConcurrentQueue<GitOutputLine>();
+        var watched = new RemoteSync(mine.Path, Options with { OnOutput = seen.Enqueue });
+
+        await watched.FetchAsync(Ct);
+        await mine.GitAsync("switch", "-q", "-c", "topic");
+        await mine.CommitAsync("b.txt", "b\n", "Second");
+        await new RemoteSync(mine.Path, Options with { OnOutput = seen.Enqueue }).PushAsync(Ct);
+
+        Assert.Contains(_calls, c => c.Arguments.SequenceEqual(["fetch", "--progress", "origin"]));
+        Assert.Contains(_calls, c => c.Arguments.SequenceEqual(["push", "--porcelain", "--progress", "--set-upstream", "origin", "topic"]));
+        // Only the commands that change something: what Diffract reads to decide is not shown.
+        Assert.Equal(["git fetch --progress origin", "git push --porcelain --progress --set-upstream origin topic"], seen.Where(l => l.Kind == GitOutputKind.Command).Select(l => l.Text));
+        // Git names the remote without its ".git".
+        Assert.Contains(seen, l => l.Kind == GitOutputKind.Line && l.Text == $"From {remote.Path[..^".git".Length]}");
+        Assert.Contains(seen, l => l.Kind == GitOutputKind.Progress && l.Text.StartsWith("Writing objects:", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Fetch_without_an_upstream_fetches_origin()
     {
         var (mine, _, _) = await SharedAsync();

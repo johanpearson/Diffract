@@ -16,9 +16,12 @@ public class ChangesPolicyTests
         "commit -F -",
         "commit --amend -F -",
         "fetch origin",
+        "fetch --progress origin",
         "merge --ff-only origin/main",
         "push --porcelain origin feature/åäö",
         "push --porcelain --set-upstream origin feature/x",
+        "push --porcelain --progress origin feature/åäö",
+        "push --porcelain --progress --set-upstream origin feature/x",
         $"branch feature/x {Commit}",
         "switch main",
         $"switch -c feature/x {Commit}",
@@ -53,6 +56,8 @@ public class ChangesPolicyTests
     // Anything that forces, skips hooks or throws work away.
     [InlineData("push --force origin main")]
     [InlineData("push --porcelain --force origin main")]
+    [InlineData("push --porcelain --progress --force origin main")]
+    [InlineData("fetch --progress --prune origin")]
     [InlineData("push --porcelain --force-with-lease origin main")]
     [InlineData("push --porcelain origin +main")]
     [InlineData("push --porcelain origin :main")]

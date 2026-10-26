@@ -31,9 +31,13 @@ public static class ChangesPolicy
         ["commit", "-F", "-"],
         ["commit", "--amend", "-F", "-"],
         ["fetch", RemoteSlot],
+        // With --progress, git reports progress even though no terminal is reading it, for the command window.
+        ["fetch", "--progress", RemoteSlot],
         ["merge", "--ff-only", RefSlot],
         ["push", "--porcelain", RemoteSlot, RefSlot],
         ["push", "--porcelain", "--set-upstream", RemoteSlot, RefSlot],
+        ["push", "--porcelain", "--progress", RemoteSlot, RefSlot],
+        ["push", "--porcelain", "--progress", "--set-upstream", RemoteSlot, RefSlot],
         ["branch", RefSlot, CommitSlot],
         ["switch", RefSlot],
         ["switch", "-c", RefSlot, CommitSlot],

@@ -93,5 +93,10 @@
   "resetMode": [
     "Soft",
     "Mixed"
+  ],
+  "gitOutputKind": [
+    "Command",
+    "Line",
+    "Progress"
   ]
 }
