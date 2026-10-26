@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- Only for the code LibraryImport generates, the Native AOT way to call Windows (Cleanup/Folders.cs). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

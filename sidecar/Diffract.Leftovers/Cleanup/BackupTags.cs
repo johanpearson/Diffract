@@ -17,7 +17,8 @@ internal sealed class BackupTags(RepoSnapshot repo, DateTimeOffset now)
 {
     private readonly HashSet<string> _taken = repo.Tags.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
 
-    public CleanupStep Step(BackupOf backup)
+    /// <param name="removal">The step the backup is for. The backup expects what it does, so no tag is made for a removal that would not run.</param>
+    public CleanupStep Step(BackupOf backup, CleanupStep removal)
     {
         var tag = Unique($"archive/{backup.Kind}/{backup.Name}-{now:yyyy-MM-dd}");
         var commits = backup.CommitsAtRisk == 1 ? "1 commit" : $"{backup.CommitsAtRisk} commits";
@@ -27,7 +28,9 @@ internal sealed class BackupTags(RepoSnapshot repo, DateTimeOffset now)
             Kind = StepKind.Backup,
             Description = $"Keep a backup tag {tag} for {commits} that exist nowhere else",
             Command = new GitCommandLine(["tag", "-a", tag, backup.Commit, "-F", "-"], [message]),
+            Expects = removal.Expects,
             Undo = new GitCommandLine(["tag", "-d", tag], []),
+            UndoExpects = [new Expectation.TagOn($"refs/tags/{tag}", backup.Commit)],
         };
     }
 

@@ -35,6 +35,7 @@ The spike from milestone 5, phase 0, step 1: every command the cleanup, the stas
 
 6. **Without a configured identity, git makes one up.** With no `user.name` or `user.email` set, `git var GIT_COMMITTER_IDENT` still answered, with a name and email git guessed from Windows. A backup tag would carry that, not "Diffract" as decision 1 says. Proposal: Diffract reads `git config user.name` and `git config user.email`, and when either is missing it sets `GIT_COMMITTER_NAME=Diffract` and an email of `diffract@localhost` for the tag only.
 
-## Not checked yet
+## Checked in phase 2
 
-- **Moving a leftover folder to the Recycle Bin.** It needs a Windows API call, not git, and Native AOT rules out the usual .NET helper. It is checked with the code that does it, in phase 2, against folders in a temp folder only.
+- **Moving a leftover folder to the Recycle Bin.** Native AOT rules out the usual .NET helper, so Diffract calls the Windows shell directly, as Explorer does. A folder in a temp folder goes to the Recycle Bin and can be restored from there. A folder with a file held open is caught by the rename check first and left where it is. When Windows cannot recycle a folder, for example because it is too big for the Recycle Bin, Windows asks before deleting it for good, so nothing is lost without the user saying so. A drive with no Recycle Bin at all, such as a network drive, is left alone.
+- **A file opened between the check and the removal.** The rename check cannot catch a program that opens a file a moment after it. A test opens one right after the check: git stops with exit code 255, as in step 1, the folder stays, and the branch is kept.
