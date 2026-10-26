@@ -94,6 +94,22 @@ body {
   letter-spacing: 0.01em;
 }
 
+/* The open repo's branch, with Fetch, Pull and Push, on every view. */
+.branch-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-left: 12px;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.branch-bar .muted {
+  white-space: nowrap;
+}
+
 .versions {
   color: var(--ink-3);
   font-size: 12px;

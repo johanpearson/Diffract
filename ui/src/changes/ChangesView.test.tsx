@@ -4,6 +4,7 @@ import type { ChangeAction, FileSides } from "../history/monacoEditor";
 import { RpcClient } from "../rpc";
 import { FakeSidecar, sampleState } from "../testing/fakeSidecar";
 import { CommandsProvider } from "../commands/Commands";
+import { BranchBar } from "../components/BranchBar";
 import { ChangesView } from "./ChangesView";
 
 // jsdom runs no Monaco. This stand-in records what the view shows and the change buttons it was given.
@@ -38,6 +39,7 @@ function setup(sidecar = new FakeSidecar(), openedPath = mainWorktree) {
   const client = new RpcClient(sidecar.transport);
   render(
     <CommandsProvider client={client} autoCloseMs={20}>
+      <BranchBar client={client} state={sampleState} worktree={openedPath} />
       <ChangesView client={client} state={sampleState} openedPath={openedPath} storage={storage} />
     </CommandsProvider>,
   );
@@ -298,7 +300,7 @@ describe("the Changes view", () => {
   });
 });
 
-describe("fetch, pull and push", () => {
+describe("fetch, pull and push in the branch bar", () => {
   const remote = () => screen.getByRole("group", { name: "Remote" });
   const button = (name: string | RegExp) => within(remote()).getByRole("button", { name });
   const gitOutput = () => within(commandWindow()).getByRole("log", { name: "Git output" });
@@ -321,21 +323,25 @@ describe("fetch, pull and push", () => {
     expect(sidecar.remoteAsked).toEqual([`remote.push ${mainWorktree}`]);
   });
 
-  it("offers a branch without an upstream a push to a new branch on origin, and no pull", async () => {
+  it("shows the branch and how it stands, on its own line apart from the Changes view's status", async () => {
+    setup();
+    await ready();
+
+    const bar = screen.getByRole("group", { name: "Branch" });
+    await waitFor(() => expect(bar.textContent).toContain("main1 ahead origin/main"));
+    expect(within(bar).queryByRole("status")).toBeNull();
+  });
+
+  it("leaves a worktree an agent is using alone, says why, and still says where push would go", async () => {
     setup(new FakeSidecar(), agentWorktree);
     await ready();
     fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Work here anyway" }));
 
-    expect(button("Push to new origin/claude/räksmörgås-fix").hasAttribute("disabled")).toBe(false);
-    expect(button("Pull").getAttribute("title")).toBe("claude/räksmörgås-fix does not follow a branch on a remote yet. Push it first.");
-    expect(button("Pull").hasAttribute("disabled")).toBe(true);
-  });
-
-  it("is disabled in an agent's worktree until the user chooses to work there", async () => {
-    setup(new FakeSidecar(), agentWorktree);
-    await ready();
-
+    const bar = await screen.findByRole("group", { name: "Branch" });
+    expect(bar.getAttribute("title")).toBeTruthy();
+    expect(button("Push to new origin/claude/räksmörgås-fix").hasAttribute("disabled")).toBe(true);
     expect(button("Fetch").hasAttribute("disabled")).toBe(true);
+    expect(button("Pull").getAttribute("title")).toBe("claude/räksmörgås-fix does not follow a branch on a remote yet. Push it first.");
   });
 
   it("keeps the window open when pull could not fast-forward, until it is closed", async () => {

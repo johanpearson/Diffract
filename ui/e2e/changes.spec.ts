@@ -102,8 +102,24 @@ test("pushes in the command window, which closes by itself, and the bar shows it
   await expect(commandWindow(page)).toContainText("Pushed main to origin/main.");
   await expect(commandWindow(page).getByRole("log", { name: "Git output" })).toContainText("> git push");
   await expect(commandWindow(page)).toBeHidden();
-  await expect(page.getByText("Up to date with origin/main")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Branch" })).toContainText("Up to date with origin/main");
   expect(await page.evaluate(() => window.diffractTest.sidecar.remoteAsked)).toEqual([`remote.push ${repoRoot}`]);
+});
+
+test("fetches from the top bar on History too, where the repo opens", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Open a repo" })).toBeVisible();
+  await page.evaluate((path) => (window.diffractTest.nextFolder = path), repoRoot);
+  await page.getByRole("button", { name: "Open repo…" }).first().click();
+  await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
+  const bar = page.getByRole("group", { name: "Branch" });
+  await expect(bar).toContainText("main");
+
+  await bar.getByRole("button", { name: "Fetch" }).click();
+
+  await expect(commandWindow(page)).toContainText("Fetched from origin.");
+  await expect(commandWindow(page)).toBeHidden();
+  expect(await page.evaluate(() => window.diffractTest.sidecar.remoteAsked)).toEqual([`remote.fetch ${repoRoot}`]);
 });
 
 test("a fetch can be cancelled from the command window", async ({ page }) => {
