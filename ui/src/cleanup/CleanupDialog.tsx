@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { kindLabels } from "../model/format";
 import type { CleanupPlanView, LeftoverPlanView, StepRef, StepView } from "../protocol";
-import { leaveOutOf, plannedCount, stepKey } from "./outcome";
+import { keepsOnly, leaveOutOf, plannedCount, stepKey } from "./outcome";
 
 interface Props {
   plan: CleanupPlanView;
@@ -19,6 +19,9 @@ export function CleanupDialog({ plan, onConfirm, onCancel }: Props) {
   useEffect(() => cancel.current?.focus(), []);
   const [unticked, setUnticked] = useState<ReadonlySet<string>>(new Set());
   const planned = plannedCount(plan);
+  const wording = keepsOnly(plan)
+    ? { title: "Keep these commits?", confirm: "Keep" }
+    : { title: `Clean up ${planned === 1 ? "1 leftover" : `${planned} leftovers`}?`, confirm: "Clean up" };
 
   const toggle = (key: string) =>
     setUnticked((before) => {
@@ -33,7 +36,7 @@ export function CleanupDialog({ plan, onConfirm, onCancel }: Props) {
   return (
     <div className="overlay">
       <div className="dialog cleanup-dialog" role="dialog" aria-modal="true" aria-labelledby="cleanup-title" onKeyDown={onKeyDown}>
-        <h1 id="cleanup-title">Clean up {planned === 1 ? "1 leftover" : `${planned} leftovers`}?</h1>
+        <h1 id="cleanup-title">{wording.title}</h1>
         <p>This is exactly what will happen, in this order. Nothing else is touched. A step whose leftover changed meanwhile is skipped, with why.</p>
         <ol className="cleanup-plan" aria-label="Planned steps">
           {plan.leftovers.map((leftover, l) => (
@@ -46,7 +49,7 @@ export function CleanupDialog({ plan, onConfirm, onCancel }: Props) {
             Cancel
           </button>
           <button className="abtn primary" disabled={planned === 0} onClick={() => onConfirm(leaveOutOf(plan, unticked))}>
-            Clean up
+            {wording.confirm}
           </button>
         </div>
       </div>

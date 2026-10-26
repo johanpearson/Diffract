@@ -162,6 +162,13 @@ function LeftoverRow({ row, onOpenFolder, onOpenTerminal, terminalName, cleanup 
         </div>
         <div className="why">{l.reason}</div>
         {l.path && <div className="path">{l.path}</div>}
+        {l.kind === "OrphanedCommit" && selectable(row) && (
+          <div className="item-actions">
+            <button className="abtn" onClick={() => cleanup.keep(row)} disabled={cleanup.planning || cleanup.busy} aria-label={`Keep ${l.name}`}>
+              Keep these
+            </button>
+          </div>
+        )}
         {canOpen(l) && (
           <div className="item-actions">
             <button className="abtn" onClick={() => onOpenFolder(l.path!)} aria-label={`Open folder ${l.path}`}>

@@ -4,7 +4,7 @@ import { messageOf } from "../model/format";
 import type { Row } from "../model/rows";
 import type { CleanupPlanView, CleanupResult, PastCleanup, StepRef } from "../protocol";
 import type { RpcClient } from "../rpc";
-import { needsAttention, outcomeLine, plannedCount, summarize } from "./outcome";
+import { keepsOnly, needsAttention, outcomeLine, plannedCount, summarize } from "./outcome";
 import { selectedRows, toSelected, withMergedBranches } from "./selection";
 
 /** The last cleanup or undo, as the result shows it. */
@@ -21,6 +21,8 @@ export interface Cleanup {
   selectMergedBranches(): void;
   /** Plans the selection and opens the confirm dialog. */
   start(): void;
+  /** "Keep these" on one row of orphaned commits: plans that row alone, which puts them under one backup tag. */
+  keep(row: Row): void;
   planning: boolean;
   /** The plan the dialog shows. Null when it is closed. */
   plan: CleanupPlanView | null;
@@ -50,16 +52,19 @@ export function useCleanup(client: RpcClient, repoId: string, rows: Row[], showN
   const [history, loadHistory] = usePastCleanups(client, repoId, showNotice);
   const [busy, setBusy] = useState(false);
 
-  const start = useCallback(async () => {
-    setPlanning(true);
-    try {
-      setPlan(await client.call("cleanup.plan", { repoId, leftovers: selected.map((row) => toSelected(row.leftover)) }));
-    } catch (error) {
-      showNotice(`Could not plan the cleanup: ${messageOf(error)}`);
-    } finally {
-      setPlanning(false);
-    }
-  }, [client, repoId, selected, showNotice]);
+  const planFor = useCallback(
+    async (chosen: Row[]) => {
+      setPlanning(true);
+      try {
+        setPlan(await client.call("cleanup.plan", { repoId, leftovers: chosen.map((row) => toSelected(row.leftover)) }));
+      } catch (error) {
+        showNotice(`Could not plan the cleanup: ${messageOf(error)}`);
+      } finally {
+        setPlanning(false);
+      }
+    },
+    [client, repoId, showNotice],
+  );
 
   /** Runs an apply or an undo in the command window, then shows what it did and reads the history again. */
   const run = useCallback(
@@ -86,7 +91,7 @@ export function useCleanup(client: RpcClient, repoId: string, rows: Row[], showN
     (leaveOut: StepRef[]) => {
       if (!plan) return;
       setPlan(null);
-      const title = `Clean up ${count(plannedCount(plan))}`;
+      const title = keepsOnly(plan) ? "Keep these commits" : `Clean up ${count(plannedCount(plan))}`;
       void run(title, false, leaveOut, (operation) => client.call("cleanup.apply", { repoId, planId: plan.planId, leaveOut, operation }));
     },
     [client, plan, repoId, run],
@@ -102,7 +107,8 @@ export function useCleanup(client: RpcClient, repoId: string, rows: Row[], showN
     isSelected: selection.isSelected,
     toggle: selection.toggle,
     selectMergedBranches: selection.selectMergedBranches,
-    start: () => void start(),
+    start: () => void planFor(selected),
+    keep: (row) => void planFor([row]),
     planning,
     plan,
     cancel: () => setPlan(null),

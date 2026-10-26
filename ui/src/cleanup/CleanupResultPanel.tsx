@@ -16,7 +16,7 @@ export function CleanupResultPanel({ shown, canUndo, busy, onUndo, onDismiss }: 
   const { done, backups, notDone } = summarize(shown.result, shown.undo);
   return (
     <section className="cleanup-result" aria-label={shown.undo ? "Undo result" : "Cleanup result"}>
-      <h2>{shown.undo ? "Undone" : "Cleaned up"}</h2>
+      <h2>{shown.undo ? "Undone" : done.length === 0 && backups.length > 0 ? "Kept" : "Cleaned up"}</h2>
       <StepList title={shown.undo ? "Put back" : "Removed"} steps={done} />
       <StepList title="Kept as a backup" steps={backups} />
       <StepList title="Not done" steps={notDone} />

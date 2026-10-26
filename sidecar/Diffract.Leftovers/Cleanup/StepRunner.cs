@@ -21,6 +21,8 @@ internal sealed class StepRunner(string repoPath, GitRunnerOptions git, IFolderO
             return folders.Recycle(step.Folder!);
         try
         {
+            if (step.Planned?.Keep is { } keep)
+                return await KeepAsync(command, keep, ct).ConfigureAwait(false);
             var runner = command.Arguments is ["tag", "-a", ..] ? await TaggerAsync(ct).ConfigureAwait(false) : _cleanup;
             await runner.RunAsync(ForNow(command, check), ct).ConfigureAwait(false);
             return null;
@@ -33,6 +35,20 @@ internal sealed class StepRunner(string repoPath, GitRunnerOptions git, IFolderO
         {
             return $"Git refused: {Reason(e)}";
         }
+    }
+
+    /// <summary>
+    /// Makes the commit that holds the orphaned commits, then tags the id git answers with. Both carry the same
+    /// identity as any backup tag. If the tag fails, the commit made is unreachable and held by nothing, so no harm.
+    /// The empty tree is written first: git knows it without storing it, but <c>git fsck</c> wants it stored.
+    /// </summary>
+    private async Task<string?> KeepAsync(GitCommandLine holder, KeepTag keep, CancellationToken ct)
+    {
+        await _cleanup.RunAsync(new GitCommandLine(["mktree"], []), ct).ConfigureAwait(false);
+        var tagger = await TaggerAsync(ct).ConfigureAwait(false);
+        var made = ObjectId.Parse((await tagger.RunAsync(holder, ct).ConfigureAwait(false)).StandardOutput.Trim());
+        await tagger.RunAsync(new GitCommandLine(["tag", "-a", keep.Name, made, "-F", "-"], [keep.Message]), ct).ConfigureAwait(false);
+        return null;
     }
 
     /// <summary>A stash is dropped at its place in the list now, which the checks just found.</summary>
@@ -56,9 +72,12 @@ internal sealed class StepRunner(string repoPath, GitRunnerOptions git, IFolderO
         return name.ExitCode == 0 && email.ExitCode == 0;
     }
 
+    /// <summary>The commit "Keep these" makes has an author too, so both are set.</summary>
     private Dictionary<string, string> AsDiffract() => new(git.Environment)
     {
         ["GIT_COMMITTER_NAME"] = "Diffract",
         ["GIT_COMMITTER_EMAIL"] = "diffract@localhost",
+        ["GIT_AUTHOR_NAME"] = "Diffract",
+        ["GIT_AUTHOR_EMAIL"] = "diffract@localhost",
     };
 }

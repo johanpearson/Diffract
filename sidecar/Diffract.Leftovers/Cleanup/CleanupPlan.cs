@@ -24,7 +24,16 @@ public enum StepKind
 
     /// <summary>Moves a folder to the Windows Recycle Bin. Not git, so the step has no command.</summary>
     RecycleFolder,
+
+    /// <summary>
+    /// Keeps several orphaned commits under one backup tag: the command makes a commit with all of them as parents,
+    /// then <see cref="CleanupStep.Keep"/> tags it. Nothing is removed. One orphaned commit is a plain <see cref="Backup"/>.
+    /// </summary>
+    KeepCommits,
 }
+
+/// <summary>The backup tag a <see cref="StepKind.KeepCommits"/> step puts on the commit it made.</summary>
+public sealed record KeepTag(string Name, string Message);
 
 /// <summary>
 /// What must still be true right before a step, or its undo, runs. When it is not, the step and the rest of its
@@ -33,6 +42,7 @@ public enum StepKind
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(RefAt), "refAt")]
 [JsonDerivedType(typeof(RefAbsent), "refAbsent")]
+[JsonDerivedType(typeof(RefPresent), "refPresent")]
 [JsonDerivedType(typeof(TagOn), "tagOn")]
 [JsonDerivedType(typeof(ObjectExists), "objectExists")]
 [JsonDerivedType(typeof(WorktreeClean), "worktreeClean")]
@@ -47,6 +57,9 @@ public abstract record Expectation
 
     /// <summary>No ref has this name, so one can be made with it again.</summary>
     public sealed record RefAbsent(string FullName) : Expectation;
+
+    /// <summary>The ref is still there, wherever it points, such as the tag "Keep these" made on a commit it made.</summary>
+    public sealed record RefPresent(string FullName) : Expectation;
 
     /// <summary>A tag still points at this commit, such as a backup tag before its undo removes it.</summary>
     public sealed record TagOn(string FullName, string CommitId) : Expectation;
@@ -97,6 +110,9 @@ public sealed record CleanupStep
 
     /// <summary>The folder a <see cref="StepKind.RecycleFolder"/> step moves.</summary>
     public string? Folder { get; init; }
+
+    /// <summary>The tag a <see cref="StepKind.KeepCommits"/> step puts on the commit its command makes.</summary>
+    public KeepTag? Keep { get; init; }
 }
 
 /// <summary>The steps for one leftover, in order, or why there are none.</summary>

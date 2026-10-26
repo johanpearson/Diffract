@@ -121,7 +121,8 @@ internal sealed class RepoSessions(
     /// Runs a cleanup or its undo with the repo's live refresh paused, so Diffract does not read the repo half changed,
     /// then catches up with one full refresh, sent as <c>repo.changed</c> before this returns. One at a time per repo.
     /// </summary>
-    public async Task<T> CleanUpAsync<T>(RepoSession session, Func<string, Task<T>> run)
+    /// <param name="recount">Count unreachable commits again afterwards, with <c>git fsck</c>, as after keeping orphaned commits.</param>
+    public async Task<T> CleanUpAsync<T>(RepoSession session, bool recount, Func<string, Task<T>> run)
     {
         if (!session.TryStartCleanup())
             throw new CleanupLogException("A cleanup is already running in this repo. Wait for it to finish.");
@@ -132,16 +133,16 @@ internal sealed class RepoSessions(
         finally
         {
             session.EndCleanup();
-            await CatchUpAsync(session).ConfigureAwait(false);
+            await CatchUpAsync(session, recount).ConfigureAwait(false);
         }
     }
 
     /// <summary>A failure is logged, not thrown: the cleanup's own result matters more, and the next change tries again.</summary>
-    private async Task CatchUpAsync(RepoSession session)
+    private async Task CatchUpAsync(RepoSession session, bool recount)
     {
         try
         {
-            var state = await RefreshAsync(session.Id, includeUnreachable: false, session.Closing).ConfigureAwait(false);
+            var state = await RefreshAsync(session.Id, recount, session.Closing).ConfigureAwait(false);
             await notify(new RepoChanged([new RepoChange(ChangeKind.Everything, null)], state)).ConfigureAwait(false);
         }
         catch (Exception e) when (e is not OperationCanceledException)

@@ -207,11 +207,35 @@ public class CleanupPlannerTests(ScenarioSnapshots snapshots)
     }
 
     [Fact]
-    public async Task Orphaned_commits_wait_for_phase_5()
+    public async Task One_orphaned_commit_is_kept_under_a_tag_of_its_own_and_nothing_is_removed()
     {
-        var (_, plan) = await PlanAsync("OrphanedCommit");
+        var (repo, plan) = await PlanAsync("OrphanedCommit");
+        var commit = repo.UnreachableCommits.Single(c => c.Subject == "Experiment").Id;
+        var tag = $"archive/orphaned/{commit[..12]}-{Date}";
 
-        Assert.All(plan.Leftovers, l => Assert.Equal("Keeping orphaned commits comes later in this milestone, in phase 5.", l.Refused));
+        var step = Assert.Single(plan.Leftovers.Single(l => l.Leftover.Name == "1 commit").Steps);
+
+        Assert.Equal(
+            new Step("Backup", $"tag -a {tag} {commit} -F - < Kept by Diffract: 1 commit that was on no branch, tag, stash or reflog.", $"tag -d {tag}",
+                $"has {commit}", "Undo takes the tag away, and git may then delete the commit again."),
+            Describe(step));
+        Assert.Equal([$"refs/tags/{tag} on {commit}"], step.UndoExpects.Select(ExpectText));
+    }
+
+    [Fact]
+    public async Task Several_orphaned_commits_get_a_commit_made_to_hold_them_all_under_one_tag()
+    {
+        var (repo, plan) = await PlanAsync("OrphanedCommit");
+        var commits = repo.UnreachableCommits.Where(c => c.Subject.StartsWith("Agent host session", StringComparison.Ordinal)).ToList();
+        var newest = commits.MaxBy(c => c.CommittedAt)!.Id;
+
+        var step = Assert.Single(plan.Leftovers.Single(l => l.Leftover.Name == "2 commits").Steps);
+
+        Assert.Equal(StepKind.KeepCommits, step.Kind);
+        Assert.Equal(["commit-tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904", .. commits.SelectMany(c => new[] { "-p", c.Id }), "-F", "-"], step.Command!.Arguments);
+        Assert.Equal(["Diffract kept these commits"], step.Command.Input);
+        Assert.Equal(new KeepTag($"archive/orphaned/{newest[..12]}-{Date}", "Kept by Diffract: 2 commits that were on no branch, tag, stash or reflog."), step.Keep);
+        Assert.Equal([$"refs/tags/archive/orphaned/{newest[..12]}-{Date}"], step.UndoExpects.Select(e => ((Expectation.RefPresent)e).FullName));
     }
 
     public static TheoryData<string> AllScenarios => [.. FixtureRepoBuilder.ScenarioNames];

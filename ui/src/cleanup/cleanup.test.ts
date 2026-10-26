@@ -4,7 +4,7 @@ import planSample from "../../../tests/Diffract.Sidecar.Tests/Contract/cleanup.p
 import type { CleanupPlanView, CleanupResult, Leftover } from "../protocol";
 import { initialRows, type Row } from "../model/rows";
 import { sampleState } from "../testing/fakeSidecar";
-import { leaveOutOf, needsAttention, outcomeLine, plannedCount, stepKey, summarize } from "./outcome";
+import { keepsOnly, leaveOutOf, needsAttention, outcomeLine, plannedCount, stepKey, summarize } from "./outcome";
 import { isMergedBranch, selectable, selectedRows, toSelected, withMergedBranches } from "./selection";
 
 // Written by the sidecar's contract tests, from its own serializer.
@@ -73,6 +73,22 @@ describe("outcome", () => {
 
   it("counts the leftovers with steps, not the refused ones", () => {
     expect(plannedCount(plan)).toBe(2);
+  });
+
+  it("words a plan as keeping only when every planned leftover is orphaned commits", () => {
+    const orphaned = { kind: "OrphanedCommit" as const, name: "2 commits", path: null, refused: null, steps: [] };
+
+    expect(keepsOnly({ ...plan, leftovers: [orphaned, plan.leftovers[2]!] })).toBe(true);
+    expect(keepsOnly({ ...plan, leftovers: [orphaned, ...plan.leftovers] })).toBe(false);
+    expect(keepsOnly({ ...plan, leftovers: [plan.leftovers[2]!] })).toBe(false);
+  });
+
+  it("counts a keep step as a backup kept, not as something removed", () => {
+    const keep = { leftover: 0, step: 0, kind: "KeepCommits" as const, description: "Keep 2 commits", outcome: "Done" as const, reason: null };
+
+    const summary = summarize({ cleanupId: "x", steps: [keep] }, false);
+
+    expect([summary.done.length, summary.backups.length]).toEqual([0, 1]);
   });
 
   it("groups what a cleanup did: removed, kept as backups, and not done", () => {

@@ -25,6 +25,8 @@ public class RefRoundTripTests
     [InlineData("ToolStash")]
     [InlineData("StaleCheckpointSession")]
     [InlineData("OldArchiveTag")]
+    [InlineData("OrphanedCommit")]
+    [InlineData("DroppedCheckpointCommits")]
     public Task Every_kind_of_ref_is_removed_and_undo_puts_the_repo_back_where_it_started(string scenario) =>
         CleanupExecutorTests.RoundTripAsync(scenario);
 }
@@ -59,7 +61,7 @@ public class CleanupExecutorTests
         var applyCalls = fixture.Calls;
 
         AllDone(applied);
-        WithinBudget(applyCalls, applied, backups: applied.Steps.Any(s => s.Kind == StepKind.Backup));
+        WithinBudget(applyCalls, applied, backups: applied.Steps.Any(s => s.Kind is StepKind.Backup or StepKind.KeepCommits));
         var removed = plan.Leftovers.Where(l => l.Refused is null).Select(l => (l.Leftover.Kind, l.Leftover.Name)).ToList();
         Assert.NotEmpty(removed);
         Assert.DoesNotContain(await fixture.LeftoversAsync(), l => removed.Contains((l.Kind, l.Name)));
@@ -218,6 +220,27 @@ public class CleanupExecutorTests
         Assert.True(waiting.CanUndo);
         Assert.Equal([(undone.CleanupId, applied.CleanupId, false), (applied.CleanupId, null, false)], history.Select(c => (c.CleanupId, c.Undoes, c.CanUndo)));
         Assert.Equal(applied.Steps, history[1].Steps);
+    }
+
+    [Fact]
+    public async Task Keeping_orphaned_commits_tags_them_so_git_keeps_them_and_undo_lists_the_same_rows_again()
+    {
+        using var fixture = await CleanupFixture.BuildAsync("OrphanedCommit");
+        var before = (await fixture.LeftoversAsync()).Select(l => (l.Name, l.CommitsAtRisk)).ToList();
+        var executor = fixture.Executor();
+
+        var kept = await executor.ApplyAsync(await fixture.PlanAsync(), None);
+
+        AllDone(kept);
+        Assert.Equal(["Backup", "KeepCommits"], kept.Steps.Select(s => s.Kind.ToString()));
+        Assert.Empty(await fixture.GitAsync("fsck", "--unreachable", "--no-reflogs", "--no-progress"));
+        var tagged = (await fixture.GitAsync("for-each-ref", "--format=%(*subject)", "refs/tags/archive/orphaned/")).Split('\n');
+        Assert.Equal(["Diffract kept these commits", "Experiment"], tagged.Order());
+
+        AllDone(await executor.UndoAsync(kept.CleanupId, None));
+
+        // The commit made to hold them is unreachable again too, but it is Diffract's own and never a row.
+        Assert.Equal(before, (await fixture.LeftoversAsync()).Select(l => (l.Name, l.CommitsAtRisk)));
     }
 
     /// <summary>A refused leftover is not in the result: the dialog already said why.</summary>
