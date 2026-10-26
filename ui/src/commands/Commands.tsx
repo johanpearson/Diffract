@@ -21,6 +21,8 @@ export interface Commands {
   run<T>(spec: CommandSpec<T>): Promise<T | null>;
   /** A command is running. */
   busy: boolean;
+  /** What is running, such as a pull, which moves the branch: other changes wait for it. */
+  running: CommandKind | null;
 }
 
 const CommandsContext = createContext<Commands | null>(null);
@@ -45,8 +47,8 @@ export function CommandsProvider({ client, autoCloseMs = AutoCloseMs, children }
   useEffect(() => client.onNotification("command.output", (output) => setCurrent((run) => run && withOutput(run, output))), [client]);
   useAutoClose(current, autoCloseMs, () => setCurrent(null));
 
-  const busy = current?.state === "running";
-  const commands = useMemo<Commands>(() => ({ run: runner.run, busy }), [runner.run, busy]);
+  const running = current?.state === "running" ? current.kind : null;
+  const commands = useMemo<Commands>(() => ({ run: runner.run, busy: running !== null, running }), [runner.run, running]);
   return (
     <CommandsContext.Provider value={commands}>
       {children}

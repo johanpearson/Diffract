@@ -5,12 +5,12 @@ import type { Hunk, RepoState, WorktreeChanges, WorktreeInfo } from "../protocol
 import type { RpcClient } from "../rpc";
 import { ChangesDiff } from "./ChangesDiff";
 import { CommitBox } from "./CommitBox";
-import { samePath, worktreeOf } from "../model/worktrees";
+import { inUseReason, worktreeOf } from "../model/worktrees";
 import { listsOf, type Entry, type Lists } from "./entries";
 import { FileLists } from "./FileLists";
-import { RemoteActions } from "./RemoteBar";
+import { BranchInfo } from "../components/BranchInfo";
+import { useCommands } from "../commands/Commands";
 import { useChanges } from "./useChanges";
-import { useRemote } from "./useRemote";
 
 interface Props {
   client: RpcClient;
@@ -48,8 +48,7 @@ function ChangesBody({ client, state, worktree, worktrees, onWorktree, storage }
     <>
       <div className="bar">
         <h1 id="changes-title">Changes</h1>
-        {changes.status && <BranchInfo status={changes.status} />}
-        {changes.status && <RemoteActions status={changes.status} remote={model.remote} disabled={changes.busy || model.warning !== null} />}
+        {changes.status && <BranchInfo status={changes.status} live />}
         <WorktreePicker worktree={worktree} worktrees={worktrees} onWorktree={onWorktree} />
       </div>
       {model.warning && <InUseWarning reason={model.warning} onAccept={model.accept} />}
@@ -62,7 +61,7 @@ function ChangesBody({ client, state, worktree, worktrees, onWorktree, storage }
 /** One worktree's changes, the rows selected and what the user may do now. */
 function useChangesModel(client: RpcClient, state: RepoState, worktree: string) {
   const changes = useChanges(client, state.repoId, worktree);
-  const remote = useRemote(client, state.repoId, worktree, changes.apply);
+  const { running } = useCommands();
   const inUse = inUseReason(state, worktree);
   const [accepted, setAccepted] = useState(false);
   const lists = useMemo(() => (changes.status ? listsOf(changes.status, state.snapshot.worktrees) : null), [changes.status, state.snapshot.worktrees]);
@@ -80,9 +79,8 @@ function useChangesModel(client: RpcClient, state: RepoState, worktree: string) 
     onToggleHunk,
     warning,
     accept: () => setAccepted(true),
-    remote,
     // A pull moves the branch and the index, so nothing is staged or committed while it runs.
-    locked: changes.busy || warning !== null || remote.running === "pull",
+    locked: changes.busy || warning !== null || running === "pull",
   };
 }
 
@@ -130,24 +128,6 @@ function Reading({ shown }: { shown: boolean }) {
   return shown ? <p className="empty">Reading the changes…</p> : null;
 }
 
-function BranchInfo({ status }: { status: WorktreeChanges }) {
-  return (
-    <>
-      <span className="ref branch">{status.branch ?? `detached at ${status.headCommit?.slice(0, 8) ?? "nothing yet"}`}</span>
-      <span className="muted" role="status">
-        {upstreamText(status)}
-      </span>
-    </>
-  );
-}
-
-function upstreamText({ upstream, ahead, behind }: WorktreeChanges): string {
-  if (upstream === null) return "No upstream";
-  if (ahead === null || behind === null) return `${upstream} is gone`;
-  if (ahead === 0 && behind === 0) return `Up to date with ${upstream}`;
-  const parts = [ahead > 0 ? `${ahead} ahead` : null, behind > 0 ? `${behind} behind` : null].filter((p) => p !== null);
-  return `${parts.join(", ")} ${upstream}`;
-}
 
 function WorktreePicker({ worktree, worktrees, onWorktree }: { worktree: string; worktrees: WorktreeInfo[]; onWorktree(path: string): void }) {
   if (worktrees.length < 2) return <span className="muted">{worktree}</span>;
@@ -177,10 +157,6 @@ function InUseWarning({ reason, onAccept }: { reason: string; onAccept(): void }
 }
 
 /** Why the leftover rules say an agent is using this worktree, or null. */
-function inUseReason(state: RepoState, worktree: string): string | null {
-  const leftover = state.leftovers.find((l) => l.kind === "Worktree" && l.verdict === "InUse" && l.path !== null && samePath(l.path, worktree));
-  return leftover?.reason ?? null;
-}
 
 
 /**

@@ -205,13 +205,17 @@ Johan's notes from 2026-10-26, each fixed in its own PR, with tests:
    - **Tags.**
    - **Worktrees**, closed by default, with its menu from milestone 2. Agent cleanup lands here in milestone 5.
 
-   Clicking a branch, remote branch or tag selects its commit in History and scrolls to it. Double-clicking a branch, or "Switch to" in its right-click menu, switches to it with `git switch`, which refuses rather than overwrite uncommitted work, as in decision 10. For a remote branch it creates the local branch that tracks it.
-4. **Fetch, Pull and Push in the top bar**, on every view, with ahead and behind counts. Until now they were only in Changes. They act on the current branch of the worktree the repo was opened from, as decisions 6 and 7 say.
+   Clicking a branch, remote branch or tag selects its commit in History and scrolls to it. Double-clicking a branch, or "Switch to" in its right-click menu, switches to it with `git switch`, which refuses rather than overwrite uncommitted work, as in decision 10. For a remote branch it creates the local branch that tracks it. Done in #55.
+4. **Fetch, Pull and Push in the top bar**, on every view, with ahead and behind counts. Until now they were only in Changes. They act on the current branch of the worktree the repo was opened from, as decisions 6 and 7 say, and they leave a worktree an agent is using alone. They are no longer in the Changes bar, so there is one place for them. Done in #59.
 5. **A command window** for everything that runs git and takes more than a moment: fetch, pull, push, commit, switch, reset, and creating a branch or tag. It shows the command, git's output as it arrives, and the result in plain words.
    - It closes by itself about 1.5 seconds after a command succeeds. When git fails or warns, it stays open with the whole output until closed.
    - Each kind of command has its own short animation while it runs: arrows coming down for fetch, a branch moving forward for pull, arrows going up for push, a new dot on the line for commit, a branch swinging over for switch. With Windows' "reduce motion" setting on, it shows a still icon instead.
    - Staging and unstaging stay instant and show no window.
    - To show git's progress while it runs, fetch and push get `--progress` on the changes allowlist, and the sidecar sends git's output lines to the UI as they arrive.
+   - After a reset the window stays open with "Undo reset". It replaces the notes that had to be dismissed, such as "Switched to main", which Johan asked to be rid of on 2026-10-26.
+
+   Done in #57 and #58.
+6. **Stage hunk covered the code** in the inline diff, and could not be clicked where it did. It now sits on its own line above the change. Done in #56.
 
 **Checkpoint:** Johan signs off, and dogfooding starts.
 

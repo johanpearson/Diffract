@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { AppInfo } from "../protocol";
 
 interface Props {
@@ -7,13 +8,16 @@ interface Props {
   /** Git for Windows is being updated, which blocks opening a repo. */
   updating: boolean;
   onOpen(): Promise<void>;
+  /** The open repo's branch bar, next to the name. */
+  children?: ReactNode;
 }
 
-/** The app name, the git and sidecar versions, and "Open repo…". */
-export function TopBar({ info, canOpen, updating, onOpen }: Props) {
+/** The app name, the open repo's branch with Fetch, Pull and Push, the git and sidecar versions, and "Open repo…". */
+export function TopBar({ info, canOpen, updating, onOpen, children }: Props) {
   return (
     <header className="topbar">
       <span className="brand">Diffract</span>
+      {children}
       <span className="grow" />
       {info && (
         <span className="versions">

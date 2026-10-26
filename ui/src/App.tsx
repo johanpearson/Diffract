@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { CommandsProvider } from "./commands/Commands";
+import { BranchBar } from "./components/BranchBar";
 import { GitUpdateConfirmDialog, GitUpdateOffer, GitUpdateOutcome } from "./components/GitUpdatePrompts";
 import type { Filter } from "./components/LeftoversView";
 import type { View } from "./components/Tabs";
@@ -78,7 +79,9 @@ function AppScreens({ host, client, clock = systemClock, initialView = "history"
 
   return (
     <div className="app">
-      <TopBar info={info} canOpen={repo.screen.kind !== "starting" && repo.screen.kind !== "gitProblem"} updating={git.running} onOpen={repo.pickAndOpen} />
+      <TopBar info={info} canOpen={repo.screen.kind !== "starting" && repo.screen.kind !== "gitProblem"} updating={git.running} onOpen={repo.pickAndOpen}>
+        {ready && <BranchBar key={ready.repoId} client={client} state={ready} worktree={work.current.path} />}
+      </TopBar>
       <GitUpdateOutcome git={git} offered={offered} onDownloadPage={openDownloadPage} />
       <GitUpdateOffer git={git} info={info} offered={offered} />
       <Notice message={notice} onDismiss={() => setNotice(null)} />
