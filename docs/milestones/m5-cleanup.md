@@ -103,6 +103,8 @@ Any row can be hidden with "Hide", and the summary counts leave it out. A hidden
 
 A plan is kept by the sidecar and applied by id, so the UI can never apply something different from what it showed. Contract samples for every shape, as in milestone 2. Live refresh pauses while a cleanup runs, as it does during a git update, and catches up once afterwards.
 
+**Done** 2026-10-26, in #67. A plan is applied once, and only one cleanup runs per repo at a time. `cleanup.apply` can leave out a step the dialog gives its own checkbox, such as a worktree's branch. Live refresh pauses only for the repo being cleaned up. A plan is refused until the scan after opening has listed the leftovers.
+
 ## Phase 4: the view
 
 From the visual plan:
