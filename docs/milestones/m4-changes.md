@@ -1,6 +1,6 @@
 # Milestone 4: changes and commit
 
-**Status:** in progress. Phases 0 to 7 are done; phase 8, the real-world check, is under way.
+**Status:** done (2026-10-26)
 **Estimate:** about 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan does a day of his own work in Diffract: he stages files and hunks, commits, pulls and pushes from the installed app, and stops opening Git Extensions for it. This is the checkpoint where dogfooding starts.
 
@@ -219,16 +219,18 @@ Johan's notes from 2026-10-26, each fixed in its own PR, with tests:
 
 **Checkpoint:** Johan signs off, and dogfooding starts.
 
+**Done** 2026-10-26. Johan used the app, sent the fixes above, and signed off once #52 to #60 were merged.
+
 ## Acceptance criteria
 
-- [ ] All tests pass locally and in CI, and the installer is built on every run.
-- [ ] Every write runs through the changes runner, and a test proves it rejects anything not on its allowlist.
-- [ ] Every parser has tests against captured real git output.
-- [ ] Staging a hunk stages exactly that hunk, proven in fixture repos for every case in phase 0.
-- [ ] Nothing in this milestone forces, skips hooks, deletes a lock or throws away a change.
-- [ ] Pull and push are tested against a bare fixture remote, never a real one.
-- [ ] No test or agent ever writes to a repo outside a temp folder.
-- [ ] Johan has worked a day in Diffract and signs off.
+- [x] All tests pass locally and in CI, and the installer is built on every run.
+- [x] Every write runs through the changes runner, and a test proves it rejects anything not on its allowlist.
+- [x] Every parser has tests against captured real git output.
+- [x] Staging a hunk stages exactly that hunk, proven in fixture repos for every case in phase 0.
+- [x] Nothing in this milestone forces, skips hooks, deletes a lock or throws away a change.
+- [x] Pull and push are tested against a bare fixture remote, never a real one.
+- [x] No test or agent ever writes to a repo outside a temp folder.
+- [x] Johan has worked a day in Diffract and signs off.
 
 ## Out of scope for milestone 4
 

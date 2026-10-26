@@ -6,7 +6,7 @@ Personal project. Windows only.
 
 ## Status
 
-Current milestone: [docs/milestones/m4-changes.md](docs/milestones/m4-changes.md), changes and commit. Milestone 3, [the history graph](docs/milestones/m3-history.md), is done. Milestone 2, [the Tauri shell, sidecar and live worktree view](docs/milestones/m2-shell.md), is done. Safe cleanup moved to milestone 5 and is planned in [docs/milestones/m5-cleanup.md](docs/milestones/m5-cleanup.md). Milestone 1, [the spike for the repo snapshot and agent leftover rules](docs/milestones/m1-spike.md), is done.
+Current milestone: [docs/milestones/m5-cleanup.md](docs/milestones/m5-cleanup.md), safe cleanup with backup tags and undo, stashes, and pruning remote branches. Milestone 4, [changes and commit](docs/milestones/m4-changes.md), is done, and dogfooding has started. Milestone 3, [the history graph](docs/milestones/m3-history.md), is done. Milestone 2, [the Tauri shell, sidecar and live worktree view](docs/milestones/m2-shell.md), is done. Milestone 1, [the spike for the repo snapshot and agent leftover rules](docs/milestones/m1-spike.md), is done.
 
 ## Docs
 
