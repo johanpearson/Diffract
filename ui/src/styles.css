@@ -1457,7 +1457,9 @@ body {
 }
 
 /* The line above a change in the diff that holds its Stage hunk or Unstage hunk button. */
+/* Placed by its zone above the change; see ActionZones in monacoEditor.ts. */
 .change-action {
+  position: absolute;
   display: flex;
   align-items: center;
   padding-left: 8px;
