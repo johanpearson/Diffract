@@ -117,6 +117,8 @@ From the visual plan:
 
 Tests: Vitest for the dialog and the result, against contract samples. Playwright: select, confirm, see the rows go, undo, see them come back.
 
+**Done** 2026-10-26, in #68. "Select all merged branches" ticks the local branches that are safe to remove, which the rules give only to merged branches and branches whose upstream is gone. A ticked row that goes away or into use drops out of the selection. The dialog opens with Cancel focused, as the Git update dialog does.
+
 ## Phase 5: old backup tags and orphaned commits
 
 Old backup tags are removed like any other leftover. Orphaned commits get "Keep these", which saves them under one `archive/` tag.
