@@ -98,12 +98,14 @@ diffract/
 2. Tauri shell, sidecar and live worktree view. Includes "Open terminal here" for the repo and each worktree (Windows Terminal, falling back to PowerShell), and a git version check at startup that offers to update Git for Windows through winget when git is older than 2.40 or a newer release exists. The update only runs after the user confirms. (Done)
 3. History graph. History becomes the view a repo opens on, because using a repo comes first and cleanup second. Opening a repo shows history and status first; the leftover scan, `git fsck` included, runs in the background and never makes the user wait. (Done)
 4. Changes and commit. *Checkpoint: start dogfooding.*
-5. Safe cleanup with backup tags and undo.
-6. Repo setup and settings. Includes a setting that turns on git's own background maintenance, so git keeps a commit-graph file that makes history load faster (see `docs/findings/history.md`).
+5. Safe cleanup with backup tags and undo. Includes a stash view (save, apply, drop with undo) and pruning remote branches.
+6. Repo setup and settings. Includes a setting that turns on git's own background maintenance, so git keeps a commit-graph file that makes history load faster (see `docs/findings/history.md`). Also: clone a repo and init a new one, a list of recent repos, several repos open at once, and blame and the history of one file.
 7. Merge and conflict resolution.
 8. Interactive rebase. *v1.*
 9. Visual experiments. Includes trying a terminal embedded in the app.
 
 On 2026-10-21 Johan moved history and changes ahead of cleanup, which was milestone 3: Diffract becomes something he uses every day once it can replace Git Extensions for daily work, and that comes before cleaning up.
+
+On 2026-10-26, after his first day of use, Johan added a stash view and pruning remote branches to milestone 5, since both need its backup and undo, and clone, init, recent repos, several repos open at once, blame and the history of one file to milestone 6. Polishing the UI and UX waits until these are in place.
 
 Each milestone may revisit how earlier views feel and perform, as new views change what matters most. Changes like that are proposed in the milestone's PR, as any other change to the plan.

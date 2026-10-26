@@ -1,4 +1,4 @@
-# Milestone 5: safe cleanup with backup tags and undo
+# Milestone 5: safe cleanup with backup tags and undo, stashes, and pruning remote branches
 
 **Status:** planned. Starts after milestone 4. Johan made the phase 0 decisions on 2026-10-21; checking the commands against fixture repos is still to do.
 **Estimate:** 1 to 2 weeks of evenings, as in the visual plan.
@@ -9,7 +9,7 @@ This is the first milestone where Diffract changes a repo. It turns the leftover
 ## Two kinds of writes
 
 - **Diffract writes to real repos** when the user confirms a cleanup. That is the product working.
-- **Coding agents still never do.** The safety rules in `AGENTS.md` do not change. Every test writes only to fixture repos in a temp folder. Agents never run a cleanup against one of Johan's repos, not even to try it. Johan does the real-world check himself, in phase 7.
+- **Coding agents still never do.** The safety rules in `AGENTS.md` do not change. Every test writes only to fixture repos in a temp folder. Agents never run a cleanup against one of Johan's repos, not even to try it. Johan does the real-world check himself, in phase 9.
 
 ## Principles
 
@@ -108,9 +108,32 @@ Old backup tags are removed like any other leftover. Orphaned commits get "Keep 
 
 As described under "Hiding rows" in phase 0. Tests: a hidden row stays hidden across a refresh and a restart, comes back when it changes, and is never part of a cleanup unless it is shown again.
 
-## Phase 7: real-world check
+## Phase 7: the stash view
 
-1. Johan installs the CI build and cleans up his busiest repos: the Copilot worktrees, gone branches and checkpoint sessions milestone 1 found.
+Added on 2026-10-26, when Johan listed what he misses from Git Extensions. It belongs here because dropping a stash throws work away, and this milestone brings the backup and undo for that. A first proposal:
+
+- **Where:** a Stashes section in the sidebar, under Tags, closed by default. Clicking a stash shows its changes, as a commit in History does. "Stash changes" sits next to the commit box in Changes.
+- **Save:** `git stash push -m <message>`, with "Include new files" for `--include-untracked`. Everything stays in the stash, so nothing is lost. It runs in the command window.
+- **Apply:** `git stash apply <commit>`, by the stash's commit, never `stash@{n}`, since the list shifts as agents stash too. The stash is kept. When applying ends in conflicts, the stash is still there, Changes lists the conflicted files, and resolving them comes with milestone 7. Diffract never runs `stash pop`.
+- **Apply and drop:** apply, then drop only when the apply was clean.
+- **Drop:** the same step as cleaning up a stash leftover: a backup tag first, then `git stash drop`, and "Undo" puts it back with `git stash store`.
+- **Allowlist:** `stash push -m -` (the message on standard input, as for commits) and `stash apply <commit>` go on the changes runner. Drop and store are on the cleanup runner already.
+- **Tests:** fixture repos for save with and without new files, apply by commit after another stash moved the list, an apply that conflicts and keeps the stash, and drop then undo.
+
+## Phase 8: prune remote branches
+
+Added on 2026-10-26, like the stash view. Git keeps a remote-tracking branch, such as `origin/fix-1`, after the branch is deleted on the remote, often after its pull request merged. Git Extensions has "Prune remote branches" for this. A first proposal:
+
+- **Plan, then apply, as for any cleanup.** Diffract asks the remote which branches it has, with `git ls-remote --heads <remote>`, which only reads. The confirm dialog lists the remote-tracking branches the remote no longer has. Confirming removes each with `git branch -d -r`, which is local only and never touches the remote.
+- **No backup tags,** as in decision 8 for branches whose upstream is gone: these were almost always merged. The operation log can put them back with `git update-ref` while git keeps the commits, and the dialog says so.
+- **Where:** "Prune remote branches" on each remote in the sidebar's Remotes section, and next to Fetch in the branch bar at the top. It runs in the command window.
+- **Allowlist:** `ls-remote --heads <remote>` on the read-only runner. It reads from the network, so it gets the network timeout fetch has.
+- **Tests:** a bare fixture remote with a branch deleted after it was fetched: the dialog lists exactly that branch, removing it leaves every other ref, and undo brings it back. A remote that cannot be reached removes nothing and says why.
+- **Later:** the "prune on fetch" setting in milestone 6 makes git do this on every fetch. This command is for doing it when you choose.
+
+## Phase 9: real-world check
+
+1. Johan installs the CI build and cleans up his busiest repos: the Copilot worktrees, gone branches and checkpoint sessions milestone 1 found. He also stashes, applies and drops, and prunes remote branches.
 2. He undoes at least one cleanup of each kind.
 3. Every surprise becomes a test and a fix.
 
