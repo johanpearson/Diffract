@@ -2,16 +2,14 @@ import type { RemoteOutcome, WorktreeChanges } from "../protocol";
 
 export type RemoteKind = "fetch" | "pull" | "push";
 
-/** How a result shows: "ok" quietly in the bar, the others as a notice that stays until dismissed. */
-export type RemoteTone = "ok" | "warn" | "error";
+/** "warn" when git left the branch as it was and the user has something to do about it. */
+export type RemoteTone = "ok" | "warn";
 
 /** A button's text, and why it cannot run, or null when it can. */
 export interface RemoteAction {
   label: string;
   reason: string | null;
 }
-
-export const runningText: Record<RemoteKind, string> = { fetch: "Fetching…", pull: "Pulling…", push: "Pushing…" };
 
 /** Diverged and Rejected left the branch as it was, and the user has something to do about it. */
 export function toneOf(outcome: RemoteOutcome): RemoteTone {

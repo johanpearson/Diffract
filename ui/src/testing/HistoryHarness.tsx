@@ -1,3 +1,4 @@
+import { CommandsProvider } from "../commands/Commands";
 import type { AppHost } from "../host";
 import { HistoryView } from "../history/HistoryView";
 import { useRepoWork } from "../model/useRepoWork";
@@ -12,8 +13,16 @@ interface Props {
   openedPath?: string;
 }
 
-/** History as the app shows it, with the history and branch actions it shares with the sidebar. */
-export function HistoryHarness({ client, state, now, storage, openedPath = state.repoRoot }: Props) {
+/** History as the app shows it, with the history and branch actions it shares with the sidebar, and the command window. */
+export function HistoryHarness(props: Props) {
+  return (
+    <CommandsProvider client={props.client}>
+      <History {...props} />
+    </CommandsProvider>
+  );
+}
+
+function History({ client, state, now, storage, openedPath = state.repoRoot }: Props) {
   const work = useRepoWork(client, state, openedPath, storage);
   return <HistoryView client={client} state={state} now={now} work={work} storage={storage} />;
 }

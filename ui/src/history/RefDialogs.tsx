@@ -6,8 +6,6 @@ import type { ResetPreview } from "./resetPreview";
 interface ShellProps {
   title: string;
   busy: boolean;
-  /** Why the action failed, from git or the sidecar. */
-  error: string | null;
   submitLabel: string;
   canSubmit: boolean;
   onSubmit(): void;
@@ -16,7 +14,7 @@ interface ShellProps {
 }
 
 /** A modal form: Escape or Cancel closes it, Enter submits it when it can. */
-function DialogShell({ title, busy, error, submitLabel, canSubmit, onSubmit, onCancel, children }: ShellProps) {
+function DialogShell({ title, busy, submitLabel, canSubmit, onSubmit, onCancel, children }: ShellProps) {
   const titleId = useId();
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape") onCancel();
@@ -30,11 +28,6 @@ function DialogShell({ title, busy, error, submitLabel, canSubmit, onSubmit, onC
       <form className="dialog ref-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onKeyDown} onSubmit={submit}>
         <h1 id={titleId}>{title}</h1>
         {children}
-        {error && (
-          <p className="dialog-error" role="alert">
-            {error}
-          </p>
-        )}
         <div className="panel-actions">
           <button type="button" className="abtn" onClick={onCancel}>
             Cancel
@@ -55,13 +48,12 @@ interface NameProps {
   repoId: string;
   worktree: string;
   busy: boolean;
-  error: string | null;
   onCreate(name: string, extra: { switchTo: boolean; message: string }): void;
   onCancel(): void;
 }
 
 /** Asks for a new branch or tag's name, and says before anything runs if git would not take it. */
-export function NameDialog({ kind, commit, client, repoId, worktree, busy, error, onCreate, onCancel }: NameProps) {
+export function NameDialog({ kind, commit, client, repoId, worktree, busy, onCreate, onCancel }: NameProps) {
   const [name, setName] = useState("");
   const [switchTo, setSwitchTo] = useState(true);
   const [message, setMessage] = useState("");
@@ -71,7 +63,6 @@ export function NameDialog({ kind, commit, client, repoId, worktree, busy, error
     <DialogShell
       title={`Create ${noun} at ${commit.id.slice(0, 8)}`}
       busy={busy}
-      error={error}
       submitLabel={`Create ${noun}`}
       canSubmit={name.trim() !== "" && !check.checking && check.problem === null}
       onSubmit={() => onCreate(name, { switchTo, message })}
@@ -125,7 +116,6 @@ interface ResetProps {
   commit: CommitEntry;
   preview: ResetPreview;
   busy: boolean;
-  error: string | null;
   onReset(mode: ResetMode): void;
   onCancel(): void;
 }
@@ -139,10 +129,10 @@ const modes: { mode: ResetMode; label: string; detail: string }[] = [
 const listed = 8;
 
 /** Says which commits leave the branch and asks soft or mixed. Files are never touched either way. */
-export function ResetDialog({ branch, commit, preview, busy, error, onReset, onCancel }: ResetProps) {
+export function ResetDialog({ branch, commit, preview, busy, onReset, onCancel }: ResetProps) {
   const [mode, setMode] = useState<ResetMode>("Soft");
   return (
-    <DialogShell title={`Reset ${branch} to ${commit.id.slice(0, 8)}?`} busy={busy} error={error} submitLabel="Reset" canSubmit onSubmit={() => onReset(mode)} onCancel={onCancel}>
+    <DialogShell title={`Reset ${branch} to ${commit.id.slice(0, 8)}?`} busy={busy} submitLabel="Reset" canSubmit onSubmit={() => onReset(mode)} onCancel={onCancel}>
       <LeavingCommits branch={branch} preview={preview} />
       {preview.pushedTo && (
         <p className="warn-text" role="note">

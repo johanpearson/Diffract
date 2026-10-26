@@ -6,6 +6,7 @@ import type {
   AppInfo,
   CommitDetails,
   CommitEntry,
+  GitOutputKind,
   GitInUse,
   GitUpdateCheck,
   GitUpdateResult,
@@ -208,7 +209,19 @@ export class FakeSidecar {
     for (const answer of this.waiting.splice(0)) answer();
   }
 
+  /** What git "says" during the next request that names an operation, after the command line. */
+  gitSays: { kind: GitOutputKind; text: string }[] = [];
+
+  /** As the sidecar does for a request that names an operation: the command, then git's lines, before the answer. */
+  private watch(method: keyof Methods, params: unknown): void {
+    const operation = (params as { operation?: string } | undefined)?.operation;
+    if (!operation) return;
+    const lines = [{ kind: "Command" as const, text: `git ${method.slice(method.indexOf(".") + 1)}` }, ...this.gitSays.splice(0)];
+    for (const line of lines) this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "command.output", params: { operation, ...line } }));
+  }
+
   private answer(method: keyof Methods, params: unknown): unknown {
+    this.watch(method, params);
     const failure = this.failures.get(method);
     if (failure) {
       this.failures.delete(method);

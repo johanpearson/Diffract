@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import type { ChangeAction, FileSides } from "../history/monacoEditor";
 import { RpcClient } from "../rpc";
 import { FakeSidecar, sampleState } from "../testing/fakeSidecar";
+import { CommandsProvider } from "../commands/Commands";
 import { ChangesView } from "./ChangesView";
 
 // jsdom runs no Monaco. This stand-in records what the view shows and the change buttons it was given.
@@ -34,7 +35,12 @@ const agentWorktree = "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix";
 const storage = { get: () => null, set: () => {} };
 
 function setup(sidecar = new FakeSidecar(), openedPath = mainWorktree) {
-  render(<ChangesView client={new RpcClient(sidecar.transport)} state={sampleState} openedPath={openedPath} storage={storage} />);
+  const client = new RpcClient(sidecar.transport);
+  render(
+    <CommandsProvider client={client} autoCloseMs={20}>
+      <ChangesView client={client} state={sampleState} openedPath={openedPath} storage={storage} />
+    </CommandsProvider>,
+  );
   return sidecar;
 }
 
@@ -42,6 +48,8 @@ const lists = () => screen.getByRole("listbox", { name: "Changed files" });
 const group = (name: "Unstaged" | "Staged") => within(lists()).getByRole("group", { name: new RegExp(`^${name}`) });
 const rows = (name: "Unstaged" | "Staged") => within(group(name)).queryAllByRole("option").map((o) => o.textContent);
 const selected = () => within(lists()).getByRole("option", { selected: true });
+const commandWindow = () => screen.getByRole("dialog");
+const windowClosed = () => waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 const commitButton = () => screen.getByRole("button", { name: /^(Commit|Amend)/ });
 
 async function ready() {
@@ -151,6 +159,9 @@ describe("the Changes view", () => {
     fireEvent.click(commitButton());
 
     await waitFor(() => expect(rows("Staged")).toEqual([]));
+    expect(within(commandWindow()).getByRole("heading").textContent).toBe("Commit");
+    expect(commandWindow().textContent).toMatch(/Committed [0-9a-f]{8}: Explain the shop/);
+    await windowClosed();
     expect(sidecar.worktree(mainWorktree).commits).toEqual([{ message: "Explain the shop\n\nIn the README.", amend: false }]);
     expect((message as HTMLTextAreaElement).value).toBe("");
     expect(screen.getByRole("status").textContent).toBe("2 ahead origin/main");
@@ -290,17 +301,24 @@ describe("the Changes view", () => {
 describe("fetch, pull and push", () => {
   const remote = () => screen.getByRole("group", { name: "Remote" });
   const button = (name: string | RegExp) => within(remote()).getByRole("button", { name });
+  const gitOutput = () => within(commandWindow()).getByRole("log", { name: "Git output" });
 
-  it("says where push goes, pushes, and shows the result and the new counts", async () => {
+  it("says where push goes, pushes in the command window with git's output, and shows the new counts", async () => {
     const sidecar = setup();
+    sidecar.gitSays = [
+      { kind: "Progress", text: "Writing objects:  50% (1/2)" },
+      { kind: "Line", text: "Writing objects: 100% (2/2), done." },
+    ];
     await ready();
 
     fireEvent.click(button("Push to origin/main"));
 
-    await waitFor(() => expect(remote().textContent).toContain("Pushed main to origin/main."));
+    await waitFor(() => expect(commandWindow().textContent).toContain("Pushed main to origin/main."));
+    expect(within(commandWindow()).getByRole("heading").textContent).toBe("Push to origin/main");
+    expect([...gitOutput().children].map((line) => line.textContent)).toEqual(["> git push", "Writing objects: 100% (2/2), done."]);
+    await windowClosed();
     expect(screen.getByRole("status").textContent).toBe("Up to date with origin/main");
     expect(sidecar.remoteAsked).toEqual([`remote.push ${mainWorktree}`]);
-    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("offers a branch without an upstream a push to a new branch on origin, and no pull", async () => {
@@ -320,7 +338,7 @@ describe("fetch, pull and push", () => {
     expect(button("Fetch").hasAttribute("disabled")).toBe(true);
   });
 
-  it("says when pull could not fast-forward, until dismissed", async () => {
+  it("keeps the window open when pull could not fast-forward, until it is closed", async () => {
     const sidecar = new FakeSidecar();
     const wt = sidecar.worktree(mainWorktree);
     wt.status = { ...wt.status, behind: 2 };
@@ -329,13 +347,15 @@ describe("fetch, pull and push", () => {
 
     fireEvent.click(button("Pull"));
 
-    const notice = await screen.findByRole("alert");
-    expect(notice.textContent).toContain("main and origin/main have both moved on.");
-    fireEvent.click(within(notice).getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByRole("alert")).toBeNull();
+    const reason = await within(commandWindow()).findByRole("alert");
+    expect(reason.textContent).toContain("main and origin/main have both moved on.");
+    expect(within(commandWindow()).getByRole("status").textContent).toBe("Nothing was changed");
+    await new Promise((r) => setTimeout(r, 60));
+    fireEvent.click(within(commandWindow()).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("shows what is running with Cancel, and cancelling leaves nothing to read", async () => {
+  it("cancels from the window, which then closes with nothing to read, and leaves staging free meanwhile", async () => {
     const sidecar = new FakeSidecar();
     sidecar.held.add("remote.fetch");
     setup(sidecar);
@@ -343,13 +363,14 @@ describe("fetch, pull and push", () => {
 
     fireEvent.click(button("Fetch"));
 
-    expect(remote().textContent).toContain("Fetching…");
-    expect(within(remote()).queryByRole("button", { name: "Fetch" })).toBeNull();
+    expect(within(commandWindow()).getByRole("status").textContent).toBe("Running");
+    expect(button("Fetch").hasAttribute("disabled")).toBe(true);
+    expect(within(commandWindow()).queryByRole("button", { name: "Close" })).toBeNull();
     expect(within(group("Unstaged")).getAllByRole("button", { name: /^Stage/ })[0]!.hasAttribute("disabled")).toBe(false);
-    fireEvent.click(button("Cancel"));
-    await waitFor(() => expect(button("Fetch")).toBeTruthy());
+    fireEvent.click(within(commandWindow()).getByRole("button", { name: "Cancel" }));
+    await windowClosed();
+    expect(button("Fetch").hasAttribute("disabled")).toBe(false);
     expect(sidecar.transport.sent.some((m) => m.method === "$/cancelRequest")).toBe(true);
-    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("holds staging while a pull runs, as it moves the branch", async () => {
@@ -360,13 +381,14 @@ describe("fetch, pull and push", () => {
 
     fireEvent.click(button("Pull"));
 
-    expect(remote().textContent).toContain("Pulling…");
     expect(within(group("Unstaged")).getAllByRole("button", { name: /^Stage/ })[0]!.hasAttribute("disabled")).toBe(true);
     act(() => sidecar.release());
-    await waitFor(() => expect(remote().textContent).toContain("Nothing to pull."));
+    await waitFor(() => expect(commandWindow().textContent).toContain("Nothing to pull."));
+    await windowClosed();
+    expect(within(group("Unstaged")).getAllByRole("button", { name: /^Stage/ })[0]!.hasAttribute("disabled")).toBe(false);
   });
 
-  it("shows git's own words when the remote cannot be reached", async () => {
+  it("shows git's own words when the remote cannot be reached, until closed", async () => {
     const sidecar = new FakeSidecar();
     sidecar.failures.set("remote.fetch", {
       error: {
@@ -380,6 +402,7 @@ describe("fetch, pull and push", () => {
 
     fireEvent.click(button("Fetch"));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("fatal: unable to access");
+    expect((await within(commandWindow()).findByRole("alert")).textContent).toContain("fatal: unable to access");
+    expect(within(commandWindow()).getByRole("status").textContent).toBe("Failed");
   });
 });

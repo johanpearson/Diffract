@@ -91,28 +91,44 @@ test("moves through a file's changes from the bar above the diff and stages one"
   expect(asked.at(-1)).toMatchObject({ method: "changes.stage", hunk: { path: "src/Cart.cs", id: "cart-round" } });
 });
 
-test("pushes to the upstream the button names, and the bar shows it is up to date", async ({ page }) => {
+const commandWindow = (page: Page) => page.getByRole("dialog");
+
+test("pushes in the command window, which closes by itself, and the bar shows it is up to date", async ({ page }) => {
   await openChanges(page);
   const remote = page.getByRole("group", { name: "Remote" });
 
   await remote.getByRole("button", { name: "Push to origin/main" }).click();
 
-  await expect(remote).toContainText("Pushed main to origin/main.");
+  await expect(commandWindow(page)).toContainText("Pushed main to origin/main.");
+  await expect(commandWindow(page).getByRole("log", { name: "Git output" })).toContainText("> git push");
+  await expect(commandWindow(page)).toBeHidden();
   await expect(page.getByText("Up to date with origin/main")).toBeVisible();
   expect(await page.evaluate(() => window.diffractTest.sidecar.remoteAsked)).toEqual([`remote.push ${repoRoot}`]);
 });
 
-test("a fetch can be cancelled from the bar", async ({ page }) => {
+test("a fetch can be cancelled from the command window", async ({ page }) => {
   await openChanges(page);
   await page.evaluate(() => window.diffractTest.sidecar.held.add("remote.fetch"));
   const remote = page.getByRole("group", { name: "Remote" });
 
   await remote.getByRole("button", { name: "Fetch" }).click();
-  await expect(remote).toContainText("Fetching…");
-  await remote.getByRole("button", { name: "Cancel" }).click();
+  await expect(commandWindow(page).getByRole("status")).toHaveText("Running");
+  await expect(commandWindow(page).locator("svg.command-animation")).toHaveClass(/is-running/);
+  await commandWindow(page).getByRole("button", { name: "Cancel" }).click();
 
+  await expect(commandWindow(page)).toBeHidden();
   await expect(remote.getByRole("button", { name: "Fetch" })).toBeEnabled();
-  await expect(page.getByRole("alert").filter({ hasText: /fetch|cancel/i })).toHaveCount(0);
+});
+
+test("the animation moves, and stands still with reduce motion on", async ({ page }) => {
+  await openChanges(page);
+  await page.evaluate(() => window.diffractTest.sidecar.held.add("remote.fetch"));
+  await page.getByRole("group", { name: "Remote" }).getByRole("button", { name: "Fetch" }).click();
+  const drop = commandWindow(page).locator(".anim-drop").first();
+
+  await expect.poll(() => drop.evaluate((el) => getComputedStyle(el).animationName)).toBe("anim-drop");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect.poll(() => drop.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
 });
 
 for (const layout of ["Side by side", "Inline"]) {

@@ -80,8 +80,13 @@ describe("the history row's menu", () => {
     fireEvent.click(create);
 
     expect(await screen.findByText(`Created branch fix/räksmörgås at ${root.id.slice(0, 8)}, and switched to it.`)).toBeTruthy();
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(sidecar.refsAsked.at(-1)).toEqual({ method: "branch.create", params: { repoId: "1", worktree: sampleState.repoRoot, commit: root.id, name: "fix/räksmörgås", switch: true } });
+    // The command window took over from the dialog.
+    expect(screen.getByRole("dialog").textContent).toContain("Create branch fix/räksmörgås");
+    expect(screen.queryByRole("dialog", { name: /^Create branch at/ })).toBeNull();
+    expect(sidecar.refsAsked.at(-1)).toEqual({
+      method: "branch.create",
+      params: { repoId: "1", worktree: sampleState.repoRoot, commit: root.id, name: "fix/räksmörgås", switch: true, operation: expect.stringMatching(/^op-/) },
+    });
   });
 
   it("creates a tag with its message", async () => {
