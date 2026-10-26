@@ -1,6 +1,6 @@
 # Milestone 5: safe cleanup with backup tags and undo
 
-**Status:** planned. Starts after milestone 4. Johan made the phase 0 decisions on 2026-10-21; checking the commands against fixture repos is still to do.
+**Status:** in progress. Johan made the phase 0 decisions on 2026-10-21; checking the commands against fixture repos, phase 0 step 1, is next.
 **Estimate:** 1 to 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan cleans up the agent leftovers in his busiest repos from the installed app, nothing he did not choose is touched, and every removal he tries to undo comes back.
 
