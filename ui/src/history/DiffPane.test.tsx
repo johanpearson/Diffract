@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import type { FileChange } from "../protocol";
 import { RpcClient } from "../rpc";
 import { FakeSidecar, sampleDetails, sampleState } from "../testing/fakeSidecar";
-import { HistoryView } from "./HistoryView";
+import { HistoryHarness } from "../testing/HistoryHarness";
 import { DiffLayoutKey, DiffPane } from "./DiffPane";
 import type { DiffLayout, FileSides } from "./monacoEditor";
 
@@ -48,7 +48,7 @@ const list = () => screen.getByRole("listbox", { name: "Commits" });
 
 function setup(sidecar = new FakeSidecar(), storage = memory()) {
   const client = new RpcClient(sidecar.transport);
-  render(<HistoryView client={client} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} openedPath={sampleState.repoRoot} storage={storage} />);
+  render(<HistoryHarness client={client} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} openedPath={sampleState.repoRoot} storage={storage} />);
   return { sidecar, client, storage };
 }
 

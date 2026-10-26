@@ -1,6 +1,7 @@
 import type { GitUpdate } from "../model/useGitUpdate";
 import type { RepoSession } from "../model/useRepoSession";
 import type { Terminals } from "../model/useTerminals";
+import type { RepoWork } from "../model/useRepoWork";
 import type { Screen } from "../model/session";
 import type { RepoState } from "../protocol";
 import { ErrorPanel } from "./ErrorPanel";
@@ -8,6 +9,7 @@ import { LeftoversView, type Filter } from "./LeftoversView";
 import { Sidebar } from "./Sidebar";
 import { Splitter, useStoredSize, type SizeSpec } from "./Splitter";
 import { tabId, Tabs, type View } from "./Tabs";
+import type { SwitchTo } from "../history/commitMenu";
 import { HistoryView } from "../history/HistoryView";
 import { ChangesView } from "../changes/ChangesView";
 
@@ -25,18 +27,45 @@ export interface ScreenProps {
   onOpenFolder(path: string): void;
   onDownloadPage(): void;
   now: Date;
+  /** History, its refs and the branch actions, shared by the sidebar and History. */
+  work: RepoWork;
+  /** Shows History with this commit selected. */
+  onReveal(commitId: string): void;
 }
 
 export const SidebarWidth: SizeSpec = { key: "diffract.size.sidebar", initial: 250, min: 180, max: 480 };
 
 /** The sidebar, only once a repo is open, with a bar to change its width. */
-export function RepoSidebar({ repo, terminals, onOpenFolder }: ScreenProps) {
-  const [width, setWidth] = useStoredSize(repo.session.host.storage, SidebarWidth);
+export function RepoSidebar({ repo, terminals, onOpenFolder, work, onReveal, onView }: ScreenProps) {
+  const storage = repo.session.host.storage;
+  const [width, setWidth] = useStoredSize(storage, SidebarWidth);
   if (repo.screen.kind !== "ready") return null;
+  const refs = work.history.refs.refs;
+  const branches = { current: work.current.branch, localBranches: new Set(refs.filter((r) => r.kind === "Branch").map((r) => r.name)) };
+  const commands = {
+    reveal: onReveal,
+    // Shown first, so the outcome appears in History, next to the commit it is about.
+    switchTo: (target: SwitchTo, commitId: string) => {
+      onReveal(commitId);
+      work.actions.switchTo(target);
+    },
+    copy: work.actions.copy,
+  };
   return (
     <>
       <div className="sidebar-frame" style={{ width }}>
-        <Sidebar state={repo.screen.state} terminals={terminals.list} terminal={terminals.current} onOpenFolder={onOpenFolder} onOpenTerminal={terminals.open} />
+        <Sidebar
+          state={repo.screen.state}
+          terminals={terminals.list}
+          terminal={terminals.current}
+          onOpenFolder={onOpenFolder}
+          onOpenTerminal={terminals.open}
+          storage={storage}
+          refs={refs}
+          branches={branches}
+          commands={commands}
+          onShowLeftovers={() => onView("leftovers")}
+        />
       </div>
       <Splitter label="Resize sidebar" orientation="vertical" spec={SidebarWidth} size={width} onSize={setWidth} growsForward />
     </>
@@ -122,7 +151,7 @@ function ViewOf(props: ScreenProps & { state: RepoState }) {
   const { client, host } = repo.session;
   switch (view) {
     case "history":
-      return <HistoryView key={state.repoId} client={client} state={state} now={props.now} openedPath={repo.session.repo.current?.path ?? state.repoRoot} storage={host.storage} />;
+      return <HistoryView key={state.repoId} client={client} state={state} now={props.now} work={props.work} storage={host.storage} />;
     case "changes":
       return <ChangesView key={state.repoId} client={client} state={state} openedPath={repo.session.repo.current?.path ?? state.repoRoot} storage={host.storage} />;
     case "leftovers":

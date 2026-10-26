@@ -7,9 +7,9 @@ export { emptyHistory, type History } from "./historySync";
 
 /**
  * Reads the repo's whole history once per repo, page by page, and its refs. After that, whenever the repo's snapshot
- * or the toggles change, only what changed is read. Stops when the repo changes.
+ * or the toggles change, only what changed is read. Stops when the repo changes. With no repo, reads nothing.
  */
-export function useHistory(client: RpcClient, repoId: string, snapshotAt: string, show: HistoryShow): History {
+export function useHistory(client: RpcClient, repoId: string | null, snapshotAt: string, show: HistoryShow): History {
   const [history, setHistory] = useState<History>(emptyHistory);
   const sync = useRef<HistorySync | null>(null);
   const target: HistoryTarget = { snapshotAt, show };
@@ -18,6 +18,10 @@ export function useHistory(client: RpcClient, repoId: string, snapshotAt: string
 
   useEffect(() => {
     setHistory(emptyHistory);
+    if (repoId === null) {
+      sync.current = null;
+      return;
+    }
     const current = new HistorySync(client, repoId, latest.current, setHistory);
     sync.current = current;
     void current.start();

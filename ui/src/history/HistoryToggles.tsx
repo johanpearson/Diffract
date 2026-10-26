@@ -5,7 +5,7 @@ import type { FadeToggles } from "./emphasis";
 
 export type Toggles = FadeToggles & HistoryShow;
 
-type ToggleName = keyof Toggles;
+export type ToggleName = keyof Toggles;
 
 /** In the order shown, with the visual plan's defaults: merged branches fade, the rest is off. */
 const toggles: { name: ToggleName; label: string; title: string; initial: boolean }[] = [

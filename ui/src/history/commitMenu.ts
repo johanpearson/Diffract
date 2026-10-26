@@ -66,6 +66,6 @@ function resetItems({ commit, current }: MenuContext, actions: MenuActions): Men
 }
 
 /** "topic" for "origin/topic". */
-function localName(remoteBranch: string): string {
+export function localName(remoteBranch: string): string {
   return remoteBranch.slice(remoteBranch.indexOf("/") + 1);
 }

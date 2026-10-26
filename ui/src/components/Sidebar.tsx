@@ -1,7 +1,12 @@
 import { useState, type MouseEvent } from "react";
-import type { RepoState, TerminalInfo, TerminalKind, WorktreeInfo } from "../protocol";
+import type { AppHost } from "../host";
+import type { HistoryRef, RepoState, TerminalInfo, TerminalKind, WorktreeInfo } from "../protocol";
 import { folderName } from "../model/format";
 import { ContextMenu, type MenuItem } from "./ContextMenu";
+import { menuPosition } from "./menuPosition";
+import type { BranchContext, RefCommands } from "./refMenu";
+import { SidebarRefs } from "./SidebarRefs";
+import { SidebarSection } from "./SidebarSection";
 
 interface Props {
   state: RepoState;
@@ -12,10 +17,21 @@ interface Props {
   onOpenFolder(path: string): void;
   /** Without `kind`, the current terminal. With it, that one, which becomes the current one. */
   onOpenTerminal(path: string, kind?: TerminalKind): void;
+  /** Remembers which sections are open. */
+  storage: AppHost["storage"];
+  /** The refs History read, so both always show the same. */
+  refs: readonly HistoryRef[];
+  branches: BranchContext;
+  commands: RefCommands;
+  /** Opens the "Worktrees and agents" view. */
+  onShowLeftovers(): void;
 }
 
-/** The repo's worktrees with their state, and the Leftovers entry with the count of everything not in use. */
-export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTerminal }: Props) {
+/**
+ * The repo, then its branches, remotes and tags, which a person works with every day, and last its worktrees, which
+ * matter mostly for cleaning up after agents. Every section opens and closes, and stays as it was left.
+ */
+export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTerminal, storage, refs, branches, commands, onShowLeftovers }: Props) {
   const [menu, setMenu] = useState<{ worktree: WorktreeInfo; x: number; y: number } | null>(null);
   const [chooser, setChooser] = useState<{ x: number; y: number } | null>(null);
   const inUse = new Set(state.leftovers.filter((l) => l.verdict === "InUse" && l.path).map((l) => l.path!.toLowerCase()));
@@ -48,17 +64,19 @@ export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTermin
           )}
         </div>
       </div>
-      <h2 id="worktrees-title">Worktrees</h2>
-      <ul className="worktrees" aria-labelledby="worktrees-title">
-        {state.snapshot.worktrees.map((w) => (
-          <WorktreeEntry key={w.path} worktree={w} inUse={inUse.has(w.path.toLowerCase())} onMenu={(event) => setMenu({ worktree: w, ...menuPosition(event) })} />
-        ))}
-      </ul>
-      <ul className="nav">
-        <li aria-current="page">
-          Leftovers <LeftoverCount state={state} notInUse={notInUse} />
-        </li>
-      </ul>
+      <div className="side-sections">
+        <SidebarRefs refs={refs} context={branches} commands={commands} storage={storage} />
+        <SidebarSection id="worktrees" title="Worktrees" count={state.snapshot.worktrees.length} initial={false} storage={storage}>
+          <ul className="worktrees" aria-label="Worktrees">
+            {state.snapshot.worktrees.map((w) => (
+              <WorktreeEntry key={w.path} worktree={w} inUse={inUse.has(w.path.toLowerCase())} onMenu={(event) => setMenu({ worktree: w, ...menuPosition(event) })} />
+            ))}
+          </ul>
+          <button className="leftovers-link" onClick={onShowLeftovers}>
+            Leftovers <LeftoverCount state={state} notInUse={notInUse} />
+          </button>
+        </SidebarSection>
+      </div>
 
       {menu && (
         <ContextMenu
@@ -114,14 +132,6 @@ function WorktreeEntry({ worktree: w, inUse, onMenu }: { worktree: WorktreeInfo;
       </div>
     </li>
   );
-}
-
-// The menu key and Shift+F10 also raise contextmenu, but with no pointer position: open it under the entry instead.
-function menuPosition(event: MouseEvent<HTMLLIElement>): { x: number; y: number } {
-  event.preventDefault();
-  const rect = event.currentTarget.getBoundingClientRect();
-  if (event.clientX === 0 && event.clientY === 0) return { x: rect.left + 16, y: rect.bottom };
-  return { x: event.clientX, y: event.clientY };
 }
 
 // The current terminal first, so the menu's first item does what the button does.

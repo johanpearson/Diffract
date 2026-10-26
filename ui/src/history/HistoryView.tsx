@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Splitter, useStoredSize, type SizeSpec } from "../components/Splitter";
 import type { AppHost } from "../host";
+import type { RepoWork } from "../model/useRepoWork";
 import type { FileChange, HistoryRef, RepoState } from "../protocol";
 import type { RpcClient } from "../rpc";
 import { CommitPanel } from "./CommitPanel";
@@ -8,19 +9,18 @@ import { DiffPane } from "./DiffPane";
 import { fadedCommits } from "./emphasis";
 import { FindBox } from "./FindBox";
 import { HistoryList } from "./HistoryList";
-import { currentWorktree, HistoryMenu, RefNoteBar, useOpenMenu } from "./HistoryMenu";
-import { HistoryToggles, useHistoryToggles, type Toggles } from "./HistoryToggles";
+import { HistoryMenu, RefNoteBar, useOpenMenu } from "./HistoryMenu";
+import { HistoryToggles, type Toggles } from "./HistoryToggles";
 import { markersByCommit } from "./markers";
 import { useCommitDetails } from "./useCommitDetails";
-import { useHistory, type History } from "./useHistory";
-import { useRefActions } from "./useRefActions";
+import type { History } from "./useHistory";
 
 interface Props {
   client: RpcClient;
   state: RepoState;
   now: Date;
-  /** The folder the repo was opened from. The menu's switch and reset act on its worktree. */
-  openedPath: string;
+  /** The history, the toggles and the branch actions, shared with the sidebar. */
+  work: RepoWork;
   /** Remembers panel sizes and the diff layout. */
   storage: AppHost["storage"];
 }
@@ -29,10 +29,8 @@ export const DetailsWidth: SizeSpec = { key: "diffract.size.details", initial: 3
 export const DiffHeight: SizeSpec = { key: "diffract.size.diff", initial: 380, min: 120, max: 1600 };
 
 /** The repo's history as a graph, with the selected commit's details beside it and a file's diff below. */
-export function HistoryView({ client, state, now, openedPath, storage }: Props) {
-  const [toggles, setToggle] = useHistoryToggles(storage);
-  const show = { checkpoints: toggles.checkpoints, stashes: toggles.stashes };
-  const history = useHistory(client, state.repoId, state.takenAt, show);
+export function HistoryView({ client, state, now, work, storage }: Props) {
+  const { history, toggles, setToggle, current, actions } = work;
   const refs = useMemo(() => shownRefs(history.refs.refs, toggles), [history.refs.refs, toggles]);
   const markers = useMemo(() => markersByCommit(refs, state.snapshot.worktrees), [refs, state.snapshot.worktrees]);
   const faded = useMemo(
@@ -40,13 +38,12 @@ export function HistoryView({ client, state, now, openedPath, storage }: Props) 
     [history.commits, history.refs, state.mainBranch, toggles],
   );
   const selection = useSelection(history);
+  useReveal(work, selection);
   const details = useCommitDetails(client, state.repoId, selection.id);
   const diff = useOpenFile(selection.id);
   const panel = useRef<HTMLElement>(null);
   const find = useRef<HTMLInputElement>(null);
   const [detailsWidth, setDetailsWidth] = useStoredSize(storage, DetailsWidth);
-  const current = currentWorktree(state, openedPath, history.refs.refs);
-  const actions = useRefActions(client, state.repoId, current.path);
   const menu = useOpenMenu();
 
   useHistoryKeys({ onFind: () => find.current?.focus(), onEscape: diff.file ? diff.close : null });
@@ -156,6 +153,20 @@ function useSelection({ commits }: History) {
     choose: setChosen,
     isLoaded: (commitId: string) => indexById.has(commitId),
   };
+}
+
+/**
+ * Selects the commit asked for from elsewhere, such as the sidebar, once it has been read. A commit the history does
+ * not have, such as one only a hidden checkpoint reaches, leaves the selection as it is.
+ */
+function useReveal({ reveal, revealed, history }: RepoWork, { choose, isLoaded }: ReturnType<typeof useSelection>) {
+  const { done } = history;
+  useEffect(() => {
+    if (!reveal) return;
+    const found = isLoaded(reveal.commitId);
+    if (found) choose(reveal.commitId);
+    if (found || done) revealed();
+  }, [reveal, revealed, choose, isLoaded, done]);
 }
 
 function countText({ commits, done }: History): string {

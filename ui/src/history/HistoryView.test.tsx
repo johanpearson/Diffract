@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { RpcClient } from "../rpc";
 import { FakeSidecar, sampleCommits, sampleDetails, sampleState } from "../testing/fakeSidecar";
-import { HistoryView } from "./HistoryView";
+import { HistoryHarness } from "../testing/HistoryHarness";
 
 // jsdom has no canvas. The graph's drawing has its own tests.
 beforeEach(() => void vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null));
@@ -14,7 +14,7 @@ afterEach(() => {
 const [merge, root] = sampleCommits as [(typeof sampleCommits)[0], (typeof sampleCommits)[0]];
 
 function setup(sidecar = new FakeSidecar()) {
-  render(<HistoryView client={new RpcClient(sidecar.transport)} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} openedPath={sampleState.repoRoot} storage={{ get: () => null, set: () => {} }} />);
+  render(<HistoryHarness client={new RpcClient(sidecar.transport)} state={sampleState} now={new Date("2026-10-21T09:30:00+02:00")} openedPath={sampleState.repoRoot} storage={{ get: () => null, set: () => {} }} />);
   return sidecar;
 }
 
