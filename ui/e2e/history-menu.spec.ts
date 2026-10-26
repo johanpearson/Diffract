@@ -99,3 +99,18 @@ test("resets main soft after showing what leaves it, and undoes the reset", asyn
   await expect(page.getByText("Undid the reset: main is back at 9fceb02d.")).toBeVisible();
   expect(await asked(page)).toEqual(["branch.reset", "branch.undoReset"]);
 });
+
+test("the sidebar shows a tag's commit on click, and switches to a branch on double-click", async ({ page }) => {
+  await openHistory(page);
+  const sidebar = page.getByRole("navigation", { name: "Repository" });
+  await sidebar.getByRole("button", { name: /^Tags(, \d+)?$/ }).click();
+
+  await sidebar.getByRole("button", { name: "v1.0" }).click();
+  await expect(rows(page).nth(1)).toHaveAttribute("aria-selected", "true");
+
+  await sidebar.getByRole("button", { name: /^claude(, \d+)?$/ }).click();
+  await sidebar.getByRole("button", { name: "räksmörgås-fix" }).dblclick();
+  await expect(page.getByText("Switched to claude/räksmörgås-fix.")).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "räksmörgås-fix" })).toHaveAttribute("aria-current", "true");
+  expect(await asked(page)).toEqual(["branch.switch"]);
+});

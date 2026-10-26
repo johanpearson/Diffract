@@ -10,6 +10,7 @@ import { FakeSidecar, sampleState } from "./testing/fakeSidecar";
 afterEach(cleanup);
 
 const repoRoot = sampleState.repoRoot;
+const WorktreesOpenKey = "diffract.sidebar.open.worktrees";
 
 /** Renders the app against a fake sidecar. `last` is the repo remembered from the previous run. */
 /** `terminal` is the one remembered from the previous run. */
@@ -21,8 +22,10 @@ function setup({
   terminal = null as string | null,
   remembered = {} as Record<string, string>,
   view = "leftovers" as View,
+  worktreesOpen = true,
 } = {}) {
-  const stored = new Map<string, string>([...(last ? [[LastRepoKey, last] as const] : []), ...Object.entries(remembered)]);
+  // The sidebar's Worktrees section starts closed. Most tests here are about worktrees, so it was left open last time.
+  const stored = new Map<string, string>([...(worktreesOpen ? [[WorktreesOpenKey, "true"] as const] : []), ...(last ? [[LastRepoKey, last] as const] : []), ...Object.entries(remembered)]);
   if (terminal) stored.set(TerminalKey, terminal);
   const handlers = new Set<(event: SidecarEvent) => void>();
   const host: AppHost = {
@@ -109,19 +112,22 @@ describe("App", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     const { sidecar } = setup({ last: repoRoot });
     await screen.findByRole("list", { name: "Leftovers" });
-    expect(sent(sidecar, "history.read")).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("tab", { name: "History" }));
 
     expect(await screen.findByRole("listbox", { name: "Commits" })).toBeTruthy();
     expect(screen.getByRole("tabpanel", { name: "History" })).toBeTruthy();
-    expect(sent(sidecar, "history.read")[0]?.params).toMatchObject({ repoId: sampleState.repoId });
+    // Read once when the repo opened, for the sidebar too, and kept while other views are shown.
+    expect(sent(sidecar, "history.read").map((m) => m.params)).toEqual([expect.objectContaining({ repoId: sampleState.repoId })]);
     fireEvent.keyDown(screen.getByRole("tab", { name: "History" }), { key: "ArrowRight" });
     expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Changes" }));
     expect(await screen.findByRole("listbox", { name: "Changed files" })).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("tab", { name: "Changes" }), { key: "ArrowRight" });
     expect(await screen.findByRole("list", { name: "Leftovers" })).toBeTruthy();
     expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Worktrees and agents" }));
+    fireEvent.click(screen.getByRole("tab", { name: "History" }));
+    expect(await screen.findByRole("listbox", { name: "Commits" })).toBeTruthy();
+    expect(sent(sidecar, "history.read")).toHaveLength(1);
     vi.restoreAllMocks();
   });
 
@@ -443,6 +449,99 @@ describe("App", () => {
 
     await waitFor(() => expect(host.restartSidecar).toHaveBeenCalled());
     await waitFor(() => expect(sent(sidecar, "app.info").length).toBeGreaterThan(1));
+  });
+});
+
+describe("the sidebar", () => {
+  const sidebar = () => screen.getByRole("navigation", { name: "Repository" });
+  const toggle = (title: string) => within(sidebar()).getByRole("button", { name: new RegExp(`^${title}(, \\d+)?$`) });
+  const entry = (name: string) => within(sidebar()).getByRole("button", { name });
+  const commits = () => within(screen.getByRole("listbox", { name: "Commits" })).getAllByRole("option");
+  const root = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+  /** Opens the repo on the leftovers, with every sidebar section as it starts on a first run. */
+  async function openRepo(sidecar = new FakeSidecar()) {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const opened = setup({ last: repoRoot, sidecar, worktreesOpen: false });
+    await within(await screen.findByRole("navigation", { name: "Repository" })).findByRole("button", { name: "main" });
+    return opened;
+  }
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("lists the branches, with the current one marked, and keeps remotes, tags and worktrees closed", async () => {
+    await openRepo();
+
+    expect(["Branches", "Remotes", "Tags", "Worktrees"].map((t) => [t, toggle(t).getAttribute("aria-expanded")])).toEqual([
+      ["Branches", "true"],
+      ["Remotes", "false"],
+      ["Tags", "false"],
+      ["Worktrees", "false"],
+    ]);
+    expect(entry("main").getAttribute("aria-current")).toBe("true");
+    expect(within(sidebar()).queryByRole("button", { name: "v1.0" })).toBeNull();
+  });
+
+  it("keeps agent branches in a closed folder, and remembers a section opened", async () => {
+    const { stored } = await openRepo();
+    expect(within(sidebar()).queryByRole("button", { name: "räksmörgås-fix" })).toBeNull();
+
+    fireEvent.click(toggle("claude"));
+    fireEvent.click(toggle("Tags"));
+
+    expect(entry("räksmörgås-fix")).toBeTruthy();
+    expect(entry("v1.0")).toBeTruthy();
+    expect([stored.get("diffract.sidebar.open.branches/claude"), stored.get("diffract.sidebar.open.tags")]).toEqual(["true", "true"]);
+  });
+
+  it("shows a ref's commit in History when it is clicked", async () => {
+    await openRepo();
+    fireEvent.click(toggle("Tags"));
+
+    fireEvent.click(entry("v1.0"));
+
+    expect(screen.getByRole("tab", { name: "History" }).getAttribute("aria-selected")).toBe("true");
+    await waitFor(() => expect(commits()[1]!.getAttribute("aria-selected")).toBe("true"));
+  });
+
+  it("switches to a branch on double-click, and to a remote branch's own branch", async () => {
+    const { sidecar } = await openRepo();
+    fireEvent.click(toggle("claude"));
+
+    fireEvent.doubleClick(entry("räksmörgås-fix"));
+
+    await screen.findByText("Switched to claude/räksmörgås-fix.");
+    expect(sidecar.refsAsked.map((a) => a.params)).toEqual([expect.objectContaining({ branch: "claude/räksmörgås-fix" })]);
+    await waitFor(() => expect(entry("räksmörgås-fix").getAttribute("aria-current")).toBe("true"));
+  });
+
+  it("does nothing on double-click of the branch already checked out, or of a tag", async () => {
+    const { sidecar } = await openRepo();
+    fireEvent.click(toggle("Tags"));
+
+    fireEvent.doubleClick(entry("main"));
+    fireEvent.doubleClick(entry("v1.0"));
+
+    expect(sidecar.refsAsked).toEqual([]);
+  });
+
+  it("checks out a tag, detached, from its menu", async () => {
+    const { sidecar } = await openRepo();
+    fireEvent.click(toggle("Tags"));
+
+    fireEvent.contextMenu(entry("v1.0"), { clientX: 40, clientY: 300 });
+    fireEvent.click(within(screen.getByRole("menu", { name: "Actions for v1.0" })).getByRole("menuitem", { name: "Check out v1.0 (detached)" }));
+
+    await waitFor(() => expect(sidecar.refsAsked.map((a) => a.params)).toEqual([expect.objectContaining({ commit: root })]));
+  });
+
+  it("opens the worktrees and agents view from the Worktrees section", async () => {
+    await openRepo();
+    fireEvent.click(toggle("Worktrees"));
+
+    fireEvent.click(within(sidebar()).getByRole("button", { name: /^Leftovers/ }));
+
+    expect(screen.getByRole("tab", { name: "Worktrees and agents" }).getAttribute("aria-selected")).toBe("true");
   });
 });
 

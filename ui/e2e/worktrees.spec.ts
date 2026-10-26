@@ -15,6 +15,11 @@ async function openRepo(page: Page, folder = repoRoot) {
   if (await tab.isVisible()) await tab.click();
 }
 
+/** Opens the sidebar's Worktrees section, which starts closed: branches come first. */
+async function openWorktrees(page: Page) {
+  await page.getByRole("navigation", { name: "Repository" }).getByRole("button", { name: /^Worktrees(, \d+)?$/ }).click();
+}
+
 const leftovers = (page: Page) => page.getByRole("list", { name: "Leftovers" });
 const row = (page: Page, name: string) => leftovers(page).getByRole("listitem", { name });
 
@@ -25,6 +30,7 @@ test("opens a repo and shows its worktrees and leftovers", async ({ page }) => {
   await expect(leftovers(page).getByRole("listitem")).toHaveCount(3);
   await expect(row(page, "copilot/fix-login")).toContainText("Needs review");
   await expect(row(page, "old-task")).toContainText("At risk: -");
+  await openWorktrees(page);
   await expect(page.getByRole("navigation", { name: "Repository" })).toContainText("claude/räksmörgås-fix");
 });
 
@@ -116,6 +122,7 @@ for (const colorScheme of ["light", "dark"] as const) {
 test("opens a terminal from the sidebar's menu with the keyboard", async ({ page }) => {
   await openRepo(page);
   await expect(leftovers(page).getByRole("listitem")).toHaveCount(3);
+  await openWorktrees(page);
 
   const entry = page.getByRole("listitem", { name: "claude/räksmörgås-fix" });
   for (let i = 0; i < 20 && !(await entry.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");

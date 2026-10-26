@@ -10,6 +10,7 @@ import { messageOf } from "./model/format";
 import { useAppStart } from "./model/useAppStart";
 import { offeredVersion, useGitUpdate } from "./model/useGitUpdate";
 import { useNow } from "./model/useNow";
+import { useRepoWork } from "./model/useRepoWork";
 import { useRepoEvents, useRepoSession } from "./model/useRepoSession";
 import { useTerminals } from "./model/useTerminals";
 import type { RpcClient } from "./rpc";
@@ -38,6 +39,16 @@ export function App({ host, client, clock = systemClock, initialView = "history"
   const repo = useRepoSession(client, host, setNotice);
   const { info, afterUpdate } = useAppStart(repo.session, repo.starts, { checkForUpdate: git.checkForUpdate, setTerminals: terminals.setList });
   useRepoEvents(repo.session, repo.rows);
+  const ready = repo.screen.kind === "ready" ? repo.screen.state : null;
+  const work = useRepoWork(client, ready, repo.session.repo.current?.path ?? ready?.repoRoot ?? "", host.storage);
+  const { revealCommit } = work;
+  const reveal = useCallback(
+    (commitId: string) => {
+      setView("history");
+      revealCommit(commitId);
+    },
+    [revealCommit],
+  );
 
   const openDownloadPage = useCallback(() => {
     client.call("git.openDownloadPage", undefined).catch((error: unknown) => setNotice(messageOf(error)));
@@ -51,7 +62,7 @@ export function App({ host, client, clock = systemClock, initialView = "history"
   );
 
   const offered = offeredVersion(git.check);
-  const screens: ScreenProps = { repo, git, terminals, offered, filter, onFilter: setFilter, view, onView: setView, onOpenFolder: openFolder, onDownloadPage: openDownloadPage, now };
+  const screens: ScreenProps = { repo, git, terminals, offered, filter, onFilter: setFilter, view, onView: setView, onOpenFolder: openFolder, onDownloadPage: openDownloadPage, now, work, onReveal: reveal };
 
   return (
     <div className="app">
