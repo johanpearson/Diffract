@@ -1,6 +1,6 @@
 # Milestone 5: safe cleanup with backup tags and undo, stashes, and pruning remote branches
 
-**Status:** in progress. Johan made the phase 0 decisions on 2026-10-21; checking the commands against fixture repos, phase 0 step 1, is next.
+**Status:** in progress. Phase 0 step 1, checking the commands against fixture repos, was done on 2026-10-26 in `docs/findings/cleanup.md`. Johan's acceptance of the changes it led to is the checkpoint before phase 1.
 **Estimate:** 1 to 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan cleans up the agent leftovers in his busiest repos from the installed app, nothing he did not choose is touched, and every removal he tries to undo comes back.
 
@@ -28,17 +28,26 @@ A first proposal, to settle in phase 0. "Backup" applies only when the leftover 
 
 | Leftover | Removed with | Backup | Undo |
 |---|---|---|---|
-| Worktree (clean, not locked) | `git worktree remove <path>`, then `git branch -D <branch>` | tag on the branch tip | recreate the branch, then `git worktree add <path> <branch>` |
-| Prunable worktree (folder gone) | `git worktree prune` for its record | tag on its HEAD | recreate the branch from the tag; the folder was already gone |
+| Worktree (clean, not locked) | rename its folder away and back, to check no program has a file open in it, then `git worktree remove <path>`, then `git branch -D <branch>` | tag on the branch tip | recreate the branch, then `git worktree add <path> <branch>` |
+| Prunable worktree (folder gone) | `git worktree remove <path>`, which removes only this one's record, unlike `worktree prune` | tag on its HEAD | recreate the branch from the tag; the folder was already gone |
 | Local branch | `git branch -D <name>` | tag on the tip, none when its upstream is gone (decision 8) | `git branch <name> <sha>` |
 | Remote-tracking branch | `git branch -d -r <remote>/<name>`, local only, never pushed | tag on the tip | `git update-ref refs/remotes/<remote>/<name> <sha>` |
-| Stash | `git stash drop`, after checking its commit is still the same | tag on the stash commit | `git stash store -m <message> <sha>` |
+| Stash | `git stash drop stash@{n}`, with `n` looked up by the stash's commit right before, and checked with `git rev-parse` | tag on the stash commit | `git stash store -m <message> <sha>`, which puts it back on top of the list |
 | Checkpoint session | `git update-ref --stdin` deleting each of its refs, with their expected values | none, see decision 4 | the same command, recreating them |
 | Old backup tag | `git tag -d <name>`, after checking it still points where it did | none, it is the backup | `git tag <name> <sha>`, while git still has the commits |
 | Leftover folder | moved to the Windows Recycle Bin | none | restore it from the Recycle Bin |
 | Orphaned commits | nothing is removed: "Keep these" only, see decision 3 | one tag holding all of them | `git tag -d` on that tag |
 
-Allowed write commands for the cleanup runner: `worktree remove` (never `--force`), `worktree prune`, `worktree add`, `branch -D`, `branch -d -r`, `branch <name> <sha>`, `tag -a`, `tag -d`, `tag <name> <sha>`, `stash drop`, `stash store`, `update-ref` (only with expected old values). Never: `push`, `fetch`, `reset`, `checkout`, `switch`, `clean`, `gc`, `reflog expire`, or `--force` on anything.
+Allowed write commands for the cleanup runner: `worktree remove` (never `--force`), `worktree add`, `branch -D`, `branch -d -r`, `branch <name> <sha>`, `tag -a`, `tag -d`, `tag <name> <sha>`, `stash drop`, `stash store`, `update-ref` (only with expected old values). Never: `push`, `fetch`, `reset`, `checkout`, `switch`, `clean`, `gc`, `reflog expire`, `worktree prune`, or `--force` on anything.
+
+### What the check in step 1 changed
+
+Checked on 2026-10-26, in `docs/findings/cleanup.md`. These are proposals until Johan accepts them, the checkpoint before phase 1:
+
+1. **Prunable worktrees are removed with `worktree remove`,** since `worktree prune` removes every prunable worktree, not the one picked. `worktree prune` leaves the allowlist.
+2. **A worktree is removed only when no program has a file open in it.** A held file made git remove the worktree's record and every other file, then stop, leaving the folder behind. Renaming the folder away and back finds this first, and the worktree and its branch are skipped with the reason. If git still stops part way, the result says what was left, the branch is kept, and the folder shows as a leftover folder on the next scan.
+3. **A stash is dropped by its current `stash@{n}`,** looked up by its commit and checked right before, since git takes no commit there and agents shift the list. Undo puts it back on top of the list, and the result says so.
+4. **Backup tags never carry an identity git made up.** When `user.name` or `user.email` is not set, the tag is made with "Diffract" and `diffract@localhost`, as decision 1 says.
 
 ## Phase 0: decisions
 
@@ -117,7 +126,7 @@ Added on 2026-10-26, when Johan listed what he misses from Git Extensions. It be
 - **Apply:** `git stash apply <commit>`, by the stash's commit, never `stash@{n}`, since the list shifts as agents stash too. The stash is kept. When applying ends in conflicts, the stash is still there, Changes lists the conflicted files, and resolving them comes with milestone 7. Diffract never runs `stash pop`.
 - **Apply and drop:** apply, then drop only when the apply was clean.
 - **Drop:** the same step as cleaning up a stash leftover: a backup tag first, then `git stash drop`, and "Undo" puts it back with `git stash store`.
-- **Allowlist:** `stash push -m -` (the message on standard input, as for commits) and `stash apply <commit>` go on the changes runner. Drop and store are on the cleanup runner already.
+- **Allowlist:** `stash push -m <message>`, `stash push --include-untracked -m <message>` and `stash apply <commit>` go on the changes runner. Git cannot read a stash message from standard input, so it is an argument, which takes a message starting with "-" as it is. Drop and store are on the cleanup runner already.
 - **Tests:** fixture repos for save with and without new files, apply by commit after another stash moved the list, an apply that conflicts and keeps the stash, and drop then undo.
 
 ## Phase 8: prune remote branches
