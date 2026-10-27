@@ -10,6 +10,8 @@ const item = (name: string, overrides: Partial<Leftover> = {}): Leftover => ({
   verdict: "NeedsReview",
   commitsAtRisk: 1,
   reason: "Reason",
+  check: null,
+  commit: null,
   ...overrides,
 });
 

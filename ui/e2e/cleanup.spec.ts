@@ -44,6 +44,18 @@ test("select, confirm, see the rows go, undo, see them come back", async ({ page
   await expect(page.getByRole("list", { name: "Past cleanups" }).getByRole("listitem")).toHaveCount(2);
 });
 
+test("a row that needs review says what to check, opens to list its commits, and shows in History", async ({ page }) => {
+  await openRepo(page);
+  const branch = row(page, "copilot/fix-login");
+  await expect(branch).toContainText("Look at the 2 commits only on this branch in History.");
+
+  await branch.getByRole("button", { name: "Show the commits of copilot/fix-login" }).click();
+
+  await expect(page.getByRole("list", { name: "Commits of copilot/fix-login" })).toContainText("Retry the login on räksmörgås");
+  await branch.getByRole("button", { name: "Show copilot/fix-login in History" }).click();
+  await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
+});
+
 test("the confirm dialog opens with Cancel focused, so Enter removes nothing", async ({ page }) => {
   await openRepo(page);
   await page.getByRole("checkbox", { name: "Select old-task" }).check();

@@ -44,6 +44,22 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
         return Task.FromResult(SidecarMethods.Result(View(planId, plan)));
     }
 
+    /// <summary>
+    /// What a row holds: the newest commits only it has, as removing it would put them at risk. One read-only
+    /// <c>git log</c>, none for a folder.
+    /// </summary>
+    public async Task<JsonElement> InspectAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var request = SidecarMethods.Params<CleanupInspectParams>(parameters);
+        var selected = request.Leftover ?? throw new RpcException(RpcErrorCodes.InvalidParams, "'leftover' is required");
+        var (snapshot, leftovers) = repos.LeftoversOf(repos.Get(SidecarMethods.Required(request.RepoId, "repoId")));
+        var leftover = leftovers.FirstOrDefault(l => Picks(selected, l)) ?? throw new CleanupLogException(NoLongerALeftover);
+        var content = LeftoverCommits.RangeOf(snapshot, leftover, setup.Config) is { } range
+            ? await LeftoverCommits.ReadAsync(new GitRunner(snapshot.RepoRoot, runnerOptions), leftover.Kind, range, ct).ConfigureAwait(false)
+            : new LeftoverContent([], More: false);
+        return SidecarMethods.Result(content);
+    }
+
     public async Task<JsonElement> ApplyAsync(JsonElement? parameters, CancellationToken ct)
     {
         var request = SidecarMethods.Params<CleanupApplyParams>(parameters);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Splitter, useStoredSize, type SizeSpec } from "../components/Splitter";
 import type { AppHost } from "../host";
-import type { RepoWork } from "../model/useRepoWork";
+import { revealSettled, type RepoWork } from "../model/useRepoWork";
 import type { FileChange, HistoryRef, RepoState } from "../protocol";
 import type { RpcClient } from "../rpc";
 import { CommitPanel } from "./CommitPanel";
@@ -157,16 +157,17 @@ function useSelection({ commits }: History) {
 
 /**
  * Selects the commit asked for from elsewhere, such as the sidebar, once it has been read. A commit the history does
- * not have, such as one only a hidden checkpoint reaches, leaves the selection as it is.
+ * not have, such as one only a hidden checkpoint reaches, leaves the selection as it is. When a toggle was just
+ * turned on to show it, the history from before the toggle does not count: the update it brings decides.
  */
 function useReveal({ reveal, revealed, history }: RepoWork, { choose, isLoaded }: ReturnType<typeof useSelection>) {
-  const { done } = history;
+  const { done, version } = history;
   useEffect(() => {
     if (!reveal) return;
     const found = isLoaded(reveal.commitId);
     if (found) choose(reveal.commitId);
-    if (found || done) revealed();
-  }, [reveal, revealed, choose, isLoaded, done]);
+    if (revealSettled(reveal, found, { done, version })) revealed();
+  }, [reveal, revealed, choose, isLoaded, done, version]);
 }
 
 function countText({ commits, done }: History): string {

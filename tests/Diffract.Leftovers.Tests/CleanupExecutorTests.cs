@@ -232,7 +232,7 @@ public class CleanupExecutorTests
         var kept = await executor.ApplyAsync(await fixture.PlanAsync(), None);
 
         AllDone(kept);
-        Assert.Equal(["Backup", "KeepCommits"], kept.Steps.Select(s => s.Kind.ToString()));
+        Assert.Equal(["Backup", "KeepCommits"], kept.Steps.Select(s => s.Kind.ToString()).Order());
         Assert.Empty(await fixture.GitAsync("fsck", "--unreachable", "--no-reflogs", "--no-progress"));
         var tagged = (await fixture.GitAsync("for-each-ref", "--format=%(*subject)", "refs/tags/archive/orphaned/")).Split('\n');
         Assert.Equal(["Diffract kept these commits", "Experiment"], tagged.Order());

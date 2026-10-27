@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { AppHost } from "../host";
 import type { RepoState } from "../protocol";
 import type { RpcClient } from "../rpc";
@@ -11,6 +11,11 @@ import { useRefActions, type RefActions } from "../history/useRefActions";
 /** A request to select a commit in History, until History has done it. */
 export interface Reveal {
   commitId: string;
+  /**
+   * Set when a toggle was just turned on to show the commit, such as Stashes: the history at this version is from
+   * before, so a commit missing from it may still arrive. Undefined: the history as it is decides.
+   */
+  afterVersion?: number;
 }
 
 /**
@@ -25,9 +30,19 @@ export interface RepoWork {
   current: CurrentWorktree;
   actions: RefActions;
   reveal: Reveal | null;
-  revealCommit(commitId: string): void;
+  /** `afterUpdate`: a toggle was just turned on, so wait for the history it brings before giving up on the commit. */
+  revealCommit(commitId: string, afterUpdate?: boolean): void;
   /** History selected the commit, so the request is done. */
   revealed(): void;
+}
+
+/**
+ * A reveal is over once the commit is found, or once the whole history has been read without it. After a toggle was
+ * turned on for it, the history from before the toggle does not count: only a newer version can rule it out.
+ */
+export function revealSettled(reveal: Reveal, found: boolean, history: { done: boolean; version: number }): boolean {
+  const waiting = reveal.afterVersion !== undefined && history.version <= reveal.afterVersion;
+  return found || (history.done && !waiting);
 }
 
 /** With no repo open, nothing is read. */
@@ -37,7 +52,12 @@ export function useRepoWork(client: RpcClient, state: RepoState | null, openedPa
   const current = state ? currentWorktree(state, openedPath, history.refs.refs) : noWorktree;
   const actions = useRefActions(client, state?.repoId ?? "", current.path);
   const [reveal, setReveal] = useState<Reveal | null>(null);
-  const revealCommit = useCallback((commitId: string) => setReveal({ commitId }), []);
+  const version = useRef(history.version);
+  version.current = history.version;
+  const revealCommit = useCallback(
+    (commitId: string, afterUpdate = false) => setReveal({ commitId, afterVersion: afterUpdate ? version.current : undefined }),
+    [],
+  );
   const revealed = useCallback(() => setReveal(null), []);
   return { history, toggles, setToggle, current, actions, reveal, revealCommit, revealed };
 }

@@ -72,5 +72,6 @@ export const paramShapes: { [M in WithParams]: Shape } = {
   "cleanup.plan": object<Params<"cleanup.plan">>({ repoId: string, leftovers: arrayOf(selectedLeftover) }),
   "cleanup.apply": object<Params<"cleanup.apply">>({ repoId: string, planId: string, leaveOut: optional(nullable(arrayOf(stepRef))), ...watched }),
   "cleanup.history": object<Params<"cleanup.history">>({ repoId: string }),
+  "cleanup.inspect": object<Params<"cleanup.inspect">>({ repoId: string, leftover: selectedLeftover }),
   "cleanup.undo": object<Params<"cleanup.undo">>({ repoId: string, cleanupId: string, ...watched }),
 };

@@ -149,6 +149,8 @@ internal static class RpcJson
 [JsonSerializable(typeof(CleanupApplyParams))]
 [JsonSerializable(typeof(CleanupHistoryParams))]
 [JsonSerializable(typeof(CleanupUndoParams))]
+[JsonSerializable(typeof(CleanupInspectParams))]
+[JsonSerializable(typeof(Diffract.Leftovers.LeftoverContent))]
 [JsonSerializable(typeof(CleanupPlanView))]
 [JsonSerializable(typeof(Diffract.Leftovers.Cleanup.CleanupResult))]
 [JsonSerializable(typeof(IReadOnlyList<Diffract.Leftovers.Cleanup.PastCleanup>))]

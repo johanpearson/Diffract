@@ -74,7 +74,9 @@
         "agent": "Claude Code",
         "verdict": "SafeToRemove",
         "commitsAtRisk": null,
-        "reason": "Empty folder left in a worktree container. Removing it loses nothing."
+        "reason": "Empty folder left in a worktree container. Removing it loses nothing.",
+        "check": null,
+        "commit": null
       },
       {
         "kind": "LocalBranch",
@@ -83,7 +85,9 @@
         "agent": "GitHub Copilot",
         "verdict": "NeedsReview",
         "commitsAtRisk": 2,
-        "reason": "Not merged into main and untouched for 21 days."
+        "reason": "Not merged into main and untouched for 21 days.",
+        "check": "Look at the 2 commits only on this branch in History. Deleting it keeps them under a backup tag.",
+        "commit": "e83c5163316f89bfbde7d9ab23ca2e25604af290"
       },
       {
         "kind": "Worktree",
@@ -92,7 +96,9 @@
         "agent": null,
         "verdict": "InUse",
         "commitsAtRisk": 2,
-        "reason": "Locked: claude agent agent-a1b2c3 (pid 4242)."
+        "reason": "Locked: claude agent agent-a1b2c3 (pid 4242).",
+        "check": null,
+        "commit": "9fceb02d0ae598e95dc970b74767f19372d61af8"
       }
     ]
   }

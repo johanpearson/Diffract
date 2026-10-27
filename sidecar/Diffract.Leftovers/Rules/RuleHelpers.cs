@@ -45,6 +45,19 @@ internal static class Describe
     };
 
     public static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
+
+    /// <summary>"Look at the 2 commits only on this branch." The backup tag a removal makes keeps them anyway.</summary>
+    public static string LookAtCommits(int commits, string where, string removing) => commits == 0
+        ? $"No commit exists only {where}. Check that you no longer need it."
+        : $"Look at the {Count(commits, "commit")} only {where} in History. {removing} keeps them under a backup tag.";
+
+    /// <summary>
+    /// For a branch whose upstream is gone: its commits were most likely squash-merged, so they look unmerged. Null
+    /// when nothing is at risk, as for a branch merged the usual way.
+    /// </summary>
+    public static string? SquashMerged(int commits, string main) => commits == 0
+        ? null
+        : $"Its upstream was deleted, most likely after a squash merge. Check that the work of its {Count(commits, "commit")} is in {main}.";
 }
 
 internal static class Worktrees
@@ -69,11 +82,15 @@ internal static class Worktrees
             Attribution.ForWorktree(config, worktree),
             finding.Verdict,
             Branch(repo, worktree)?.CommitsAtRisk ?? worktree.AheadOfMain,
-            finding.Reason);
+            finding.Reason)
+        {
+            Check = finding.Check,
+            Commit = worktree.Head,
+        };
 }
 
-/// <summary>What a rule decided about an item, and why.</summary>
-internal sealed record Finding(Verdict Verdict, string Reason);
+/// <summary>What a rule decided about an item, and why, and what to look at before removing it.</summary>
+internal sealed record Finding(Verdict Verdict, string Reason, string? Check = null);
 
 internal static class Branches
 {
@@ -83,8 +100,12 @@ internal static class Branches
     public static IEnumerable<BranchInfo> WithoutWorktree(RepoSnapshot repo) =>
         repo.Branches.Where(b => !b.IsRemote && b.Name != repo.MainBranch && !repo.Worktrees.Any(w => w.Branch == b.Name));
 
-    public static Leftover Leftover(DiffractConfig config, BranchInfo branch, Verdict verdict, string reason) =>
-        new(LeftoverKind.LocalBranch, branch.Name, null, Attribution.ForBranch(config, branch.Name), verdict, branch.CommitsAtRisk, reason);
+    public static Leftover Leftover(DiffractConfig config, BranchInfo branch, Finding finding) =>
+        new(LeftoverKind.LocalBranch, branch.Name, null, Attribution.ForBranch(config, branch.Name), finding.Verdict, branch.CommitsAtRisk, finding.Reason)
+        {
+            Check = finding.Check,
+            Commit = branch.TargetId,
+        };
 
     /// <summary>How long ago the branch's last commit was, or null when its date is unknown.</summary>
     public static TimeSpan? Idle(BranchInfo branch, DateTimeOffset now) => now - branch.LastCommitAt;

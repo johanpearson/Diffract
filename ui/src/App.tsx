@@ -12,10 +12,11 @@ import { messageOf } from "./model/format";
 import { useAppStart } from "./model/useAppStart";
 import { offeredVersion, useGitUpdate } from "./model/useGitUpdate";
 import { useNow } from "./model/useNow";
-import { useRepoWork } from "./model/useRepoWork";
+import { useRepoWork, type RepoWork } from "./model/useRepoWork";
 import { useRepoEvents, useRepoSession } from "./model/useRepoSession";
 import { useTerminals } from "./model/useTerminals";
 import type { RpcClient } from "./rpc";
+import type { ToggleName } from "./history/HistoryToggles";
 
 export { LastRepoKey } from "./model/session";
 export { TerminalKey } from "./model/useTerminals";
@@ -42,6 +43,30 @@ export function App({ autoCloseMs, ...props }: Props) {
   );
 }
 
+/**
+ * Switching to History with a commit selected, from the sidebar or a cleanup row. A stash or a checkpoint only shows
+ * in History with its toggle on, so that is turned on first.
+ */
+function useShowInHistory({ revealCommit, toggles, setToggle }: RepoWork, setView: (view: View) => void) {
+  const reveal = useCallback(
+    (commitId: string) => {
+      setView("history");
+      revealCommit(commitId);
+    },
+    [revealCommit, setView],
+  );
+  const showInHistory = useCallback(
+    (commitId: string, toggle: ToggleName | null) => {
+      const turnOn = toggle !== null && !toggles[toggle];
+      if (turnOn) setToggle(toggle, true);
+      setView("history");
+      revealCommit(commitId, turnOn);
+    },
+    [revealCommit, toggles, setToggle, setView],
+  );
+  return { reveal, showInHistory };
+}
+
 function AppScreens({ host, client, clock = systemClock, initialView = "history" }: Omit<Props, "autoCloseMs">) {
   const [filter, setFilter] = useState<Filter>("all");
   const [view, setView] = useState<View>(initialView);
@@ -54,14 +79,7 @@ function AppScreens({ host, client, clock = systemClock, initialView = "history"
   useRepoEvents(repo.session, repo.rows);
   const ready = repo.screen.kind === "ready" ? repo.screen.state : null;
   const work = useRepoWork(client, ready, repo.session.repo.current?.path ?? ready?.repoRoot ?? "", host.storage);
-  const { revealCommit } = work;
-  const reveal = useCallback(
-    (commitId: string) => {
-      setView("history");
-      revealCommit(commitId);
-    },
-    [revealCommit],
-  );
+  const { reveal, showInHistory } = useShowInHistory(work, setView);
 
   const openDownloadPage = useCallback(() => {
     client.call("git.openDownloadPage", undefined).catch((error: unknown) => setNotice(messageOf(error)));
@@ -75,7 +93,11 @@ function AppScreens({ host, client, clock = systemClock, initialView = "history"
   );
 
   const offered = offeredVersion(git.check);
-  const screens: ScreenProps = { repo, git, terminals, offered, filter, onFilter: setFilter, view, onView: setView, onOpenFolder: openFolder, onDownloadPage: openDownloadPage, now, work, onReveal: reveal };
+  const screens: ScreenProps = {
+    repo, git, terminals, offered, filter, onFilter: setFilter, view, onView: setView, onOpenFolder: openFolder, onDownloadPage: openDownloadPage, now, work,
+    onReveal: reveal,
+    onShowInHistory: showInHistory,
+  };
 
   return (
     <div className="app">

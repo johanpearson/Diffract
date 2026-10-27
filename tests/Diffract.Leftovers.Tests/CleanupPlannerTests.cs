@@ -213,7 +213,7 @@ public class CleanupPlannerTests(ScenarioSnapshots snapshots)
         var commit = repo.UnreachableCommits.Single(c => c.Subject == "Experiment").Id;
         var tag = $"archive/orphaned/{commit[..12]}-{Date}";
 
-        var step = Assert.Single(plan.Leftovers.Single(l => l.Leftover.Name == "1 commit").Steps);
+        var step = Assert.Single(plan.Leftovers.Single(l => l.Leftover.Name == "49919a09 Experiment").Steps);
 
         Assert.Equal(
             new Step("Backup", $"tag -a {tag} {commit} -F - < Kept by Diffract: 1 commit that was on no branch, tag, stash or reflog.", $"tag -d {tag}",
@@ -229,7 +229,7 @@ public class CleanupPlannerTests(ScenarioSnapshots snapshots)
         var commits = repo.UnreachableCommits.Where(c => c.Subject.StartsWith("Agent host session", StringComparison.Ordinal)).ToList();
         var newest = commits.MaxBy(c => c.CommittedAt)!.Id;
 
-        var step = Assert.Single(plan.Leftovers.Single(l => l.Leftover.Name == "2 commits").Steps);
+        var step = Assert.Single(plan.Leftovers.Single(l => l.Leftover.Name == "2 commits of session d2061d20").Steps);
 
         Assert.Equal(StepKind.KeepCommits, step.Kind);
         Assert.Equal(["commit-tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904", .. commits.SelectMany(c => new[] { "-p", c.Id }), "-F", "-"], step.Command!.Arguments);

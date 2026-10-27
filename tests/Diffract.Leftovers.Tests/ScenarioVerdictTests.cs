@@ -74,8 +74,9 @@ public class ScenarioVerdictTests(ScenarioSnapshots snapshots)
 
     [Fact]
     public Task OrphanedCommit() => AssertLeftoversAsync("OrphanedCommit",
-        (LeftoverKind.OrphanedCommit, "1 commit", NeedsReview, 1, null),
-        (LeftoverKind.OrphanedCommit, "2 commits", NeedsReview, 2, Copilot));
+        (LeftoverKind.OrphanedCommit, "2 commits of session d2061d20", NeedsReview, 2, Copilot),
+        // A commit of its own, named by its id, which the fixture's fixed dates keep the same on every run.
+        (LeftoverKind.OrphanedCommit, "49919a09 Experiment", NeedsReview, 1, null));
 
     [Fact]
     public Task ReflogOnlyCommit() => AssertLeftoversAsync("ReflogOnlyCommit");
@@ -90,7 +91,10 @@ public class ScenarioVerdictTests(ScenarioSnapshots snapshots)
 
     [Fact]
     public Task DroppedCheckpointCommits() =>
-        AssertLeftoversAsync("DroppedCheckpointCommits", (LeftoverKind.OrphanedCommit, "4 checkpoint commits", SafeToRemove, 4, Copilot));
+        AssertLeftoversAsync("DroppedCheckpointCommits",
+            // The "dirty-archive" commit names its own id, which reads as a session of its own.
+            (LeftoverKind.OrphanedCommit, "1 checkpoint commit of session 9e1b7c3d", SafeToRemove, 1, Copilot),
+            (LeftoverKind.OrphanedCommit, "3 checkpoint commits of session 2d5ea27e", SafeToRemove, 3, Copilot));
 
     [Fact]
     public Task OldArchiveTag() => AssertLeftoversAsync("OldArchiveTag", (BackupTag, "archive/old-idea", NeedsReview, 1, null));
@@ -123,6 +127,40 @@ public class ScenarioVerdictTests(ScenarioSnapshots snapshots)
         Assert.Equal("No activity for 9 days, 2 commits exist nowhere else", Assert.Single(await ClassifyAsync("StaleAgentWorktree")).Reason);
         Assert.Equal("Files changed 1 minute ago", Assert.Single(await ClassifyAsync("ActiveAgentWorktree")).Reason);
         Assert.Equal("3 checkpoints, newest is 9 days old", Assert.Single(await ClassifyAsync("StaleCheckpointSession")).Reason);
+    }
+
+    public static TheoryData<string> AllScenarios => [.. FixtureRepoBuilder.ScenarioNames];
+
+    /// <summary>A row Johan has to look at says what to look at, so it is something he can act on.</summary>
+    [Theory]
+    [MemberData(nameof(AllScenarios))]
+    public async Task Every_row_that_needs_review_says_what_to_check(string scenario)
+    {
+        var rows = await ClassifyAsync(scenario);
+
+        Assert.All(rows.Where(l => l.Verdict == NeedsReview), l => Assert.False(string.IsNullOrWhiteSpace(l.Check), $"{l.Kind} {l.Name} says nothing to check"));
+    }
+
+    [Theory]
+    [MemberData(nameof(AllScenarios))]
+    public async Task Every_row_but_a_folder_has_a_commit_to_show_in_History(string scenario)
+    {
+        var rows = await ClassifyAsync(scenario);
+
+        Assert.All(rows.Where(l => l.Kind != LeftoverFolder), l => Assert.Matches("^[0-9a-f]{40}$", l.Commit ?? ""));
+        Assert.All(rows.Where(l => l.Kind == LeftoverFolder), l => Assert.Null(l.Commit));
+    }
+
+    [Fact]
+    public async Task The_check_says_in_plain_words_what_to_look_at()
+    {
+        Assert.Equal(
+            "Look at the 3 commits only on this branch in History. Deleting it keeps them under a backup tag.",
+            Assert.Single(await ClassifyAsync("AgentBranchUnmerged")).Check);
+        Assert.Equal(
+            "Its upstream was deleted, most likely after a squash merge. Check that the work of its 2 commits is in main.",
+            Assert.Single(await ClassifyAsync("SquashMergedBranch")).Check);
+        Assert.Null(Assert.Single(await ClassifyAsync("AgentBranchMerged")).Check);
     }
 
     [Fact]

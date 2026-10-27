@@ -117,6 +117,12 @@ public class ContractTests
             new StepResult(0, 0, StepKind.Backup, "Undo: Keep a backup tag archive/worktree/claude/räksmörgås-fix-2026-10-21 for 2 commits that exist nowhere else",
                 StepOutcome.Skipped, "Skipped, as an earlier step for the same leftover did not run."),
         ])),
+        ["cleanup.inspect"] = () => Response(new LeftoverContent(
+            [
+                new CommitEntry(Side, [Parent], "GitHub Copilot", "198982749+Copilot@users.noreply.github.com", Now.AddDays(-21), Now.AddDays(-21), "Retry the login on räksmörgås"),
+                new CommitEntry(Parent, [], "GitHub Copilot", "198982749+Copilot@users.noreply.github.com", Now.AddDays(-22), Now.AddDays(-22), ""),
+            ],
+            More: true)),
         ["cleanup.history"] = () => Response<IReadOnlyList<PastCleanup>>(
         [
             new PastCleanup(Applied.CleanupId, Now, null,
@@ -371,9 +377,13 @@ public class ContractTests
             new(LeftoverKind.LeftoverFolder, "old-task", @"C:\src\shop\.claude\worktrees\old-task", "Claude Code", Verdict.SafeToRemove, null,
                 "Empty folder left in a worktree container. Removing it loses nothing."),
             new(LeftoverKind.LocalBranch, "copilot/fix-login", null, "GitHub Copilot", Verdict.NeedsReview, 2,
-                "Not merged into main and untouched for 21 days."),
+                "Not merged into main and untouched for 21 days.")
+            {
+                Check = "Look at the 2 commits only on this branch in History. Deleting it keeps them under a backup tag.",
+                Commit = Side,
+            },
             new(LeftoverKind.Worktree, "räksmörgås fix", AgentWorktree, null, Verdict.InUse, 2,
-                "Locked: claude agent agent-a1b2c3 (pid 4242)."),
+                "Locked: claude agent agent-a1b2c3 (pid 4242).") { Commit = Merge },
         ];
 
         return RepoState.From(repoId, snapshot, leftovers, new ScanStatus(UnreachableCountedAt: Now.AddMinutes(-10), Scanning: false, Problem: null));

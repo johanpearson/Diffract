@@ -168,6 +168,16 @@ export interface Leftover {
   commitsAtRisk: number | null;
   /** One plain-English sentence. */
   reason: string;
+  /** What to look at before removing it, in plain English. Null when there is nothing to check. */
+  check: string | null;
+  /** The commit "Show in History" opens. Null for a folder. */
+  commit: string | null;
+}
+
+/** Result of `cleanup.inspect`: the newest commits only the leftover holds, at most 50, and whether there are more. */
+export interface LeftoverContent {
+  commits: CommitEntry[];
+  more: boolean;
 }
 
 /** Result of `repo.open` and `repo.refresh`, and the new state in `repo.changed`. */
@@ -662,6 +672,8 @@ export interface Methods {
   "branch.undoReset": { params: { repoId: string; worktree: string; reset: ResetResult } & Watched; result: ResetResult };
   /** Plans removing the selected leftovers, from the repo's latest snapshot. Starts no git. Refused until the scan has listed the leftovers. */
   "cleanup.plan": { params: { repoId: string; leftovers: SelectedLeftover[] }; result: CleanupPlanView };
+  /** What one row holds: the newest commits only it has. One read-only git call, none for a folder. */
+  "cleanup.inspect": { params: { repoId: string; leftover: SelectedLeftover }; result: LeftoverContent };
   /**
    * Runs the plan with that id, once, checking each step right before it runs. Live refresh pauses meanwhile, and one
    * `repo.changed` with the repo as it is afterwards arrives before the answer.
