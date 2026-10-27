@@ -187,13 +187,13 @@ public sealed class CleanupMethodsTests : IAsyncDisposable
     {
         await OpenAsync("Clean");
         var hold = new TaskCompletionSource<int>();
-        var first = _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), false, _ => hold.Task);
+        var first = _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), AfterCleanup.Refresh, _ => hold.Task);
 
-        var second = await Assert.ThrowsAsync<CleanupLogException>(() => _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), false, _ => Task.FromResult(0)));
+        var second = await Assert.ThrowsAsync<CleanupLogException>(() => _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), AfterCleanup.Refresh, _ => Task.FromResult(0)));
         hold.SetResult(1);
 
         Assert.Equal("A cleanup is already running in this repo. Wait for it to finish.", second.Message);
         Assert.Equal(1, await first);
-        Assert.Equal(0, await _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), false, _ => Task.FromResult(0)));
+        Assert.Equal(0, await _methods.Repos.CleanUpAsync(_methods.Repos.Get("1"), AfterCleanup.Refresh, _ => Task.FromResult(0)));
     }
 }

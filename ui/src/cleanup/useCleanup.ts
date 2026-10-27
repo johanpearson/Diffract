@@ -46,25 +46,10 @@ export function useCleanup(client: RpcClient, repoId: string, rows: Row[], showN
   const commands = useCommands();
   const selection = useSelection(rows);
   const { selected, clear } = selection;
-  const [planning, setPlanning] = useState(false);
-  const [plan, setPlan] = useState<CleanupPlanView | null>(null);
+  const { plan, setPlan, planning, planFor } = usePlanning(client, repoId, showNotice);
   const [shown, setShown] = useState<Shown | null>(null);
   const [history, loadHistory] = usePastCleanups(client, repoId, showNotice);
   const [busy, setBusy] = useState(false);
-
-  const planFor = useCallback(
-    async (chosen: Row[]) => {
-      setPlanning(true);
-      try {
-        setPlan(await client.call("cleanup.plan", { repoId, leftovers: chosen.map((row) => toSelected(row.leftover)) }));
-      } catch (error) {
-        showNotice(`Could not plan the cleanup: ${messageOf(error)}`);
-      } finally {
-        setPlanning(false);
-      }
-    },
-    [client, repoId, showNotice],
-  );
 
   /** Runs an apply or an undo in the command window, then shows what it did and reads the history again. */
   const run = useCallback(
@@ -133,6 +118,26 @@ function useSelection(rows: Row[]) {
     toggle: (key: string) => setTicked((before) => toggled(before, key)),
     selectMergedBranches: () => setTicked((before) => withMergedBranches(rows, before)),
   };
+}
+
+/** Asks the sidecar for a plan, which opens the confirm dialog. A plan that cannot be made is a notice. */
+function usePlanning(client: RpcClient, repoId: string, showNotice: (message: string) => void) {
+  const [planning, setPlanning] = useState(false);
+  const [plan, setPlan] = useState<CleanupPlanView | null>(null);
+  const planFor = useCallback(
+    async (chosen: Row[]) => {
+      setPlanning(true);
+      try {
+        setPlan(await client.call("cleanup.plan", { repoId, leftovers: chosen.map((row) => toSelected(row.leftover)) }));
+      } catch (error) {
+        showNotice(`Could not plan the cleanup: ${messageOf(error)}`);
+      } finally {
+        setPlanning(false);
+      }
+    },
+    [client, repoId, showNotice],
+  );
+  return { plan, setPlan, planning, planFor };
 }
 
 /** The operation log, read when the view opens and again after each cleanup or undo. */

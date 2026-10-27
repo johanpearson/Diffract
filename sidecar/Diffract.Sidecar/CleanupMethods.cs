@@ -52,7 +52,7 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
         try
         {
             var keeps = _plans.TryGetValue(planId, out var kept) && kept.Plan.Leftovers.Any(l => l.Refused is null && l.Leftover.Kind == LeftoverKind.OrphanedCommit);
-            var result = await repos.CleanUpAsync(repos.Get(repoId), keeps, root => Executor(root, parameters).ApplyAsync(Take(repoId, planId), request.LeaveOut ?? [], ct)).ConfigureAwait(false);
+            var result = await repos.CleanUpAsync(repos.Get(repoId), After(keeps), root => Executor(root, parameters).ApplyAsync(Take(repoId, planId), request.LeaveOut ?? [], ct)).ConfigureAwait(false);
             return SidecarMethods.Result(result);
         }
         catch (ArgumentException e)
@@ -77,8 +77,11 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
         // Undoing "Keep these" makes the commits orphaned again, so they are counted again.
         var keeps = Executor(session.RepoRoot, parameters).History()
             .Any(c => c.CleanupId == cleanupId && c.Leftovers.Any(l => l.Kind == LeftoverKind.OrphanedCommit));
-        return SidecarMethods.Result(await repos.CleanUpAsync(session, keeps, root => Executor(root, parameters).UndoAsync(cleanupId, ct)).ConfigureAwait(false));
+        return SidecarMethods.Result(await repos.CleanUpAsync(session, After(keeps), root => Executor(root, parameters).UndoAsync(cleanupId, ct)).ConfigureAwait(false));
     }
+
+    /// <summary>Keeping orphaned commits, or undoing that, changes which commits are orphaned, so they are counted again.</summary>
+    private static AfterCleanup After(bool keepsCommits) => keepsCommits ? AfterCleanup.RecountUnreachable : AfterCleanup.Refresh;
 
     /// <summary>Forgets the plans of a repo that was closed.</summary>
     public void Forget(string repoId)
