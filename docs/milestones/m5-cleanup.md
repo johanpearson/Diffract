@@ -1,6 +1,6 @@
 # Milestone 5: safe cleanup with backup tags and undo, stashes, and pruning remote branches
 
-**Status:** in progress. Phases 0 to 4 are done; phase 5, old backup tags and orphaned commits, is next.
+**Status:** in progress. Phases 0 to 5 are done. Next: making "Needs review" rows something you can act on (see "Revisiting the view" under phase 5), then phase 6, hiding rows.
 **Estimate:** 1 to 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan cleans up the agent leftovers in his busiest repos from the installed app, nothing he did not choose is touched, and every removal he tries to undo comes back.
 
@@ -90,7 +90,7 @@ Any row can be hidden with "Hide", and the summary counts leave it out. A hidden
 - Undo reads a cleanup from the log and runs its undo steps in reverse order, with the same checks.
 - Tests: every kind is removed and then undone in a fixture repo, and the repo ends where it started (refs, worktrees, stashes). Then the awkward paths: a branch that moved after planning, a worktree that turned dirty, a locked file, an undo after git already removed the commits. A call budget per step, as in milestones 1 and 2.
 
-**Done** 2026-10-26, in #66. A backup tag is now made only when the removal it is for would run, so a leftover that changed gets no stray tag. An undo that stopped part way can be run again and does only what is left. Leaving out a step the dialog makes optional, such as a worktree's branch, comes with the protocol in phase 3.
+**Done** 2026-10-26, in #66. A backup tag is now made only when the removal it is for would run, so a leftover that changed gets no stray tag. An undo that stopped part way can be run again and does only what is left. Leaving out a step the dialog makes optional, such as a worktree's branch, comes with the protocol in phase 3. Johan accepted that each test run leaves one small empty folder in the Recycle Bin, and that Windows asks before deleting for good a folder it cannot recycle.
 
 ## Phase 3: protocol
 
@@ -122,6 +122,16 @@ Tests: Vitest for the dialog and the result, against contract samples. Playwrigh
 ## Phase 5: old backup tags and orphaned commits
 
 Old backup tags are removed like any other leftover. Orphaned commits get "Keep these", which saves them under one `archive/` tag.
+
+**Done** 2026-10-27. Old backup tags needed nothing new: they were planned in phase 1 and undone in phase 2. "Keep these" tags one orphaned commit as it is. Several get a commit made to hold them all, with git's empty tree, and that commit is tagged. Git knows the empty tree without storing it, but `git fsck` reported the holder commit as broken until it was stored, so Diffract writes it first. `commit-tree` and `mktree`, with no input, join the cleanup allowlist; neither touches a ref. Unreachable commits are counted again after keeping, or after undoing a keep, so the row goes and comes back.
+
+### Revisiting the view
+
+Johan tried phase 4 on 2026-10-27 and asked for changes before more is built on it:
+
+- The view is called "Cleanup", not "Worktrees and agents": it lists branches, stashes, tags and folders too. Done in #68.
+- Past cleanups are folded away under one line, each one a quiet line with "Undo". Done in #68.
+- "Needs review" rows must be something you can act on. Each row says what to check, opens to show what is in it (its commits, or a stash's files), and has "Show in History". Grouped rows are split: one row per orphaned commit, with an agent's checkpoint commits grouped per session. Next, before phase 6.
 
 ## Phase 6: hiding rows
 
