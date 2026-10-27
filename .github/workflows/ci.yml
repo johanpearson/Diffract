@@ -212,7 +212,7 @@ jobs:
         id: rust
         shell: pwsh
         run: |
-          $version = (rustc -V) -replace '[^A-Za-z0-9.]+', '-'
+          $version = ((rustc -V) -replace '[^A-Za-z0-9.]+', '-').Trim('-')
           Write-Output "rustc: $version"
           "version=$version" >> $env:GITHUB_OUTPUT
 
