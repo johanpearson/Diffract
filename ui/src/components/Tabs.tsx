@@ -3,7 +3,7 @@ import { useRef, type KeyboardEvent } from "react";
 export const views = ["history", "changes", "leftovers"] as const;
 export type View = (typeof views)[number];
 
-const labels: Record<View, string> = { leftovers: "Worktrees and agents", history: "History", changes: "Changes" };
+const labels: Record<View, string> = { leftovers: "Cleanup", history: "History", changes: "Changes" };
 
 export function tabId(view: View): string {
   return `tab-${view}`;

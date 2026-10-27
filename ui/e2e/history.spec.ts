@@ -280,7 +280,7 @@ test("opens on History and shows it before the leftover scan has finished", asyn
 
   await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
   await expect(list(page).getByRole("option").first()).toBeVisible();
-  await page.getByRole("tab", { name: "Worktrees and agents" }).click();
+  await page.getByRole("tab", { name: "Cleanup" }).click();
   await expect(page.getByText("Looking for leftovers. History is ready to use meanwhile.")).toBeVisible();
 
   await page.evaluate(() => window.diffractTest.sidecar.finishScan("1"));

@@ -56,7 +56,7 @@ describe("App", () => {
   it("opens the last repo again on start", async () => {
     const { sidecar } = setup({ last: repoRoot });
 
-    expect(await screen.findByRole("heading", { name: "Worktrees and agents" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Cleanup" })).toBeTruthy();
     expect(rowNames()).toEqual(["old-task", "copilot/fix-login", "räksmörgås fix"]);
     expect(sent(sidecar, "repo.open")[0]?.params).toEqual({ path: repoRoot });
   });
@@ -124,7 +124,7 @@ describe("App", () => {
     expect(await screen.findByRole("listbox", { name: "Changed files" })).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("tab", { name: "Changes" }), { key: "ArrowRight" });
     expect(await screen.findByRole("list", { name: "Leftovers" })).toBeTruthy();
-    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Worktrees and agents" }));
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Cleanup" }));
     fireEvent.click(screen.getByRole("tab", { name: "History" }));
     expect(await screen.findByRole("listbox", { name: "Commits" })).toBeTruthy();
     expect(sent(sidecar, "history.read")).toHaveLength(1);
@@ -334,7 +334,7 @@ describe("App", () => {
       expect(screen.getAllByRole("tab").map((t) => [t.textContent, t.getAttribute("aria-selected")])).toEqual([
         ["History", "true"],
         ["Changes", "false"],
-        ["Worktrees and agents", "false"],
+        ["Cleanup", "false"],
       ]);
       vi.restoreAllMocks();
     });
@@ -541,7 +541,7 @@ describe("the sidebar", () => {
 
     fireEvent.click(within(sidebar()).getByRole("button", { name: /^Leftovers/ }));
 
-    expect(screen.getByRole("tab", { name: "Worktrees and agents" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Cleanup" }).getAttribute("aria-selected")).toBe("true");
   });
 });
 

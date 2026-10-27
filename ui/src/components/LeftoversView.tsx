@@ -29,7 +29,7 @@ interface Props {
   now: Date;
 }
 
-/** The "Worktrees and agents" view: counts, filter chips, one row per leftover to select, and cleaning them up. */
+/** The "Cleanup" view: counts, filter chips, one row per leftover to select, and cleaning them up. */
 export function LeftoversView(props: Props) {
   const { state, cleanup, now } = props;
   return (
@@ -57,7 +57,7 @@ function Bar({ state, refreshing, refreshBlocked = null, onRefresh, cleanup }: P
   const scanned = !state.scanning && state.scanProblem === null;
   return (
     <div className="bar">
-      <h1 id="view-title">Worktrees and agents</h1>
+      <h1 id="view-title">Cleanup</h1>
       <span className="grow" />
       <button
         className="abtn"

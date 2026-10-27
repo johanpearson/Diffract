@@ -4,14 +4,14 @@ import type {} from "../src/e2eHost";
 // The repo in the repo.open contract sample, which the fake sidecar serves.
 const repoRoot = "C:\\src\\shop";
 
-/** Opens the repo, then its "Worktrees and agents" tab. */
+/** Opens the repo, then its "Cleanup" tab. */
 async function openRepo(page: Page) {
   await page.goto("/");
   // The app sets up its test hooks as it starts, so wait for it first.
   await expect(page.getByRole("heading", { name: "Open a repo" })).toBeVisible();
   await page.evaluate((path) => (window.diffractTest.nextFolder = path), repoRoot);
   await page.getByRole("button", { name: "Open repo…" }).first().click();
-  await page.getByRole("tab", { name: "Worktrees and agents" }).click();
+  await page.getByRole("tab", { name: "Cleanup" }).click();
 }
 
 const leftovers = (page: Page) => page.getByRole("list", { name: "Leftovers" });
@@ -40,6 +40,7 @@ test("select, confirm, see the rows go, undo, see them come back", async ({ page
 
   await expect(page.getByRole("region", { name: "Undo result" })).toBeVisible();
   await expect(leftovers(page).getByRole("listitem")).toHaveCount(3);
+  await page.getByText("Past cleanups (2)").click();
   await expect(page.getByRole("list", { name: "Past cleanups" }).getByRole("listitem")).toHaveCount(2);
 });
 
