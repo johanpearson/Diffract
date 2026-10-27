@@ -9,6 +9,9 @@ using Diffract.Sidecar.Rpc;
 
 namespace Diffract.Sidecar;
 
+/// <summary>What the refresh after a cleanup counts. <c>git fsck</c> is slow, so only when commits may have stopped, or started, being orphaned.</summary>
+internal enum AfterCleanup { Refresh, RecountUnreachable }
+
 /// <summary>
 /// The repos the UI has open, by id. Opening a repo that is already open, through any of its worktrees, returns the same id.
 /// Opening answers with a quick snapshot, which is all history needs, and scans the rest in the background: worktree
@@ -121,8 +124,8 @@ internal sealed class RepoSessions(
     /// Runs a cleanup or its undo with the repo's live refresh paused, so Diffract does not read the repo half changed,
     /// then catches up with one full refresh, sent as <c>repo.changed</c> before this returns. One at a time per repo.
     /// </summary>
-    /// <param name="recount">Count unreachable commits again afterwards, with <c>git fsck</c>, as after keeping orphaned commits.</param>
-    public async Task<T> CleanUpAsync<T>(RepoSession session, bool recount, Func<string, Task<T>> run)
+    /// <param name="after">What the refresh afterwards counts: unreachable commits too, as after keeping orphaned commits.</param>
+    public async Task<T> CleanUpAsync<T>(RepoSession session, AfterCleanup after, Func<string, Task<T>> run)
     {
         if (!session.TryStartCleanup())
             throw new CleanupLogException("A cleanup is already running in this repo. Wait for it to finish.");
@@ -133,16 +136,16 @@ internal sealed class RepoSessions(
         finally
         {
             session.EndCleanup();
-            await CatchUpAsync(session, recount).ConfigureAwait(false);
+            await CatchUpAsync(session, after).ConfigureAwait(false);
         }
     }
 
     /// <summary>A failure is logged, not thrown: the cleanup's own result matters more, and the next change tries again.</summary>
-    private async Task CatchUpAsync(RepoSession session, bool recount)
+    private async Task CatchUpAsync(RepoSession session, AfterCleanup after)
     {
         try
         {
-            var state = await RefreshAsync(session.Id, recount, session.Closing).ConfigureAwait(false);
+            var state = await RefreshAsync(session.Id, after == AfterCleanup.RecountUnreachable, session.Closing).ConfigureAwait(false);
             await notify(new RepoChanged([new RepoChange(ChangeKind.Everything, null)], state)).ConfigureAwait(false);
         }
         catch (Exception e) when (e is not OperationCanceledException)
