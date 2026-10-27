@@ -1,6 +1,6 @@
 # Milestone 5: safe cleanup with backup tags and undo, stashes, and pruning remote branches
 
-**Status:** in progress. Phases 0 to 5 are done. Next: making "Needs review" rows something you can act on (see "Revisiting the view" under phase 5), then phase 6, hiding rows.
+**Status:** in progress. Phases 0 to 5 are done, and so is the revisit of the view under phase 5. Phase 6, hiding rows, is next.
 **Estimate:** 1 to 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan cleans up the agent leftovers in his busiest repos from the installed app, nothing he did not choose is touched, and every removal he tries to undo comes back.
 
@@ -131,7 +131,7 @@ Johan tried phase 4 on 2026-10-27 and asked for changes before more is built on 
 
 - The view is called "Cleanup", not "Worktrees and agents": it lists branches, stashes, tags and folders too. Done in #68.
 - Past cleanups are folded away under one line, each one a quiet line with "Undo". Done in #68.
-- "Needs review" rows must be something you can act on. Each row says what to check, opens to show what is in it (its commits, or a stash's files), and has "Show in History". Grouped rows are split: one row per orphaned commit, with an agent's checkpoint commits grouped per session. Next, before phase 6.
+- "Needs review" rows must be something you can act on. Each row says what to check, opens to show what is in it (its commits, or a stash's files), and has "Show in History". Grouped rows are split: one row per orphaned commit, with an agent's checkpoint commits grouped per session. Done in #71. A stash's files show in History, which "Show in History" opens with Stashes turned on. Orphaned commits have no "Show in History", as History never lists them; their row lists the commits instead.
 
 ## Phase 6: hiding rows
 
