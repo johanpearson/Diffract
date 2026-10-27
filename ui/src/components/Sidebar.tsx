@@ -23,7 +23,7 @@ interface Props {
   refs: readonly HistoryRef[];
   branches: BranchContext;
   commands: RefCommands;
-  /** Opens the "Worktrees and agents" view. */
+  /** Opens the "Cleanup" view. */
   onShowLeftovers(): void;
 }
 

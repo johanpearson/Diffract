@@ -11,7 +11,7 @@ afterEach(cleanup);
 
 const repoRoot = sampleState.repoRoot;
 
-/** The app on "Worktrees and agents" with the sample repo open, against a fake sidecar. */
+/** The app on "Cleanup" with the sample repo open, against a fake sidecar. */
 async function setup(sidecar = new FakeSidecar()) {
   const stored = new Map([[LastRepoKey, repoRoot]]);
   const host: AppHost = {
@@ -86,15 +86,29 @@ describe("cleaning up", () => {
 
     await screen.findByRole("region", { name: "Undo result" });
     await waitFor(() => expect(rowNames()).toContain("copilot/fix-login"));
+    await waitFor(() => expect(screen.getByText("Past cleanups (2)")).toBeTruthy());
+    fireEvent.click(screen.getByText("Past cleanups (2)"));
     const past = within(screen.getByRole("list", { name: "Past cleanups" }));
-    expect(past.getAllByRole("listitem").map((li) => li.getAttribute("aria-label"))).toEqual(["Undo, just now", "Cleanup, just now"]);
+    expect(past.getAllByRole("listitem").map((li) => li.getAttribute("aria-label"))).toEqual(["Undo of 1 branch, just now", "1 branch, just now"]);
     expect(past.queryByRole("button", { name: /^Undo the cleanup/ })).toBeNull();
+  });
+
+  it("folds past cleanups under one line until it is opened", async () => {
+    await setup();
+    await cleanUp("old-task", "copilot/fix-login");
+
+    const folded = await screen.findByText("Past cleanups (1)");
+
+    expect(folded.closest("details")?.open).toBe(false);
+    fireEvent.click(folded);
+    expect(within(screen.getByRole("list", { name: "Past cleanups" })).getByRole("listitem").getAttribute("aria-label")).toBe("1 folder, 1 branch, just now");
   });
 
   it("lists past cleanups with Undo on each one git can still take back", async () => {
     await setup();
     await cleanUp("copilot/fix-login");
     fireEvent.click(within(screen.getByRole("region", { name: "Cleanup result" })).getByRole("button", { name: "Close" }));
+    fireEvent.click(await screen.findByText("Past cleanups (1)"));
 
     fireEvent.click(button("Undo the cleanup of copilot/fix-login"));
 

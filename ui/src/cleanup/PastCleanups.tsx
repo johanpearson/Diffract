@@ -1,5 +1,5 @@
 import { formatAge } from "../model/format";
-import type { PastCleanup } from "../protocol";
+import type { LeftoverKind, PastCleanup } from "../protocol";
 
 interface Props {
   history: PastCleanup[];
@@ -8,46 +8,53 @@ interface Props {
   now: Date;
 }
 
-/** The operation log: past cleanups and undos, newest first, with "Undo" on each cleanup git can still take back. */
+/** One word per kind, for "2 branches, 1 folder". */
+const nouns: Record<LeftoverKind, [string, string]> = {
+  Worktree: ["worktree", "worktrees"],
+  PrunableWorktree: ["worktree", "worktrees"],
+  LocalBranch: ["branch", "branches"],
+  RemoteBranch: ["remote branch", "remote branches"],
+  Stash: ["stash", "stashes"],
+  CheckpointSession: ["checkpoint session", "checkpoint sessions"],
+  OrphanedCommit: ["orphaned commit row", "orphaned commit rows"],
+  BackupTag: ["backup tag", "backup tags"],
+  LeftoverFolder: ["folder", "folders"],
+};
+
+/**
+ * The operation log, folded away under one line. Opened, each past cleanup or undo is one line: when, what it was
+ * about, and "Undo" while git can still take it back.
+ */
 export function PastCleanups({ history, busy, onUndo, now }: Props) {
   if (history.length === 0) return null;
   return (
-    <section className="past-cleanups" aria-labelledby="past-cleanups-title">
-      <h2 id="past-cleanups-title">Past cleanups</h2>
+    <details className="past-cleanups">
+      <summary>Past cleanups ({history.length})</summary>
       <ul aria-label="Past cleanups">
         {history.map((c) => (
-          <li key={c.cleanupId} className="past-cleanup" aria-label={`${title(c)}, ${formatAge(c.at, now)}`}>
-            <div>
-              <span className="nm">{title(c)}</span>
-              <span className="kind">{formatAge(c.at, now)}</span>
-            </div>
-            <div className="why">{c.leftovers.map((l) => l.name).join(", ")}</div>
-            <div className="why">{counts(c)}</div>
+          <li key={c.cleanupId} className="past-cleanup" aria-label={`${what(c)}, ${formatAge(c.at, now)}`}>
+            <span className="when">{formatAge(c.at, now)}</span>
+            <span className="what">{what(c)}</span>
             {c.canUndo && (
-              <div className="item-actions">
-                <button className="abtn" disabled={busy} onClick={() => onUndo(c.cleanupId)} aria-label={`Undo the cleanup of ${c.leftovers.map((l) => l.name).join(", ")}`}>
-                  Undo
-                </button>
-              </div>
+              <button className="link" disabled={busy} onClick={() => onUndo(c.cleanupId)} aria-label={`Undo the cleanup of ${names(c)}`}>
+                Undo
+              </button>
             )}
           </li>
         ))}
       </ul>
-    </section>
+    </details>
   );
 }
 
-function title(c: PastCleanup): string {
-  return c.undoes === null ? "Cleanup" : "Undo";
+/** "2 branches, 1 folder", or "Undo of 2 branches, 1 folder". */
+function what(c: PastCleanup): string {
+  const counts = new Map<LeftoverKind, number>();
+  for (const l of c.leftovers) counts.set(l.kind, (counts.get(l.kind) ?? 0) + 1);
+  const parts = [...counts].map(([kind, n]) => `${n} ${nouns[kind][n === 1 ? 0 : 1]}`);
+  return c.undoes === null ? parts.join(", ") : `Undo of ${parts.join(", ")}`;
 }
 
-/** "3 steps done, 1 not done". */
-function counts(c: PastCleanup): string {
-  const done = c.steps.filter((s) => s.outcome === "Done").length;
-  const notDone = c.steps.length - done;
-  return notDone === 0 ? `${steps(done)} done` : `${steps(done)} done, ${notDone} not done`;
-}
-
-function steps(n: number): string {
-  return n === 1 ? "1 step" : `${n} steps`;
+function names(c: PastCleanup): string {
+  return c.leftovers.map((l) => l.name).join(", ");
 }
