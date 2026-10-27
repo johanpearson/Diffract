@@ -74,7 +74,7 @@ public class ContractTests
                 new("v1.0", HistoryRefKind.Tag, Parent, null),
                 new("claude/räksmörgås-fix", HistoryRefKind.Branch, Side, "Claude Code"),
                 new("copilot/checkpoints/7f3a/1", HistoryRefKind.Checkpoint, Side, "GitHub Copilot"),
-                new("stash@{0}", HistoryRefKind.Stash, Side, null),
+                new("stash@{0}", HistoryRefKind.Stash, Side, null, "On claude/räksmörgås-fix: Halvfärdigt"),
             ],
             [Side],
             ["copilot checkpoint: "])),
@@ -107,7 +107,18 @@ public class ContractTests
                 new Hunk { Id = "5d41402abc4b2a76b9719d911017c592", OldStart = 2, OldLines = 1, NewStart = 2, NewLines = 1 },
                 new Hunk { Id = "7d793037a0760186574b0282f2f435e7", OldStart = 2, OldLines = 0, NewStart = 3, NewLines = 1 },
             ]))),
+        ["stash.push"] = () => Response(new StashPushResult(Side, "Stashed your changes. The stash keeps them until you drop it.", Changes with { Files = [] })),
+        ["stash.apply"] = () => Response(new StashApplyResult(true,
+            "Applied the stash with conflicts. It is still in the list, and Changes lists the conflicted files.", Changes)),
         ["cleanup.plan"] = () => Response(CleanupPlan),
+        ["cleanup.planStash"] = () => Response(new CleanupPlanView("5b2e7c1d9a03",
+        [
+            new LeftoverPlanView(LeftoverKind.Stash, "stash@{2}", null, null,
+            [
+                new StepView(StepKind.Backup, "Keep a backup tag archive/stash/e83c5163316f-2026-10-21 for stash \"On main: Halvfärdigt\"", true, null, false),
+                new StepView(StepKind.DropStash, "Drop stash \"On main: Halvfärdigt\"", true, "Undo puts it back on top of the list.", false),
+            ]),
+        ])),
         ["cleanup.apply"] = () => Response(Applied),
         ["cleanup.undo"] = () => Response(new CleanupResult("7c0e5b9d2f41",
         [

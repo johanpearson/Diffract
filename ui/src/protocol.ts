@@ -294,6 +294,8 @@ export interface HistoryRef {
   targetId: string;
   /** The agent it looks like it belongs to, from the patterns in diffract.json. A hint only. */
   agent: string | null;
+  /** A stash's message, such as "On main: half done". Null for every other ref; left out by test data that has none. */
+  message?: string | null;
 }
 
 /** Result of `history.refs`: the refs, and what tells agent work apart. */
@@ -568,6 +570,24 @@ export interface PastCleanup {
   canUndo: boolean;
 }
 
+/** Result of `stash.push`. */
+export interface StashPushResult {
+  /** The new stash's commit. */
+  commitId: string;
+  /** What happened, in plain words. */
+  message: string;
+  /** The worktree afterwards. */
+  status: WorktreeChanges;
+}
+
+/** Result of `stash.apply`. */
+export interface StashApplyResult {
+  /** It applied with conflicts. The stash is kept, and `status` lists the conflicted files. */
+  conflicts: boolean;
+  message: string;
+  status: WorktreeChanges;
+}
+
 /** Params of `branch.switch`: exactly one of a local branch, a remote-tracking branch or a full commit id. */
 /** A request that changes the repo can name an operation, to get git's output as `command.output` while it runs. */
 export interface Watched {
@@ -673,8 +693,17 @@ export interface Methods {
   "branch.reset": { params: { repoId: string; worktree: string; commit: string; mode: ResetMode } & Watched; result: ResetResult };
   /** Moves the branch back, only while it is still where the reset left it. Answers with that move. */
   "branch.undoReset": { params: { repoId: string; worktree: string; reset: ResetResult } & Watched; result: ResetResult };
+  /**
+   * Stashes the worktree's changes, and new files too with `includeUntracked`. Only the message's first line is used;
+   * without one, git names it "WIP on <branch>". Nothing to stash is ChangeRefused.
+   */
+  "stash.push": { params: { repoId: string; worktree: string; message?: string | null; includeUntracked: boolean } & Watched; result: StashPushResult };
+  /** Applies a stash by its full commit id and keeps it. Never pops. Conflicts are a result, not an error. */
+  "stash.apply": { params: { repoId: string; worktree: string; commit: string } & Watched; result: StashApplyResult };
   /** Plans removing the selected leftovers, from the repo's latest snapshot. Starts no git. Refused until the scan has listed the leftovers. */
   "cleanup.plan": { params: { repoId: string; leftovers: SelectedLeftover[] }; result: CleanupPlanView };
+  /** Plans dropping one stash, by its commit, with a backup tag first, as for a stash leftover. Apply it with `cleanup.apply`. */
+  "cleanup.planStash": { params: { repoId: string; commit: string }; result: CleanupPlanView };
   /** What one row holds: the newest commits only it has. One read-only git call, none for a folder. */
   "cleanup.inspect": { params: { repoId: string; leftover: SelectedLeftover }; result: LeftoverContent };
   /** Leaves the row out of the list and its counts until it changes. Changes nothing in the repo. Answers with the new state. */

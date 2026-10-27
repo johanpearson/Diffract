@@ -5,7 +5,7 @@ import type { Hunk, RepoState, WorktreeChanges, WorktreeInfo } from "../protocol
 import type { RpcClient } from "../rpc";
 import { ChangesDiff } from "./ChangesDiff";
 import { CommitBox } from "./CommitBox";
-import { inUseReason, worktreeOf } from "../model/worktrees";
+import { changesWorktrees, inUseReason } from "../model/worktrees";
 import { listsOf, type Entry, type Lists } from "./entries";
 import { FileLists } from "./FileLists";
 import { BranchInfo } from "../components/BranchInfo";
@@ -15,29 +15,27 @@ import { useChanges } from "./useChanges";
 interface Props {
   client: RpcClient;
   state: RepoState;
-  /** The folder the repo was opened from. Its worktree is the one shown first. */
-  openedPath: string;
+  /** The worktree shown. The sidebar applies stashes to it too, so the choice is kept outside this view. */
+  worktree: string;
+  onWorktree(path: string): void;
   storage: AppHost["storage"];
 }
 
 export const ListsWidth: SizeSpec = { key: "diffract.size.changes", initial: 340, min: 240, max: 720 };
 
 /** What is different in one worktree: what to stage, what is staged, the commit box, and the selected file's diff. */
-export function ChangesView({ client, state, openedPath, storage }: Props) {
-  const worktrees = useMemo(() => state.snapshot.worktrees.filter((w) => !w.isBare && !w.isPrunable), [state.snapshot.worktrees]);
-  const [worktree, setWorktree] = useState(() => worktreeOf(openedPath, worktrees) ?? state.repoRoot);
+export function ChangesView({ worktree, ...props }: Props) {
+  const worktrees = useMemo(() => changesWorktrees(props.state), [props.state]);
 
   return (
     <section className="view changes" aria-labelledby="changes-title">
-      <ChangesBody key={worktree} client={client} state={state} worktree={worktree} worktrees={worktrees} onWorktree={setWorktree} storage={storage} />
+      <ChangesBody key={worktree} {...props} worktree={worktree} worktrees={worktrees} />
     </section>
   );
 }
 
-interface BodyProps extends Omit<Props, "openedPath"> {
-  worktree: string;
+interface BodyProps extends Props {
   worktrees: WorktreeInfo[];
-  onWorktree(path: string): void;
 }
 
 function ChangesBody({ client, state, worktree, worktrees, onWorktree, storage }: BodyProps) {
@@ -101,7 +99,7 @@ function ChangesMain({ model, status, lists, storage }: { model: Model; status: 
           onStageAll={() => changes.stage(lists.unstaged.filter((e) => e.blocked === null))}
           locked={locked}
         />
-        <CommitBox status={status} stagedCount={lists.staged.length} locked={locked} onCommit={changes.commit} />
+        <CommitBox status={status} stagedCount={lists.staged.length} locked={locked} onCommit={changes.commit} onStash={changes.stash} />
       </div>
       <Splitter label="Resize file lists" orientation="vertical" spec={ListsWidth} size={width} onSize={setWidth} growsForward />
       {entry ? (

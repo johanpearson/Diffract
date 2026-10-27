@@ -2,6 +2,7 @@ import inspectSample from "../../../tests/Diffract.Sidecar.Tests/Contract/cleanu
 import type {
   CleanupPlanView,
   CleanupResult,
+  HistoryRef,
   Leftover,
   LeftoverContent,
   LeftoverPlanView,
@@ -30,11 +31,18 @@ export interface CleanupHost {
 
 const EarlierStep = "Skipped, as an earlier step for the same leftover did not run.";
 
+/** What applying and undoing a plan change on the fake besides its leftovers, such as its stashes. */
+export interface Effect {
+  apply(): void;
+  undo(): void;
+}
+
 /** A plan the fake keeps, as the sidecar does, until it is applied. */
 interface Kept {
   repoId: string;
   plan: CleanupPlanView;
   leftovers: (Leftover | null)[];
+  effect?: Effect;
 }
 
 /**
@@ -51,7 +59,7 @@ export class FakeCleanups {
   readonly asked: { method: string; params: unknown }[] = [];
 
   private readonly plans = new Map<string, Kept>();
-  private readonly removed = new Map<string, { repoId: string; leftovers: Leftover[] }>();
+  private readonly removed = new Map<string, { repoId: string; leftovers: Leftover[]; effect?: Effect }>();
   private next = 0;
 
   answer(host: CleanupHost, method: string, params: unknown): unknown {
@@ -88,6 +96,17 @@ export class FakeCleanups {
     return plan;
   }
 
+  /** As cleanup.planStash: a backup tag, then the drop, which `effect` carries out on the fake when applied. */
+  planStash(repoId: string, stash: HistoryRef, effect: Effect): CleanupPlanView {
+    const steps = [
+      step("Backup", `Keep a backup tag archive/stash/${stash.targetId.slice(0, 12)}-2026-10-21 for stash "${stash.message}"`),
+      step("DropStash", `Drop stash "${stash.message}"`, { undoNote: "Undo puts it back on top of the list." }),
+    ];
+    const plan: CleanupPlanView = { planId: `plan-${++this.next}`, leftovers: [{ kind: "Stash", name: stash.name, path: null, refused: null, steps }] };
+    this.plans.set(plan.planId, { repoId, plan, leftovers: [null], effect });
+    return plan;
+  }
+
   private apply(host: CleanupHost, repoId: string, planId: string, leaveOut: StepRef[]): CleanupResult {
     const kept = this.plans.get(planId);
     if (!kept || kept.repoId !== repoId) throw refused("This plan is no longer there, or was applied already. Select the leftovers again.");
@@ -97,7 +116,9 @@ export class FakeCleanups {
     const cleaned = this.cleaned(kept);
 
     const cleanupId = `cleanup-${++this.next}`;
-    this.removed.set(cleanupId, { repoId, leftovers: cleaned });
+    const effect = steps.every((s) => s.outcome === "Done") ? kept.effect : undefined;
+    effect?.apply();
+    this.removed.set(cleanupId, { repoId, leftovers: cleaned, effect });
     host.change(repoId, (s) => withLeftovers(s, s.leftovers.filter((l) => !cleaned.some((c) => same(c, l)))), [{ kind: "Everything", path: null }]);
     const canUndo = steps.some((s) => s.outcome === "Done" && s.kind !== "RecycleFolder");
     this.history.unshift({ cleanupId, at: host.state(repoId).takenAt, undoes: null, leftovers: kept.plan.leftovers.map(named), steps, canUndo });
@@ -126,6 +147,7 @@ export class FakeCleanups {
     const entry = this.history.find((c) => c.cleanupId === cleanupId);
     if (!entry?.canUndo) throw refused("Everything in this cleanup that can be undone is undone already.");
     const back = this.removed.get(cleanupId)?.leftovers ?? [];
+    this.removed.get(cleanupId)?.effect?.undo();
     host.change(repoId, (s) => withLeftovers(s, [...s.leftovers, ...back]), [{ kind: "Everything", path: null }]);
     const steps = entry.steps
       .filter((s) => s.outcome === "Done" && s.kind !== "RecycleFolder")

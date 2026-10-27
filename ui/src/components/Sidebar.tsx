@@ -7,6 +7,7 @@ import { menuPosition } from "./menuPosition";
 import type { BranchContext, RefCommands } from "./refMenu";
 import { SidebarRefs } from "./SidebarRefs";
 import { SidebarSection } from "./SidebarSection";
+import { SidebarStashes, type SidebarStashesProps as StashesProps } from "../stash/SidebarStashes";
 
 interface Props {
   state: RepoState;
@@ -25,13 +26,15 @@ interface Props {
   commands: RefCommands;
   /** Opens the "Cleanup" view. */
   onShowLeftovers(): void;
+  /** What the Stashes section does with a stash. */
+  stashes: Pick<StashesProps, "actions" | "target" | "onShow">;
 }
 
 /**
  * The repo, then its branches, remotes and tags, which a person works with every day, and last its worktrees, which
  * matter mostly for cleaning up after agents. Every section opens and closes, and stays as it was left.
  */
-export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTerminal, storage, refs, branches, commands, onShowLeftovers }: Props) {
+export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTerminal, storage, refs, branches, commands, onShowLeftovers, stashes }: Props) {
   const [menu, setMenu] = useState<{ worktree: WorktreeInfo; x: number; y: number } | null>(null);
   const [chooser, setChooser] = useState<{ x: number; y: number } | null>(null);
   const inUse = new Set(state.leftovers.filter((l) => l.verdict === "InUse" && l.path).map((l) => l.path!.toLowerCase()));
@@ -66,6 +69,7 @@ export function Sidebar({ state, terminals, terminal, onOpenFolder, onOpenTermin
       </div>
       <div className="side-sections">
         <SidebarRefs refs={refs} context={branches} commands={commands} storage={storage} />
+        <SidebarStashes refs={refs} storage={storage} {...stashes} />
         <SidebarSection id="worktrees" title="Worktrees" count={state.snapshot.worktrees.length} initial={false} storage={storage}>
           <ul className="worktrees" aria-label="Worktrees">
             {state.snapshot.worktrees.map((w) => (

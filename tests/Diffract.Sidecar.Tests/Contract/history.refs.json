@@ -7,37 +7,43 @@
         "name": "main",
         "kind": "Branch",
         "targetId": "9fceb02d0ae598e95dc970b74767f19372d61af8",
-        "agent": null
+        "agent": null,
+        "message": null
       },
       {
         "name": "origin/main",
         "kind": "RemoteBranch",
         "targetId": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
-        "agent": null
+        "agent": null,
+        "message": null
       },
       {
         "name": "v1.0",
         "kind": "Tag",
         "targetId": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
-        "agent": null
+        "agent": null,
+        "message": null
       },
       {
         "name": "claude/räksmörgås-fix",
         "kind": "Branch",
         "targetId": "e83c5163316f89bfbde7d9ab23ca2e25604af290",
-        "agent": "Claude Code"
+        "agent": "Claude Code",
+        "message": null
       },
       {
         "name": "copilot/checkpoints/7f3a/1",
         "kind": "Checkpoint",
         "targetId": "e83c5163316f89bfbde7d9ab23ca2e25604af290",
-        "agent": "GitHub Copilot"
+        "agent": "GitHub Copilot",
+        "message": null
       },
       {
         "name": "stash@{0}",
         "kind": "Stash",
         "targetId": "e83c5163316f89bfbde7d9ab23ca2e25604af290",
-        "agent": null
+        "agent": null,
+        "message": "On claude/räksmörgås-fix: Halvfärdigt"
       }
     ],
     "agentHeads": [

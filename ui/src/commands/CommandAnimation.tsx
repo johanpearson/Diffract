@@ -90,6 +90,14 @@ const pictures: Record<CommandKind, ReactNode> = {
       <Dots className="anim-fade" xs={[40, 54]} y={30} />
     </>
   ),
+  // Changes drop off the line into the stash, kept to one side.
+  stash: (
+    <>
+      <Line y={14} xs={[14, 32, 50]} />
+      <Dots className="anim-drop" xs={[32]} y={30} />
+      <path className="anim-line" d="M20 34v12h24V34" />
+    </>
+  ),
   // HEAD slides back to an earlier commit.
   reset: (
     <>

@@ -19,6 +19,9 @@ public static class ChangesPolicy
     /// <summary>A full commit id, never a revision expression.</summary>
     private const string CommitSlot = "<commit>";
 
+    /// <summary>A stash's message: anything that is not empty, passed as its own argument, so a leading "-" is part of it.</summary>
+    private const string MessageSlot = "<message>";
+
     private static readonly string[][] Shapes =
     [
         ["add", "--pathspec-from-file=-", "--pathspec-file-nul"],
@@ -46,6 +49,13 @@ public static class ChangesPolicy
         ["tag", "-a", RefSlot, CommitSlot, "-F", "-"],
         ["reset", "--soft", CommitSlot],
         ["reset", "--mixed", CommitSlot],
+        // A stash keeps everything it takes, so nothing is lost. Without a message, git writes "WIP on <branch>".
+        ["stash", "push"],
+        ["stash", "push", "--include-untracked"],
+        ["stash", "push", "-m", MessageSlot],
+        ["stash", "push", "--include-untracked", "-m", MessageSlot],
+        // By the stash's commit, never stash@{n}, since the list shifts as agents stash too. The stash is kept.
+        ["stash", "apply", CommitSlot],
     ];
 
     /// <summary>Every allowed command, with a placeholder such as "&lt;commit&gt;" for each value.</summary>
@@ -62,7 +72,7 @@ public static class ChangesPolicy
 
     private static bool Fits(string slot, string value) => slot switch
     {
-        PathSlot => value.Length > 0,
+        PathSlot or MessageSlot => value.Length > 0,
         CommitSlot => ObjectId.IsValid(value),
         RemoteSlot or RefSlot => PolicySlots.IsPlainName(value),
         _ => slot == value,

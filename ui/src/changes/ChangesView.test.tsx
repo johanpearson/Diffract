@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ChangeAction, FileSides } from "../history/monacoEditor";
@@ -40,10 +41,16 @@ function setup(sidecar = new FakeSidecar(), openedPath = mainWorktree) {
   render(
     <CommandsProvider client={client} autoCloseMs={20}>
       <BranchBar client={client} state={sampleState} worktree={openedPath} />
-      <ChangesView client={client} state={sampleState} openedPath={openedPath} storage={storage} />
+      <Changes client={client} openedPath={openedPath} />
     </CommandsProvider>,
   );
   return sidecar;
+}
+
+/** The view, with the worktree choice kept outside it, as the app keeps it. */
+function Changes({ client, openedPath }: { client: RpcClient; openedPath: string }) {
+  const [worktree, setWorktree] = useState(openedPath);
+  return <ChangesView client={client} state={sampleState} worktree={worktree} onWorktree={setWorktree} storage={storage} />;
 }
 
 const lists = () => screen.getByRole("listbox", { name: "Changed files" });
@@ -297,6 +304,70 @@ describe("the Changes view", () => {
     expect(rows("Unstaged")).toEqual(["Usrc/merge.csConflict"]);
     expect(within(group("Unstaged")).queryByRole("button", { name: /Stage src/ })).toBeNull();
     expect(await screen.findByText(/merge conflict/)).toBeTruthy();
+  });
+});
+
+describe("Stash changes", () => {
+  const stashButton = () => screen.getByRole("button", { name: "Stash changes" });
+  const message = () => screen.getByRole("textbox", { name: "Commit message" });
+  const includeNew = () => screen.queryByRole("checkbox", { name: "Include new files" });
+  const stashesAsked = (sidecar: FakeSidecar) => sidecar.stashes.asked.map((a) => a.params);
+
+  it("stashes changes to tracked files under the commit box's message, and keeps the message", async () => {
+    const sidecar = setup();
+    await ready();
+    fireEvent.change(message(), { target: { value: "Halvfärdigt\n\nmore words" } });
+
+    fireEvent.click(stashButton());
+
+    await within(commandWindow()).findByText("Stashed your changes. The stash keeps them until you drop it.");
+    expect(stashesAsked(sidecar)).toEqual([expect.objectContaining({ worktree: mainWorktree, message: "Halvfärdigt\n\nmore words", includeUntracked: false })]);
+    // The new file stays, as "Include new files" was off.
+    await waitFor(() => expect(rows("Unstaged")).toEqual(["Adocs/notes.mdStage"]));
+    expect(within(group("Staged")).queryAllByRole("option")).toEqual([]);
+    expect((message() as HTMLTextAreaElement).value).toBe("Halvfärdigt\n\nmore words");
+  });
+
+  it("stashes new files too with Include new files", async () => {
+    const sidecar = setup();
+    await ready();
+
+    fireEvent.click(includeNew()!);
+    fireEvent.click(stashButton());
+
+    await within(commandWindow()).findByText(/Stashed your changes/);
+    expect(stashesAsked(sidecar)).toEqual([expect.objectContaining({ includeUntracked: true })]);
+  });
+
+  it("offers Include new files only when there are new files", async () => {
+    setup(new FakeSidecar(), agentWorktree);
+    await ready();
+
+    expect(stashButton()).toBeTruthy();
+    expect(includeNew()).toBeNull();
+  });
+
+  it("cannot stash while a file has a conflict, and says why", async () => {
+    const sidecar = new FakeSidecar();
+    const wt = sidecar.worktree(mainWorktree);
+    wt.status = { ...wt.status, files: [{ path: "src/merge.cs", oldPath: null, kind: "Conflicted", staged: null, unstaged: null, headId: null, indexId: null }] };
+    setup(sidecar);
+    await ready();
+
+    expect((stashButton() as HTMLButtonElement).disabled).toBe(true);
+    expect(stashButton().title).toMatch(/conflict/);
+  });
+
+  it("cannot stash only new files without Include new files", async () => {
+    const sidecar = new FakeSidecar();
+    const wt = sidecar.worktree(mainWorktree);
+    wt.status = { ...wt.status, files: wt.status.files.filter((f) => f.kind === "Untracked") };
+    setup(sidecar);
+    await ready();
+
+    expect((stashButton() as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(includeNew()!);
+    expect((stashButton() as HTMLButtonElement).disabled).toBe(false);
   });
 });
 

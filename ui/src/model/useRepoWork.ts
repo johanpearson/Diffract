@@ -7,6 +7,7 @@ import { currentWorktree } from "../history/HistoryMenu";
 import { useHistoryToggles, type ToggleName, type Toggles } from "../history/HistoryToggles";
 import { useHistory, type History } from "../history/useHistory";
 import { useRefActions, type RefActions } from "../history/useRefActions";
+import { changesWorktrees, samePath } from "./worktrees";
 
 /** A request to select a commit in History, until History has done it. */
 export interface Reveal {
@@ -28,6 +29,9 @@ export interface RepoWork {
   setToggle(name: ToggleName, on: boolean): void;
   /** The worktree the repo was opened from, which branch actions act on. */
   current: CurrentWorktree;
+  /** The worktree Changes shows, which a stash is applied to. The one the repo was opened from until another is picked. */
+  changesWorktree: string;
+  setChangesWorktree(path: string): void;
   actions: RefActions;
   reveal: Reveal | null;
   /** `afterUpdate`: a toggle was just turned on, so wait for the history it brings before giving up on the commit. */
@@ -51,6 +55,9 @@ export function useRepoWork(client: RpcClient, state: RepoState | null, openedPa
   const history = useHistory(client, state?.repoId ?? null, state?.takenAt ?? "", { checkpoints: toggles.checkpoints, stashes: toggles.stashes });
   const current = state ? currentWorktree(state, openedPath, history.refs.refs) : noWorktree;
   const actions = useRefActions(client, state?.repoId ?? "", current.path);
+  const [chosen, setChangesWorktree] = useState<string | null>(null);
+  // A worktree picked in another repo, or one that has gone since, falls back to where the repo was opened.
+  const changesWorktree = state && chosen !== null && changesWorktrees(state).some((w) => samePath(w.path, chosen)) ? chosen : current.path;
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const version = useRef(history.version);
   version.current = history.version;
@@ -59,7 +66,7 @@ export function useRepoWork(client: RpcClient, state: RepoState | null, openedPa
     [],
   );
   const revealed = useCallback(() => setReveal(null), []);
-  return { history, toggles, setToggle, current, actions, reveal, revealCommit, revealed };
+  return { history, toggles, setToggle, current, changesWorktree, setChangesWorktree, actions, reveal, revealCommit, revealed };
 }
 
 const noWorktree: CurrentWorktree = { path: "", branch: null, head: null };

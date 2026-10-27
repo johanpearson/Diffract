@@ -14,6 +14,11 @@ export function samePath(a: string, b: string): boolean {
   return normalize(a) === normalize(b);
 }
 
+/** The worktrees Changes can show: not bare, and with a folder. */
+export function changesWorktrees(state: RepoState): WorktreeInfo[] {
+  return state.snapshot.worktrees.filter((w) => !w.isBare && !w.isPrunable);
+}
+
 /** Why an agent seems to be using this worktree, or null when nothing does. */
 export function inUseReason(state: RepoState, worktree: string): string | null {
   const leftover = state.leftovers.find((l) => l.kind === "Worktree" && l.verdict === "InUse" && l.path !== null && samePath(l.path, worktree));

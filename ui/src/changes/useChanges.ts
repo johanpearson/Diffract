@@ -6,6 +6,7 @@ import { concerns } from "../model/worktrees";
 import { useCommands } from "../commands/Commands";
 import type { RpcClient } from "../rpc";
 import { pathsOf, type Entry } from "./entries";
+import { useStashSave } from "./useStashSave";
 
 export interface Changes {
   /** Null until the first status arrives. */
@@ -21,6 +22,8 @@ export interface Changes {
   toggleHunk(entry: Entry, hunk: Hunk): void;
   /** Runs in the command window, which says why when it did not commit. Resolves with whether it committed. */
   commit(message: string, amend: boolean): Promise<boolean>;
+  /** Stashes the changes, new files too with `includeUntracked`, in the command window. Resolves with whether it stashed. */
+  stash(message: string, includeUntracked: boolean): Promise<boolean>;
   /** Shows a status that arrived with another answer, such as a pull's. */
   apply(status: WorktreeChanges): void;
 }
@@ -76,6 +79,7 @@ export function useChanges(client: RpcClient, repoId: string, worktree: string):
 
   const apply = useCallback((next: WorktreeChanges) => show(++latest.current, next), [show]);
   const commit = useCommit({ client, repoId, worktree }, { apply, read, setBusy });
+  const stash = useStashSave({ client, repoId, worktree }, { apply, read, setBusy });
 
   const act = useCallback((action: () => Promise<WorktreeChanges>) => void run(action).then((failed) => failed && setProblem(failed)), [run, setProblem]);
 
@@ -88,6 +92,7 @@ export function useChanges(client: RpcClient, repoId: string, worktree: string):
     unstage: (entries) => act(() => client.call("changes.unstage", { repoId, worktree, paths: pathsOf(entries) })),
     toggleHunk: (entry, hunk) => act(() => client.call(entry.side === "unstaged" ? "changes.stage" : "changes.unstage", { repoId, worktree, hunk: hunkOf(entry, hunk) })),
     commit,
+    stash,
     apply,
   };
 }

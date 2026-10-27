@@ -8,11 +8,14 @@ interface Props {
   locked: boolean;
   /** Resolves with whether it committed. */
   onCommit(message: string, amend: boolean): Promise<boolean>;
+  /** Stashes with the message in the box. Resolves with whether it stashed. */
+  onStash(message: string, includeUntracked: boolean): Promise<boolean>;
 }
 
 /**
  * The message, and Commit. Commit is enabled when something is staged and the message has a subject; Amend also
- * when nothing is staged, to reword. Ctrl+Enter commits, wherever the focus is in the Changes view.
+ * when nothing is staged, to reword. Ctrl+Enter commits, wherever the focus is in the Changes view. Below it,
+ * "Stash changes" puts the changes away under the same message.
  */
 export function CommitBox(props: Props) {
   const form = useCommitForm(props);
@@ -30,8 +33,39 @@ export function CommitBox(props: Props) {
       <button className="abtn primary" disabled={!form.canCommit} onClick={() => void form.commit()} title="Commit (Ctrl+Enter)">
         {buttonText(props.stagedCount, form.amend)}
       </button>
+      <StashRow status={props.status} locked={props.locked} onStash={(includeUntracked) => props.onStash(form.message, includeUntracked)} />
     </div>
   );
+}
+
+/**
+ * "Stash changes", and "Include new files" only when there are new files. The message stays in the box, as the
+ * stash keeps the work it describes.
+ */
+function StashRow({ status, locked, onStash }: { status: WorktreeChanges; locked: boolean; onStash(includeUntracked: boolean): Promise<boolean> }) {
+  const [includeUntracked, setIncludeUntracked] = useState(false);
+  const hasNew = status.files.some((f) => f.kind === "Untracked");
+  const blocked = stashBlockedBy(status, hasNew && includeUntracked);
+  return (
+    <div className="commit-stash">
+      <button className="abtn" disabled={locked || blocked !== null} title={blocked ?? "Put the changes away in a stash, with the message above as its name"} onClick={() => void onStash(hasNew && includeUntracked)}>
+        Stash changes
+      </button>
+      {hasNew && (
+        <label className="toggle" title="Stash new files too, not only changes to files git already has">
+          <input type="checkbox" checked={includeUntracked} onChange={(event) => setIncludeUntracked(event.target.checked)} />
+          Include new files
+        </label>
+      )}
+    </div>
+  );
+}
+
+/** Why there is nothing to stash, or null. Git refuses to stash while a file has a conflict. */
+function stashBlockedBy(status: WorktreeChanges, withNewFiles: boolean): string | null {
+  if (status.files.some((f) => f.kind === "Conflicted")) return "A file has a conflict, and git does not stash until it is resolved.";
+  const stashable = status.files.some((f) => f.kind === "Tracked" || (withNewFiles && f.kind === "Untracked"));
+  return stashable ? null : "There are no changes to stash. New files are stashed only with \"Include new files\".";
 }
 
 function useCommitForm({ status, stagedCount, locked, onCommit }: Props) {

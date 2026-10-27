@@ -43,5 +43,5 @@ internal sealed class HistoryScope(RepoSnapshot snapshot, DiffractConfig config)
         where agent is not null || GlobMatcher.IsMatchAny(config.CheckpointRefPatterns, r.FullName, ignoreCase: false)
         select new HistoryRef(r.FullName.StartsWith("refs/", StringComparison.Ordinal) ? r.FullName[5..] : r.FullName, HistoryRefKind.Checkpoint, r.TargetId, agent);
 
-    private IEnumerable<HistoryRef> Stashes() => snapshot.Stashes.Select(s => new HistoryRef(s.Name, HistoryRefKind.Stash, s.CommitId, null));
+    private IEnumerable<HistoryRef> Stashes() => snapshot.Stashes.Select(s => new HistoryRef(s.Name, HistoryRefKind.Stash, s.CommitId, null, s.Message));
 }

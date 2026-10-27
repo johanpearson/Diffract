@@ -30,6 +30,11 @@ public class ChangesPolicyTests
         $"tag -a v1.0 {Commit} -F -",
         $"reset --soft {Commit}",
         $"reset --mixed {Commit}",
+        "stash push",
+        "stash push --include-untracked",
+        "stash push -m Halvfärdigt",
+        "stash push --include-untracked -m -looks-like-an-option",
+        $"stash apply {Commit}",
     ];
 
     [Theory]
@@ -78,7 +83,18 @@ public class ChangesPolicyTests
     [InlineData("checkout -- file.txt")]
     [InlineData("clean -fd")]
     [InlineData("stash")]
-    [InlineData("stash push")]
+    [InlineData("stash pop")]
+    [InlineData($"stash pop {Commit}")]
+    [InlineData("stash apply stash@{0}")]
+    [InlineData("stash apply")]
+    [InlineData($"stash apply --index {Commit}")]
+    [InlineData("stash drop stash@{0}")]
+    [InlineData("stash clear")]
+    [InlineData("stash push --keep-index")]
+    [InlineData("stash push --all")]
+    [InlineData("stash push -m")]
+    [InlineData("stash push -- file.txt")]
+    [InlineData("stash store -m message 0123456789abcdef0123456789abcdef01234567")]
     [InlineData("restore file.txt")]
     [InlineData("restore --staged --worktree --pathspec-from-file=- --pathspec-file-nul")]
     [InlineData("restore --worktree --pathspec-from-file=- --pathspec-file-nul")]
@@ -125,6 +141,13 @@ public class ChangesPolicyTests
     {
         Assert.False(ChangesPolicy.IsAllowed(Split(commandLine), out var reason));
         Assert.NotEmpty(reason);
+    }
+
+    [Fact]
+    public void A_stash_message_may_have_spaces_but_not_be_empty()
+    {
+        Assert.True(ChangesPolicy.IsAllowed(["stash", "push", "-m", "half done, åäö"], out _));
+        Assert.False(ChangesPolicy.IsAllowed(["stash", "push", "-m", ""], out _));
     }
 
     [Theory]

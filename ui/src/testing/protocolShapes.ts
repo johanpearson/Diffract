@@ -54,6 +54,8 @@ import {
   type RepoChanged,
   type RepoState,
   type SnapshotSummary,
+  type StashApplyResult,
+  type StashPushResult,
   type TerminalInfo,
   type WorktreeChanges,
   type WorktreeInfo,
@@ -210,6 +212,13 @@ const stepResult = object<StepResult>({
 
 const cleanupResult = object<CleanupResult>({ cleanupId: string, steps: arrayOf(stepResult) });
 
+const cleanupPlan = object<CleanupPlanView>({
+  planId: string,
+  leftovers: arrayOf(
+    object<LeftoverPlanView>({ kind: oneOf(leftoverKinds), name: string, path: nullable(string), refused: nullable(string), steps: arrayOf(stepView) }),
+  ),
+});
+
 /** The result of every method. Adding a method to `Methods` without a shape here fails the type check. */
 export const resultShapes: { [M in keyof Methods]: Shape } = {
   "app.info": appInfo,
@@ -233,7 +242,7 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "history.read": object<HistoryReadResult>({ commits: number, pages: number, tips: arrayOf(string) }),
   "history.update": object<HistoryUpdateResult>({ added: arrayOf(commitEntry), removed: arrayOf(string), tips: arrayOf(string), reread: boolean }),
   "history.refs": object<HistoryRefs>({
-    refs: arrayOf(object<HistoryRef>({ name: string, kind: oneOf(historyRefKinds), targetId: string, agent: nullable(string) })),
+    refs: arrayOf(object<HistoryRef>({ name: string, kind: oneOf(historyRefKinds), targetId: string, agent: nullable(string), message: optional(nullable(string)) })),
     agentHeads: arrayOf(string),
     agentSubjectPrefixes: arrayOf(string),
   }),
@@ -253,12 +262,10 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "tag.create": refChange,
   "branch.reset": resetResult,
   "branch.undoReset": resetResult,
-  "cleanup.plan": object<CleanupPlanView>({
-    planId: string,
-    leftovers: arrayOf(
-      object<LeftoverPlanView>({ kind: oneOf(leftoverKinds), name: string, path: nullable(string), refused: nullable(string), steps: arrayOf(stepView) }),
-    ),
-  }),
+  "stash.push": object<StashPushResult>({ commitId: string, message: string, status: worktreeChanges }),
+  "stash.apply": object<StashApplyResult>({ conflicts: boolean, message: string, status: worktreeChanges }),
+  "cleanup.plan": cleanupPlan,
+  "cleanup.planStash": cleanupPlan,
   "cleanup.inspect": object<LeftoverContent>({ commits: arrayOf(commitEntry), more: boolean }),
   "cleanup.hide": repoState,
   "cleanup.unhide": repoState,

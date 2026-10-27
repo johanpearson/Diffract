@@ -3,10 +3,18 @@ import { kindLabels } from "../model/format";
 import type { CleanupPlanView, LeftoverPlanView, StepRef, StepView } from "../protocol";
 import { keepsOnly, leaveOutOf, plannedCount, stepKey } from "./outcome";
 
+/** The dialog's question and its confirm button. */
+export interface DialogWording {
+  title: string;
+  confirm: string;
+}
+
 interface Props {
   plan: CleanupPlanView;
   onConfirm(leaveOut: StepRef[]): void;
   onCancel(): void;
+  /** For a plan made elsewhere than the Cleanup view, such as dropping a stash from the sidebar. */
+  wording?: DialogWording;
 }
 
 /**
@@ -14,14 +22,12 @@ interface Props {
  * applies that plan and nothing else. A step with its own checkbox, such as deleting a worktree's branch, can be left
  * out. A step that cannot be undone says so before anything runs.
  */
-export function CleanupDialog({ plan, onConfirm, onCancel }: Props) {
+export function CleanupDialog({ plan, onConfirm, onCancel, wording: given }: Props) {
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => cancel.current?.focus(), []);
   const [unticked, setUnticked] = useState<ReadonlySet<string>>(new Set());
   const planned = plannedCount(plan);
-  const wording = keepsOnly(plan)
-    ? { title: "Keep these commits?", confirm: "Keep" }
-    : { title: `Clean up ${planned === 1 ? "1 leftover" : `${planned} leftovers`}?`, confirm: "Clean up" };
+  const wording = given ?? wordingOf(plan, planned);
 
   const toggle = (key: string) =>
     setUnticked((before) => {
@@ -55,6 +61,11 @@ export function CleanupDialog({ plan, onConfirm, onCancel }: Props) {
       </div>
     </div>
   );
+}
+
+function wordingOf(plan: CleanupPlanView, planned: number): DialogWording {
+  if (keepsOnly(plan)) return { title: "Keep these commits?", confirm: "Keep" };
+  return { title: `Clean up ${planned === 1 ? "1 leftover" : `${planned} leftovers`}?`, confirm: "Clean up" };
 }
 
 interface LeftoverProps {

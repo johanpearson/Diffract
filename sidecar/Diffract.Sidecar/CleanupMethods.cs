@@ -40,10 +40,32 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
         var planned = new Queue<LeftoverPlan>(
             CleanupPlanner.Plan(snapshot, [.. found.OfType<Leftover>()], setup.Config, runnerOptions.TimeProvider).Leftovers);
         var plan = new CleanupPlan([.. found.Select((l, i) => l is null ? Refuse(selection[i], rows) : planned.Dequeue())]);
+        return Task.FromResult(SidecarMethods.Result(View(Keep(repoId, plan), plan)));
+    }
 
+    /// <summary>
+    /// Dropping one stash from the stash view, whether or not it is a leftover: the same steps as a stash leftover, a
+    /// backup tag first, applied with <c>cleanup.apply</c>. Picked by its commit, as its place in the list shifts. Starts no git.
+    /// </summary>
+    public Task<JsonElement> PlanStashAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var request = SidecarMethods.Params<CleanupPlanStashParams>(parameters);
+        var repoId = SidecarMethods.Required(request.RepoId, "repoId");
+        var commit = SidecarMethods.Required(request.Commit, "commit");
+        var snapshot = repos.LeftoversOf(repos.Get(repoId)).Snapshot;
+        var stash = snapshot.Stashes.FirstOrDefault(s => s.CommitId == commit)
+            ?? throw new CleanupLogException("This stash is no longer in the list. Refresh to see the stashes as they are now.");
+        var leftover = new Leftover(LeftoverKind.Stash, stash.Name, null, null, Verdict.NeedsReview, 1, $"Stash \"{stash.Message}\"");
+        var plan = CleanupPlanner.Plan(snapshot, [leftover], setup.Config, runnerOptions.TimeProvider);
+        return Task.FromResult(SidecarMethods.Result(View(Keep(repoId, plan), plan)));
+    }
+
+    /// <summary>Keeps a plan the dialog shows, until it is applied, and answers with its id.</summary>
+    private string Keep(string repoId, CleanupPlan plan)
+    {
         var planId = Guid.NewGuid().ToString("N")[..12];
         _plans[planId] = new KeptPlan(repoId, plan);
-        return Task.FromResult(SidecarMethods.Result(View(planId, plan)));
+        return planId;
     }
 
     /// <summary>A hidden row is never part of a cleanup, until it is shown again.</summary>
