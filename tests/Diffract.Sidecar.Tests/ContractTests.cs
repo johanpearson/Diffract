@@ -117,6 +117,8 @@ public class ContractTests
             new StepResult(0, 0, StepKind.Backup, "Undo: Keep a backup tag archive/worktree/claude/räksmörgås-fix-2026-10-21 for 2 commits that exist nowhere else",
                 StepOutcome.Skipped, "Skipped, as an earlier step for the same leftover did not run."),
         ])),
+        ["cleanup.hide"] = () => Response(WithBranchHidden()),
+        ["cleanup.unhide"] = () => Response(State("1")),
         ["cleanup.inspect"] = () => Response(new LeftoverContent(
             [
                 new CommitEntry(Side, [Parent], "GitHub Copilot", "198982749+Copilot@users.noreply.github.com", Now.AddDays(-21), Now.AddDays(-21), "Retry the login on räksmörgås"),
@@ -386,6 +388,19 @@ public class ContractTests
                 "Locked: claude agent agent-a1b2c3 (pid 4242).") { Commit = Merge },
         ];
 
-        return RepoState.From(repoId, snapshot, leftovers, new ScanStatus(UnreachableCountedAt: Now.AddMinutes(-10), Scanning: false, Problem: null));
+        return RepoState.From(repoId, snapshot, new SplitRows(leftovers, []), new ScanStatus(UnreachableCountedAt: Now.AddMinutes(-10), Scanning: false, Problem: null));
+    }
+
+    /// <summary>The state after hiding the branch: it moves from the list to the hidden rows, and the counts leave it out.</summary>
+    private static RepoState WithBranchHidden()
+    {
+        var state = State("1");
+        var branch = state.Leftovers.Single(l => l.Kind == LeftoverKind.LocalBranch);
+        return state with
+        {
+            Leftovers = [.. state.Leftovers.Where(l => l != branch)],
+            Hidden = [branch],
+            Summary = state.Summary with { Total = state.Summary.Total - 1, NeedsReview = state.Summary.NeedsReview - 1 },
+        };
     }
 }

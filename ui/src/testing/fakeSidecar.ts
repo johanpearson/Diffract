@@ -122,6 +122,13 @@ export class FakeSidecar {
     this.transport.emit(JSON.stringify({ jsonrpc: "2.0", method: "repo.changed", params: { changes, state } }));
   }
 
+  /** Replaces a repo's state without repo.changed, and returns it, for a method that answers with the state. */
+  replace(repoId: string, update: (state: RepoState) => RepoState): RepoState {
+    const state = update(this.state(repoId));
+    this.repos.set(state.repoRoot.toLowerCase(), state);
+    return state;
+  }
+
   /**
    * When true, repo.open answers as the real sidecar does for a repo it has not scanned yet: refs and worktrees, no
    * leftovers, `scanning`. Then `finishScan` or `failScan` sends the scan's repo.changed. When false, it answers in full.
@@ -385,6 +392,8 @@ export class FakeSidecar {
         return answerRefs(this, method, params as Parameters<typeof answerRefs>[2]);
       case "cleanup.plan":
       case "cleanup.inspect":
+      case "cleanup.hide":
+      case "cleanup.unhide":
       case "cleanup.apply":
       case "cleanup.history":
       case "cleanup.undo":

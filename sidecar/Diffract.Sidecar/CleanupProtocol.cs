@@ -15,8 +15,8 @@ internal sealed record CleanupApplyParams(string? RepoId, string? PlanId, IReadO
 
 internal sealed record CleanupHistoryParams(string? RepoId);
 
-/// <summary>The params of <c>cleanup.inspect</c>: one leftover, as the repo state lists it.</summary>
-internal sealed record CleanupInspectParams(string? RepoId, SelectedLeftover? Leftover);
+/// <summary>The params of <c>cleanup.inspect</c>, <c>cleanup.hide</c> and <c>cleanup.unhide</c>: one leftover, as the repo state lists it.</summary>
+internal sealed record CleanupRowParams(string? RepoId, SelectedLeftover? Leftover);
 
 internal sealed record CleanupUndoParams(string? RepoId, string? CleanupId);
 

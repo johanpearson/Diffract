@@ -40,6 +40,9 @@ internal sealed record SidecarDependencies
     /// <summary>Where cleanups are logged, so they can be undone. Diffract's own folder; tests use a temp folder.</summary>
     public string OperationLogFolder { get; init; } = OperationLog.DefaultFolder;
 
+    /// <summary>Where hidden rows are remembered, next to the operation log. Tests use a temp folder.</summary>
+    public string HiddenRowsFolder { get; init; } = HiddenRows.DefaultFolder;
+
     /// <summary>Checks and moves leftover folders. Tests may open a file at the worst moment.</summary>
     public IFolderOperations Folders { get; init; } = WindowsFolders.Instance;
 }
@@ -56,7 +59,7 @@ internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, Cance
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit", "remote.fetch", "remote.pull", "remote.push", "ref.checkName", "branch.create", "branch.switch", "tag.create", "branch.reset", "branch.undoReset", "cleanup.plan", "cleanup.inspect", "cleanup.apply", "cleanup.history", "cleanup.undo"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit", "remote.fetch", "remote.pull", "remote.push", "ref.checkName", "branch.create", "branch.switch", "tag.create", "branch.reset", "branch.undoReset", "cleanup.plan", "cleanup.inspect", "cleanup.apply", "cleanup.history", "cleanup.undo", "cleanup.hide", "cleanup.unhide"];
 
     /// <summary>
     /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only or changes
@@ -116,14 +119,22 @@ internal sealed class SidecarMethods : IDisposable
             RunnerOptions.TimeProvider,
             changed => _notify("repo.changed", Result(changed)),
             d.Log,
-            paused: () => _updater.IsRunning);
+            paused: () => _updater.IsRunning)
+        {
+            Hidden = new HiddenRows(d.HiddenRowsFolder),
+        };
         var worktrees = new RepoWorktrees(_repos);
         var outputs = new CommandOutputs(_notify);
         _changes = new ChangesMethods(worktrees, RunnerOptions, outputs);
         _remote = new RemoteMethods(worktrees, RunnerOptions, outputs);
         _refs = new RefMethods(worktrees, RunnerOptions, outputs);
         _cleanup = new CleanupMethods(_repos, RunnerOptions, outputs, new CleanupSetup(d.Config, new OperationLog(d.OperationLogFolder), d.Folders));
-        _handlers = new Dictionary<string, MethodHandler>
+        _handlers = CreateHandlers();
+    }
+
+    /// <summary>Every method and what answers it, made once the parts it uses exist.</summary>
+    private Dictionary<string, MethodHandler> CreateHandlers() =>
+        new()
         {
             ["app.info"] = async (_, ct) => Result(await AppInfoAsync(ct).ConfigureAwait(false)),
             ["repo.open"] = OpenRepoAsync,
@@ -150,6 +161,8 @@ internal sealed class SidecarMethods : IDisposable
             ["branch.undoReset"] = _refs.UndoResetAsync,
             ["cleanup.plan"] = _cleanup.PlanAsync,
             ["cleanup.inspect"] = _cleanup.InspectAsync,
+            ["cleanup.hide"] = _cleanup.HideAsync,
+            ["cleanup.unhide"] = _cleanup.UnhideAsync,
             ["cleanup.apply"] = _cleanup.ApplyAsync,
             ["cleanup.history"] = _cleanup.HistoryAsync,
             ["cleanup.undo"] = _cleanup.UndoAsync,
@@ -161,7 +174,6 @@ internal sealed class SidecarMethods : IDisposable
             ["git.inUse"] = (_, _) => Task.FromResult(Result(_updater.InUse())),
             ["git.openDownloadPage"] = OpenDownloadPage,
         };
-    }
 
     /// <summary>The options every git call uses. Read-only, whatever was passed in.</summary>
     internal GitRunnerOptions RunnerOptions { get; }

@@ -28,6 +28,9 @@ public class RequestContractTests
 
     private static readonly ChangesStatusParams InWorktree = new(Repo, Worktree);
 
+    /// <summary>One row, as cleanup.inspect, cleanup.hide and cleanup.unhide take it.</summary>
+    private static readonly CleanupRowParams Row = new(Repo, new SelectedLeftover(Diffract.Leftovers.LeftoverKind.Worktree, "claude/räksmörgås-fix", Worktree));
+
     private static readonly ChangesStageParams Stage = new()
     {
         RepoId = Repo,
@@ -68,7 +71,9 @@ public class RequestContractTests
         ["cleanup.plan"] = () => Node(new CleanupPlanParams(Repo, [new SelectedLeftover(Diffract.Leftovers.LeftoverKind.Worktree, "claude/räksmörgås-fix", Worktree)])),
         ["cleanup.apply"] = () => Node(new CleanupApplyParams(Repo, "3f9a1c2b7d4e", [new Diffract.Leftovers.Cleanup.StepRef(0, 2)])),
         ["cleanup.history"] = () => Node(new CleanupHistoryParams(Repo)),
-        ["cleanup.inspect"] = () => Node(new CleanupInspectParams(Repo, new SelectedLeftover(Diffract.Leftovers.LeftoverKind.Worktree, "claude/räksmörgås-fix", Worktree))),
+        ["cleanup.inspect"] = () => Node(Row),
+        ["cleanup.hide"] = () => Node(Row),
+        ["cleanup.unhide"] = () => Node(Row),
         ["cleanup.undo"] = () => Node(new CleanupUndoParams(Repo, "a1b2c3d4e5f6")),
         ["branch.undoReset"] = () => Node(new BranchUndoResetParams(Repo, Worktree, new ResetResult
         {

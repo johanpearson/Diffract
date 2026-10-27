@@ -56,6 +56,18 @@ test("a row that needs review says what to check, opens to list its commits, and
   await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
 });
 
+test("hide a row, see it go, show it again", async ({ page }) => {
+  await openRepo(page);
+
+  await row(page, "copilot/fix-login").getByRole("button", { name: "Hide copilot/fix-login" }).click();
+
+  await expect(leftovers(page).getByRole("listitem")).toHaveCount(2);
+  await page.getByText("Hidden (1)").click();
+  await page.getByRole("button", { name: "Show copilot/fix-login again" }).click();
+  await expect(leftovers(page).getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByText(/^Hidden \(/)).toHaveCount(0);
+});
+
 test("the confirm dialog opens with Cancel focused, so Enter removes nothing", async ({ page }) => {
   await openRepo(page);
   await page.getByRole("checkbox", { name: "Select old-task" }).check();

@@ -6,6 +6,8 @@ import { CleanupResultPanel } from "../cleanup/CleanupResultPanel";
 import { PastCleanups } from "../cleanup/PastCleanups";
 import { selectable } from "../cleanup/selection";
 import type { Cleanup } from "../cleanup/useCleanup";
+import { HiddenRows } from "../cleanup/HiddenRows";
+import type { Hiding } from "../cleanup/useHiding";
 import { RowReview } from "../cleanup/RowReview";
 import type { ToggleName } from "../history/HistoryToggles";
 import { StatusLine } from "./StatusLine";
@@ -30,6 +32,7 @@ interface Props {
   cleanup: Cleanup;
   /** Shows the commit in History, turning on the toggle it needs first. */
   onShowInHistory(commitId: string, toggle: ToggleName | null): void;
+  hiding: Hiding;
   now: Date;
 }
 
@@ -49,6 +52,7 @@ export function LeftoversView(props: Props) {
         />
       )}
       <ScanResult {...props} />
+      <HiddenRows hidden={state.hidden} onUnhide={props.hiding.unhide} />
       <PastCleanups history={cleanup.history} busy={cleanup.busy} onUndo={cleanup.undo} now={now} />
       <StatusLine state={state} now={now} />
       {cleanup.plan && <CleanupDialog plan={cleanup.plan} onConfirm={cleanup.confirm} onCancel={cleanup.cancel} />}
@@ -148,7 +152,7 @@ function LeftoverList(props: Omit<Props, "state">) {
 }
 
 /** What a row's buttons do. The same for every row. */
-type RowActions = Pick<Props, "onOpenFolder" | "onOpenTerminal" | "terminalName" | "cleanup" | "onShowInHistory" | "now">;
+type RowActions = Pick<Props, "onOpenFolder" | "onOpenTerminal" | "terminalName" | "cleanup" | "onShowInHistory" | "now" | "hiding">;
 
 function LeftoverRow({ row, actions }: { row: Row; actions: RowActions }) {
   const l = row.leftover;
@@ -170,6 +174,11 @@ function LeftoverRow({ row, actions }: { row: Row; actions: RowActions }) {
             </button>
           )}
           {canOpen(l) && <OpenButtons leftover={l} actions={actions} />}
+          {row.flash !== "removed" && (
+            <button className="abtn" onClick={() => actions.hiding.hide(l)} aria-label={`Hide ${l.name}`} title="Leave it out of the list until it changes. Nothing in the repo changes.">
+              Hide
+            </button>
+          )}
         </RowReview>
       </div>
       <div className="item-side">

@@ -196,9 +196,13 @@ internal sealed record RepoState(
     string? ScanProblem,
     SnapshotSummary Snapshot,
     LeftoverSummary Summary,
-    IReadOnlyList<Leftover> Leftovers)
+    IReadOnlyList<Leftover> Leftovers,
+    IReadOnlyList<Leftover> Hidden)
 {
-    public static RepoState From(string repoId, RepoSnapshot s, IReadOnlyList<Leftover> leftovers, ScanStatus scan) => new(
+    /// <param name="rows">The rows to list, and those the user hid, which the counts leave out.</param>
+    public static RepoState From(string repoId, RepoSnapshot s, SplitRows rows, ScanStatus scan) => From(repoId, s, rows.Shown, scan) with { Hidden = rows.Hidden };
+
+    private static RepoState From(string repoId, RepoSnapshot s, IReadOnlyList<Leftover> leftovers, ScanStatus scan) => new(
         RepoId: repoId,
         RepoRoot: s.RepoRoot,
         MainBranch: s.MainBranch,
@@ -220,7 +224,8 @@ internal sealed record RepoState(
             SafeToRemove: leftovers.Count(l => l.Verdict == Verdict.SafeToRemove),
             NeedsReview: leftovers.Count(l => l.Verdict == Verdict.NeedsReview),
             InUse: leftovers.Count(l => l.Verdict == Verdict.InUse)),
-        Leftovers: leftovers);
+        Leftovers: leftovers,
+        Hidden: []);
 }
 
 /// <summary>Where the scan after opening stands, for <see cref="RepoState"/>.</summary>

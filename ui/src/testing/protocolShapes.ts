@@ -118,6 +118,7 @@ const repoState = object<RepoState>({
   snapshot: snapshotSummary,
   summary: leftoverSummary,
   leftovers: arrayOf(leftover),
+  hidden: arrayOf(leftover),
 });
 
 const gitInUse = object<GitInUse>({ program: string, startedBy: nullable(string), processes: number });
@@ -259,6 +260,8 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
     ),
   }),
   "cleanup.inspect": object<LeftoverContent>({ commits: arrayOf(commitEntry), more: boolean }),
+  "cleanup.hide": repoState,
+  "cleanup.unhide": repoState,
   "cleanup.apply": cleanupResult,
   "cleanup.history": arrayOf(
     object<PastCleanup>({

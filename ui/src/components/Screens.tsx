@@ -12,7 +12,10 @@ import { tabId, Tabs, type View } from "./Tabs";
 import type { SwitchTo } from "../history/commitMenu";
 import { HistoryView } from "../history/HistoryView";
 import { ChangesView } from "../changes/ChangesView";
+import { useCallback } from "react";
 import { useCleanup } from "../cleanup/useCleanup";
+import { useHiding } from "../cleanup/useHiding";
+import { showIfCurrent } from "../model/session";
 import type { ToggleName } from "../history/HistoryToggles";
 
 /** What the screens need besides the screen itself. */
@@ -176,10 +179,14 @@ function Leftovers(props: ScreenProps) {
 /** One repo's leftovers. Its key is the repo, so a selection or a result never carries over to another repo. */
 function LeftoversScreen({ repo, git, terminals, filter, onFilter, onOpenFolder, onShowInHistory, now, state }: ScreenProps & { state: RepoState }) {
   const cleanup = useCleanup(repo.session.client, state.repoId, repo.rows, repo.session.showNotice);
+  const { session } = repo;
+  const onState = useCallback((next: RepoState) => showIfCurrent(session, next), [session]);
+  const hiding = useHiding(session.client, { repoId: state.repoId, onState, showNotice: session.showNotice });
   return (
     <LeftoversView
       state={state}
       cleanup={cleanup}
+      hiding={hiding}
       onShowInHistory={onShowInHistory}
       rows={repo.rows}
       filter={filter}
