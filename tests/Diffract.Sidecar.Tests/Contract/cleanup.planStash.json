@@ -1,0 +1,31 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "planId": "5b2e7c1d9a03",
+    "leftovers": [
+      {
+        "kind": "Stash",
+        "name": "stash@{2}",
+        "path": null,
+        "refused": null,
+        "steps": [
+          {
+            "kind": "Backup",
+            "description": "Keep a backup tag archive/stash/e83c5163316f-2026-10-21 for stash \"On main: Halvfärdigt\"",
+            "undoable": true,
+            "undoNote": null,
+            "optional": false
+          },
+          {
+            "kind": "DropStash",
+            "description": "Drop stash \"On main: Halvfärdigt\"",
+            "undoable": true,
+            "undoNote": "Undo puts it back on top of the list.",
+            "optional": false
+          }
+        ]
+      }
+    ]
+  }
+}

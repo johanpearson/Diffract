@@ -275,7 +275,9 @@ public sealed class GitRunner(string workingDirectory, GitRunnerOptions options)
         psi.Environment["GIT_OPTIONAL_LOCKS"] = "0";
         psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
         // A path such as "*.txt" or ":x" is that file and nothing else, never a pattern that stages other files.
-        if (Options.ChangesOnly)
+        // Not for stash, which takes no paths: with it, `stash push --include-untracked` stashes new files but
+        // leaves them on disk, since git's own clean step inside it passes ":/" as a pattern.
+        if (Options.ChangesOnly && args[0] != "stash")
             psi.Environment["GIT_LITERAL_PATHSPECS"] = "1";
         // Same as `-c core.longpaths=true`: git for Windows can then reach paths over 260 characters,
         // whatever the user's config says. It changes how paths are opened, never what is written.

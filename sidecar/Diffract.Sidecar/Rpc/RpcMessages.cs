@@ -154,4 +154,9 @@ internal static class RpcJson
 [JsonSerializable(typeof(CleanupPlanView))]
 [JsonSerializable(typeof(Diffract.Leftovers.Cleanup.CleanupResult))]
 [JsonSerializable(typeof(IReadOnlyList<Diffract.Leftovers.Cleanup.PastCleanup>))]
+[JsonSerializable(typeof(StashPushParams))]
+[JsonSerializable(typeof(StashApplyParams))]
+[JsonSerializable(typeof(StashPushResult))]
+[JsonSerializable(typeof(StashApplyResult))]
+[JsonSerializable(typeof(CleanupPlanStashParams))]
 internal sealed partial class RpcJsonContext : JsonSerializerContext;

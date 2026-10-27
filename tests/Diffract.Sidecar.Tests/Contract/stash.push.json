@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "commitId": "e83c5163316f89bfbde7d9ab23ca2e25604af290",
+    "message": "Stashed your changes. The stash keeps them until you drop it.",
+    "status": {
+      "worktree": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
+      "branch": "claude/räksmörgås-fix",
+      "headCommit": "9fceb02d0ae598e95dc970b74767f19372d61af8",
+      "upstream": "origin/claude/räksmörgås-fix",
+      "ahead": 2,
+      "behind": 1,
+      "headOnRemote": "origin/claude/räksmörgås-fix",
+      "files": []
+    }
+  }
+}

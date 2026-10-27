@@ -17,6 +17,10 @@ import { useCleanup } from "../cleanup/useCleanup";
 import { useHiding } from "../cleanup/useHiding";
 import { showIfCurrent } from "../model/session";
 import type { ToggleName } from "../history/HistoryToggles";
+import { folderName } from "../model/format";
+import { inUseReason, samePath } from "../model/worktrees";
+import type { StashTarget } from "../stash/SidebarStashes";
+import { useStashActions } from "../stash/useStashActions";
 
 /** What the screens need besides the screen itself. */
 export interface ScreenProps {
@@ -43,10 +47,23 @@ export interface ScreenProps {
 export const SidebarWidth: SizeSpec = { key: "diffract.size.sidebar", initial: 250, min: 180, max: 480 };
 
 /** The sidebar, only once a repo is open, with a bar to change its width. */
-export function RepoSidebar({ repo, terminals, onOpenFolder, work, onReveal, onView }: ScreenProps) {
+export function RepoSidebar(props: ScreenProps) {
+  const [width, setWidth] = useStoredSize(props.repo.session.host.storage, SidebarWidth);
+  if (props.repo.screen.kind !== "ready") return null;
+  return (
+    <>
+      <div className="sidebar-frame" style={{ width }}>
+        <ReadySidebar key={props.repo.screen.state.repoId} {...props} state={props.repo.screen.state} />
+      </div>
+      <Splitter label="Resize sidebar" orientation="vertical" spec={SidebarWidth} size={width} onSize={setWidth} growsForward />
+    </>
+  );
+}
+
+/** One repo's sidebar. Its key is the repo, so a drop dialog never carries over to another repo. */
+function ReadySidebar({ repo, terminals, onOpenFolder, work, onReveal, onView, onShowInHistory, state }: ScreenProps & { state: RepoState }) {
   const storage = repo.session.host.storage;
-  const [width, setWidth] = useStoredSize(storage, SidebarWidth);
-  if (repo.screen.kind !== "ready") return null;
+  const stashActions = useStashActions({ client: repo.session.client, repoId: state.repoId, worktree: work.changesWorktree, showNotice: repo.session.showNotice });
   const refs = work.history.refs.refs;
   const branches = { current: work.current.branch, localBranches: new Set(refs.filter((r) => r.kind === "Branch").map((r) => r.name)) };
   const commands = {
@@ -58,25 +75,32 @@ export function RepoSidebar({ repo, terminals, onOpenFolder, work, onReveal, onV
     },
     copy: work.actions.copy,
   };
+  const stashes = {
+    actions: stashActions,
+    target: stashTarget(state, work.changesWorktree),
+    onShow: (commitId: string) => onShowInHistory(commitId, "stashes"),
+  };
   return (
-    <>
-      <div className="sidebar-frame" style={{ width }}>
-        <Sidebar
-          state={repo.screen.state}
-          terminals={terminals.list}
-          terminal={terminals.current}
-          onOpenFolder={onOpenFolder}
-          onOpenTerminal={terminals.open}
-          storage={storage}
-          refs={refs}
-          branches={branches}
-          commands={commands}
-          onShowLeftovers={() => onView("leftovers")}
-        />
-      </div>
-      <Splitter label="Resize sidebar" orientation="vertical" spec={SidebarWidth} size={width} onSize={setWidth} growsForward />
-    </>
+    <Sidebar
+      state={state}
+      terminals={terminals.list}
+      terminal={terminals.current}
+      onOpenFolder={onOpenFolder}
+      onOpenTerminal={terminals.open}
+      storage={storage}
+      refs={refs}
+      branches={branches}
+      commands={commands}
+      onShowLeftovers={() => onView("leftovers")}
+      stashes={stashes}
+    />
   );
+}
+
+/** The worktree a stash is applied to, named by its branch, or its folder when HEAD is detached. */
+function stashTarget(state: RepoState, worktree: string): StashTarget {
+  const info = state.snapshot.worktrees.find((w) => samePath(w.path, worktree));
+  return { name: info?.branch ?? folderName(worktree), inUse: inUseReason(state, worktree) };
 }
 
 /** The main area for each screen. */
@@ -160,7 +184,9 @@ function ViewOf(props: ScreenProps & { state: RepoState }) {
     case "history":
       return <HistoryView key={state.repoId} client={client} state={state} now={props.now} work={props.work} storage={host.storage} />;
     case "changes":
-      return <ChangesView key={state.repoId} client={client} state={state} openedPath={repo.session.repo.current?.path ?? state.repoRoot} storage={host.storage} />;
+      return (
+        <ChangesView key={state.repoId} client={client} state={state} worktree={props.work.changesWorktree} onWorktree={props.work.setChangesWorktree} storage={host.storage} />
+      );
     case "leftovers":
       return <Leftovers {...props} />;
   }

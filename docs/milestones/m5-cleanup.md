@@ -1,6 +1,6 @@
 # Milestone 5: safe cleanup with backup tags and undo, stashes, and pruning remote branches
 
-**Status:** in progress. Phases 0 to 6 are done, and so is the revisit of the view under phase 5. Phase 7, the stash view, is next.
+**Status:** in progress. Phases 0 to 7 are done, and so is the revisit of the view under phase 5. Phase 8, pruning remote branches, is next.
 **Estimate:** 1 to 2 weeks of evenings, as in the visual plan.
 **Done when:** Johan cleans up the agent leftovers in his busiest repos from the installed app, nothing he did not choose is touched, and every removal he tries to undo comes back.
 
@@ -152,6 +152,8 @@ Added on 2026-10-26, when Johan listed what he misses from Git Extensions. It be
 - **Drop:** the same step as cleaning up a stash leftover: a backup tag first, then `git stash drop`, and "Undo" puts it back with `git stash store`.
 - **Allowlist:** `stash push -m <message>`, `stash push --include-untracked -m <message>` and `stash apply <commit>` go on the changes runner. Git cannot read a stash message from standard input, so it is an argument, which takes a message starting with "-" as it is. Drop and store are on the cleanup runner already.
 - **Tests:** fixture repos for save with and without new files, apply by commit after another stash moved the list, an apply that conflicts and keeps the stash, and drop then undo.
+
+**Done** 2026-10-27. Johan settled three open points first: Apply goes to the worktree Changes shows, and the menu names it; the stash's message is the commit box's first line, and an empty box lets git name it "WIP on <branch>", so `stash push` and `stash push --include-untracked` without `-m` join the allowlist; "Apply and drop" applies at once and opens the usual drop dialog only after a clean apply. Drop works for any stash, not only leftovers, with `cleanup.planStash`, and "Undo drop" is offered in the command window. Applying is not offered for a worktree an agent is working in; Changes asks first there. The changes runner no longer sets literal pathspecs for stash commands, as `docs/findings/cleanup.md` explains.
 
 ## Phase 8: prune remote branches
 

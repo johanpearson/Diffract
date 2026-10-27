@@ -1611,6 +1611,12 @@ body {
   color: var(--ink-3);
 }
 
+.commit-stash {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .diff-side {
   color: var(--ink-3);
   font-size: 12px;

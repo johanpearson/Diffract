@@ -316,7 +316,8 @@ internal enum HistoryRefKind { Branch, RemoteBranch, Tag, Checkpoint, Stash }
 /// <param name="Name">Short name: "feature/x", "origin/feature/x", "v1.0", "copilot/checkpoints/abc/1" or "stash@{0}".</param>
 /// <param name="TargetId">The commit it points at, after peeling annotated tags.</param>
 /// <param name="Agent">The agent it looks like it belongs to, from the patterns in diffract.json. A hint only.</param>
-internal sealed record HistoryRef(string Name, HistoryRefKind Kind, string TargetId, string? Agent);
+/// <param name="Message">A stash's message, such as "On main: half done", for the sidebar. Null for every other ref.</param>
+internal sealed record HistoryRef(string Name, HistoryRefKind Kind, string TargetId, string? Agent, string? Message = null);
 
 /// <summary>The result of <c>history.refs</c>: the refs, and what tells agent work apart.</summary>
 /// <param name="AgentHeads">The HEAD of every worktree that looks like it belongs to an agent, by its folder or branch.</param>

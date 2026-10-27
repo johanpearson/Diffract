@@ -1,7 +1,7 @@
 import type { CommandOutput, GitOutputKind } from "../protocol";
 
 /** What a command does, which picks its animation. */
-export type CommandKind = "fetch" | "pull" | "push" | "commit" | "switch" | "branch" | "tag" | "reset" | "cleanup";
+export type CommandKind = "fetch" | "pull" | "push" | "commit" | "switch" | "branch" | "tag" | "reset" | "cleanup" | "stash";
 
 /** A line in the window. A progress line is replaced by the next line git writes. */
 export interface OutputLine {
