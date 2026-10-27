@@ -137,7 +137,7 @@ Johan tried phase 4 on 2026-10-27 and asked for changes before more is built on 
 
 As described under "Hiding rows" in phase 0. Tests: a hidden row stays hidden across a refresh and a restart, comes back when it changes, and is never part of a cleanup unless it is shown again.
 
-**Done** 2026-10-27. Every row has "Hide", and hidden rows sit folded under "Hidden (N)", each with "Show again". A hidden row comes back by itself when its commit moves, its count of commits at risk changes, or its verdict does. A session with new checkpoints gets a newer commit, and an orphaned-commit row with more commits gets a new name, so both come back too. Hidden rows are kept in `%LOCALAPPDATA%\Diffract\hidden\`, one file per repo.
+**Done** 2026-10-27, in #72. Every row has "Hide", and hidden rows sit folded under "Hidden (N)", each with "Show again". A hidden row comes back by itself when its commit moves, its count of commits at risk changes, or its verdict does. A session with new checkpoints gets a newer commit, and an orphaned-commit row with more commits gets a new name, so both come back too. Hidden rows are kept in `%LOCALAPPDATA%\Diffract\hidden\`, one file per repo.
 
 Johan asked on 2026-10-27 why orphaned commits could only be kept, not removed. Git has no command that removes one commit; `git gc --prune` removes every unreachable object in the repo, which would touch what he did not choose. He chose hiding them, and decision 3 stays as it is: git deletes them itself in its next cleanup.
 
