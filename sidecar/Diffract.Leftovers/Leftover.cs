@@ -17,24 +17,15 @@ public enum LeftoverKind
 /// Null when they could not be counted, or when the item holds no commits, as a leftover folder.
 /// </param>
 /// <param name="Reason">One plain-English sentence.</param>
-public sealed record Leftover(
+/// <remarks>What to check, and the commit to show, are in Leftover.Review.cs.</remarks>
+public sealed partial record Leftover(
     LeftoverKind Kind,
     string Name,
     string? Path,
     string? Agent,
     Verdict Verdict,
     int? CommitsAtRisk,
-    string Reason)
-{
-    /// <summary>What to look at before removing it, in plain English. Null when there is nothing to check.</summary>
-    public string? Check { get; init; }
-
-    /// <summary>
-    /// The commit "Show in History" opens: a branch's or tag's commit, a worktree's HEAD, a stash, the newest
-    /// checkpoint or orphaned commit. Null for a folder.
-    /// </summary>
-    public string? Commit { get; init; }
-}
+    string Reason);
 
 /// <summary>A pure check over a snapshot: no git calls, no file system.</summary>
 public interface ILeftoverRule
