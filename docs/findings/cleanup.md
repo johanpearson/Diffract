@@ -39,3 +39,7 @@ The spike from milestone 5, phase 0, step 1: every command the cleanup, the stas
 
 - **Moving a leftover folder to the Recycle Bin.** Native AOT rules out the usual .NET helper, so Diffract calls the Windows shell directly, as Explorer does. A folder in a temp folder goes to the Recycle Bin and can be restored from there. A folder with a file held open is caught by the rename check first and left where it is. When Windows cannot recycle a folder, for example because it is too big for the Recycle Bin, Windows asks before deleting it for good, so nothing is lost without the user saying so. A drive with no Recycle Bin at all, such as a network drive, is left alone.
 - **A file opened between the check and the removal.** The rename check cannot catch a program that opens a file a moment after it. A test opens one right after the check: git stops with exit code 255, as in step 1, the folder stays, and the branch is kept.
+
+## Checked in phase 5
+
+- **A commit that holds orphaned commits.** `git commit-tree <empty tree> -p <commit> -p <commit> -F -` makes one commit with all of them as parents, so one tag keeps them all. Git knows the empty tree, `4b825dc6…`, without storing it, so the command works in any repo. But `git fsck` then reports the new commit as broken, with a missing tree. `git mktree` with no input stores the empty tree, and fsck is clean after that. Diffract runs it first, every time; it changes nothing when the tree is already stored.
