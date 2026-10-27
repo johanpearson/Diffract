@@ -197,8 +197,11 @@ export interface RepoState {
   /** Why the scan after opening failed, in plain English. A refresh tries again. */
   scanProblem: string | null;
   snapshot: SnapshotSummary;
+  /** Counts the rows in `leftovers` only: hidden rows are left out. */
   summary: LeftoverSummary;
   leftovers: Leftover[];
+  /** Rows the user hid. Each comes back into `leftovers` by itself once it changes. */
+  hidden: Leftover[];
 }
 
 export interface RepoChange {
@@ -674,6 +677,10 @@ export interface Methods {
   "cleanup.plan": { params: { repoId: string; leftovers: SelectedLeftover[] }; result: CleanupPlanView };
   /** What one row holds: the newest commits only it has. One read-only git call, none for a folder. */
   "cleanup.inspect": { params: { repoId: string; leftover: SelectedLeftover }; result: LeftoverContent };
+  /** Leaves the row out of the list and its counts until it changes. Changes nothing in the repo. Answers with the new state. */
+  "cleanup.hide": { params: { repoId: string; leftover: SelectedLeftover }; result: RepoState };
+  /** Puts a hidden row back in the list. Answers with the new state. */
+  "cleanup.unhide": { params: { repoId: string; leftover: SelectedLeftover }; result: RepoState };
   /**
    * Runs the plan with that id, once, checking each step right before it runs. Live refresh pauses meanwhile, and one
    * `repo.changed` with the repo as it is afterwards arrives before the answer.

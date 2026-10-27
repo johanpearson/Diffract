@@ -25,6 +25,13 @@ public sealed class CleanupMethodsTests : IAsyncDisposable
     private async Task<FixtureScenario> OpenAsync(string scenario)
     {
         var built = await new FixtureRepoBuilder(_temp).BuildAsync(scenario);
+        await StartAsync(built.RepoPath);
+        return built;
+    }
+
+    /// <summary>A sidecar that opens the repo and waits for the scan. Its log and hidden rows are kept in the test's temp folder.</summary>
+    private async Task StartAsync(string repoPath)
+    {
         _methods = new SidecarMethods(
             new GitRunnerOptions { Environment = IsolatedGit.Environment(_temp) },
             new SidecarDependencies
@@ -32,12 +39,24 @@ public sealed class CleanupMethodsTests : IAsyncDisposable
                 Notify = (method, parameters) => _host.Host.NotifyAsync(method, parameters),
                 Running = new FakeProcessTable(),
                 OperationLogFolder = _temp.Combine("oplog"),
+                HiddenRowsFolder = _temp.Combine("hidden"),
             });
         _host = new HostHarness(_methods.Dispatch);
-        Result(await RequestAsync("repo.open", new { path = built.RepoPath }));
+        _nextId = 1;
+        Result(await RequestAsync("repo.open", new { path = repoPath }));
         await _methods.Repos.ScannedAsync("1");
-        return built;
     }
+
+    /// <summary>As if the app closed and started again: a new sidecar on the same folders.</summary>
+    private async Task RestartAsync(string repoPath)
+    {
+        await _host.DisposeAsync();
+        _methods.Dispose();
+        await StartAsync(repoPath);
+    }
+
+    private static List<string?> Names(JsonElement state, string list) =>
+        [.. state.GetProperty(list).EnumerateArray().Select(l => l.GetProperty("name").GetString())];
 
     /// <summary>Sends a request and returns its response. The notifications that arrive first are kept, in order.</summary>
     private async Task<JsonElement> RequestAsync(string method, object parameters)
@@ -200,6 +219,57 @@ public sealed class CleanupMethodsTests : IAsyncDisposable
         var error = Error(await RequestAsync("cleanup.inspect", new { repoId = "1", leftover = Selected("LocalBranch", "gone") }));
 
         Assert.Equal("CleanupRefused", error.GetProperty("data").GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public async Task A_hidden_row_leaves_the_list_and_its_counts_and_stays_hidden_after_a_refresh_and_a_restart()
+    {
+        var built = await OpenAsync("AgentBranchUnmerged");
+
+        var hidden = Result(await RequestAsync("cleanup.hide", new { repoId = "1", leftover = Selected("LocalBranch", "copilot/add-logging") }));
+
+        Assert.Empty(Names(hidden, "leftovers"));
+        Assert.Equal(["copilot/add-logging"], Names(hidden, "hidden"));
+        Assert.Equal(0, hidden.GetProperty("summary").GetProperty("needsReview").GetInt32());
+        var refreshed = Result(await RequestAsync("repo.refresh", new { repoId = "1", includeUnreachable = false }));
+        Assert.Equal(["copilot/add-logging"], Names(refreshed, "hidden"));
+
+        await RestartAsync(built.RepoPath);
+
+        var reopened = _methods.Repos.CurrentState(_methods.Repos.Get("1"));
+        Assert.Equal((0, 1), (reopened.Leftovers.Count, reopened.Hidden.Count));
+    }
+
+    [Fact]
+    public async Task A_hidden_row_comes_back_by_itself_when_it_changes()
+    {
+        var built = await OpenAsync("AgentBranchUnmerged");
+        Result(await RequestAsync("cleanup.hide", new { repoId = "1", leftover = Selected("LocalBranch", "copilot/add-logging") }));
+        var repo = new FixtureRepo(_temp, built.RepoPath, new FixtureClock { Now = FixtureRepoBuilder.DefaultNow.AddDays(-20) });
+        await repo.GitAsync("switch", "-q", "copilot/add-logging");
+        await repo.CommitAsync("log.txt", "more", "Add logging, step 4");
+        await repo.GitAsync("switch", "-q", "main");
+
+        var refreshed = Result(await RequestAsync("repo.refresh", new { repoId = "1", includeUnreachable = false }));
+
+        Assert.Equal(["copilot/add-logging"], Names(refreshed, "leftovers"));
+        Assert.Empty(Names(refreshed, "hidden"));
+    }
+
+    [Fact]
+    public async Task A_hidden_row_is_never_part_of_a_cleanup_until_it_is_shown_again()
+    {
+        await OpenAsync("AgentBranchMerged");
+        var branch = Selected("LocalBranch", "copilot/update-deps");
+        Result(await RequestAsync("cleanup.hide", new { repoId = "1", leftover = branch }));
+
+        var refused = await PlanAsync(branch);
+        var shownAgain = Result(await RequestAsync("cleanup.unhide", new { repoId = "1", leftover = branch }));
+        var planned = await PlanAsync(branch);
+
+        Assert.Equal("Hidden, so it is not cleaned up. Show it again first.", refused.GetProperty("leftovers")[0].GetProperty("refused").GetString());
+        Assert.Equal(["copilot/update-deps"], Names(shownAgain, "leftovers"));
+        Assert.Equal(JsonValueKind.Null, planned.GetProperty("leftovers")[0].GetProperty("refused").ValueKind);
     }
 
     /// <summary>The state in the last repo.changed.</summary>

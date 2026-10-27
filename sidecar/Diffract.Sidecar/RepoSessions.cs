@@ -27,6 +27,9 @@ internal sealed class RepoSessions(
     : IDisposable
 {
     private readonly ConcurrentDictionary<string, RepoSession> _byId = new();
+
+    /// <summary>The rows the user hid, which the state lists apart and the counts leave out.</summary>
+    public HiddenRows Hidden { get; init; } = new(HiddenRows.DefaultFolder);
     private readonly Lock _openLock = new();
     private int _lastId;
 
@@ -114,7 +117,10 @@ internal sealed class RepoSessions(
     public RepoSnapshot SnapshotOf(string repoId) =>
         Get(repoId).Snapshot ?? throw new InvalidOperationException("The repo is still being opened.");
 
-    /// <summary>The latest full snapshot and its leftovers, as the UI lists them. Refused before the scan after opening has finished.</summary>
+    /// <summary>The state the UI has for the repo, hidden rows as they are now included. Starts no git.</summary>
+    public RepoState CurrentState(RepoSession session) => StateOf(session);
+
+    /// <summary>The latest full snapshot and all its leftovers, hidden ones too. Refused before the scan after opening has finished.</summary>
     public (RepoSnapshot Snapshot, IReadOnlyList<Leftover> Leftovers) LeftoversOf(RepoSession session) =>
         session is { Scanned: true, Snapshot: { } snapshot }
             ? (snapshot, new LeftoverClassifier().Classify(snapshot, config, time))
@@ -259,9 +265,9 @@ internal sealed class RepoSessions(
     private RepoState StateOf(RepoSession session)
     {
         var snapshot = session.Snapshot!;
-        var leftovers = session.Scanned ? new LeftoverClassifier().Classify(snapshot, config, time) : [];
+        var rows = session.Scanned ? Hidden.For(session.RepoRoot).Split(new LeftoverClassifier().Classify(snapshot, config, time)) : new SplitRows([], []);
         var scanning = !session.Scanned && session.ScanProblem is null;
-        return RepoState.From(session.Id, snapshot, leftovers, new ScanStatus(session.UnreachableCountedAt, scanning, session.ScanProblem));
+        return RepoState.From(session.Id, snapshot, rows, new ScanStatus(session.UnreachableCountedAt, scanning, session.ScanProblem));
     }
 
     internal sealed class RepoSession(string id, string repoRoot) : IDisposable

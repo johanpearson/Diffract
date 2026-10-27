@@ -33,15 +33,41 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
             ? given
             : throw new RpcException(RpcErrorCodes.InvalidParams, "'leftovers' must list at least one leftover");
 
-        var (snapshot, leftovers) = repos.LeftoversOf(repos.Get(repoId));
-        var found = selection.Select(s => leftovers.FirstOrDefault(l => Picks(s, l))).ToList();
+        var session = repos.Get(repoId);
+        var (snapshot, all) = repos.LeftoversOf(session);
+        var rows = repos.Hidden.For(session.RepoRoot).Split(all);
+        var found = selection.Select(s => rows.Shown.FirstOrDefault(l => Picks(s, l))).ToList();
         var planned = new Queue<LeftoverPlan>(
             CleanupPlanner.Plan(snapshot, [.. found.OfType<Leftover>()], setup.Config, runnerOptions.TimeProvider).Leftovers);
-        var plan = new CleanupPlan([.. found.Select((l, i) => l is null ? LeftoverPlan.Refuse(Gone(selection[i]), NoLongerALeftover) : planned.Dequeue())]);
+        var plan = new CleanupPlan([.. found.Select((l, i) => l is null ? Refuse(selection[i], rows) : planned.Dequeue())]);
 
         var planId = Guid.NewGuid().ToString("N")[..12];
         _plans[planId] = new KeptPlan(repoId, plan);
         return Task.FromResult(SidecarMethods.Result(View(planId, plan)));
+    }
+
+    /// <summary>A hidden row is never part of a cleanup, until it is shown again.</summary>
+    private static LeftoverPlan Refuse(SelectedLeftover selected, SplitRows rows) =>
+        rows.Hidden.FirstOrDefault(l => Picks(selected, l)) is { } hidden
+            ? LeftoverPlan.Refuse(hidden, "Hidden, so it is not cleaned up. Show it again first.")
+            : LeftoverPlan.Refuse(Gone(selected), NoLongerALeftover);
+
+    /// <summary>Leaves the row out of the list and its counts until it changes. Changes nothing in the repo.</summary>
+    public Task<JsonElement> HideAsync(JsonElement? parameters, CancellationToken ct) =>
+        Task.FromResult(ChangeHidden(parameters, (hidden, leftover, all) => hidden.Hide(leftover, all)));
+
+    public Task<JsonElement> UnhideAsync(JsonElement? parameters, CancellationToken ct) =>
+        Task.FromResult(ChangeHidden(parameters, (hidden, leftover, all) => hidden.Unhide(leftover, all)));
+
+    /// <summary>Hides or shows one row, and answers with the repo's state as the list now has it.</summary>
+    private JsonElement ChangeHidden(JsonElement? parameters, Action<RepoHiddenRows, Leftover, IReadOnlyList<Leftover>> change)
+    {
+        var request = SidecarMethods.Params<CleanupRowParams>(parameters);
+        var selected = request.Leftover ?? throw new RpcException(RpcErrorCodes.InvalidParams, "'leftover' is required");
+        var session = repos.Get(SidecarMethods.Required(request.RepoId, "repoId"));
+        var all = repos.LeftoversOf(session).Leftovers;
+        change(repos.Hidden.For(session.RepoRoot), all.FirstOrDefault(l => Picks(selected, l)) ?? throw new CleanupLogException(NoLongerALeftover), all);
+        return SidecarMethods.Result(repos.CurrentState(session));
     }
 
     /// <summary>
@@ -50,7 +76,7 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
     /// </summary>
     public async Task<JsonElement> InspectAsync(JsonElement? parameters, CancellationToken ct)
     {
-        var request = SidecarMethods.Params<CleanupInspectParams>(parameters);
+        var request = SidecarMethods.Params<CleanupRowParams>(parameters);
         var selected = request.Leftover ?? throw new RpcException(RpcErrorCodes.InvalidParams, "'leftover' is required");
         var (snapshot, leftovers) = repos.LeftoversOf(repos.Get(SidecarMethods.Required(request.RepoId, "repoId")));
         var leftover = leftovers.FirstOrDefault(l => Picks(selected, l)) ?? throw new CleanupLogException(NoLongerALeftover);

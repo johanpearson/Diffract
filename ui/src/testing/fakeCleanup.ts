@@ -14,6 +14,9 @@ import type {
   StepView,
 } from "../protocol";
 
+/** Every field any cleanup.* method's params have. */
+type Params = { repoId: string; leftovers?: SelectedLeftover[]; leftover?: SelectedLeftover; planId?: string; leaveOut?: StepRef[] | null; cleanupId?: string };
+
 /** The contract sample, which the sidecar's own tests write. */
 const sampleContent = (inspectSample as { result: LeftoverContent }).result;
 
@@ -21,6 +24,8 @@ const sampleContent = (inspectSample as { result: LeftoverContent }).result;
 export interface CleanupHost {
   state(repoId: string): RepoState;
   change(repoId: string, update: (state: RepoState) => RepoState, changes?: RepoChange[]): void;
+  /** As `change`, but without repo.changed: hiding answers with the state instead, as the sidecar does. */
+  replace(repoId: string, update: (state: RepoState) => RepoState): RepoState;
 }
 
 const EarlierStep = "Skipped, as an earlier step for the same leftover did not run.";
@@ -51,21 +56,19 @@ export class FakeCleanups {
 
   answer(host: CleanupHost, method: string, params: unknown): unknown {
     this.asked.push({ method, params });
-    const p = params as { repoId: string; leftovers?: SelectedLeftover[]; planId?: string; leaveOut?: StepRef[] | null; cleanupId?: string };
-    switch (method) {
-      case "cleanup.plan":
-        return this.plan(host.state(p.repoId), p.leftovers ?? []);
-      case "cleanup.apply":
-        return this.apply(host, p.repoId, p.planId ?? "", p.leaveOut ?? []);
-      case "cleanup.history":
-        return this.history;
-      case "cleanup.inspect":
-        return this.inspect(host.state(p.repoId), (params as { leftover: SelectedLeftover }).leftover);
-      case "cleanup.undo":
-        return this.undo(host, p.repoId, p.cleanupId ?? "");
-    }
-    return undefined;
+    return this.handlers[method]?.(host, params as Params);
   }
+
+  /** What answers each method, by name. */
+  private readonly handlers: Record<string, (host: CleanupHost, p: Params) => unknown> = {
+    "cleanup.plan": (host, p) => this.plan(host.state(p.repoId), p.leftovers ?? []),
+    "cleanup.apply": (host, p) => this.apply(host, p.repoId, p.planId ?? "", p.leaveOut ?? []),
+    "cleanup.history": () => this.history,
+    "cleanup.inspect": (host, p) => this.inspect(host.state(p.repoId), p.leftover!),
+    "cleanup.hide": (host, p) => host.replace(p.repoId, (s) => moved(s, p.leftover!, true)),
+    "cleanup.unhide": (host, p) => host.replace(p.repoId, (s) => moved(s, p.leftover!, false)),
+    "cleanup.undo": (host, p) => this.undo(host, p.repoId, p.cleanupId ?? ""),
+  };
 
   /** What a row holds: the commits in `contents` by name, or the contract sample's; nothing for a folder. */
   private inspect(state: RepoState, selected: SelectedLeftover): LeftoverContent {
@@ -137,6 +140,17 @@ export class FakeCleanups {
 
 function refused(message: string) {
   return { code: -32011, message, data: { kind: "CleanupRefused" } };
+}
+
+/** The state with the row moved to the hidden rows, or back. The counts follow the rows that are shown. */
+function moved(state: RepoState, selected: SelectedLeftover, hide: boolean): RepoState {
+  const picks = (l: Leftover) => l.kind === selected.kind && l.name === selected.name && l.path === selected.path;
+  const [from, to] = hide ? [state.leftovers, state.hidden] : [state.hidden, state.leftovers];
+  const row = from.find(picks);
+  if (!row) throw refused("It is no longer a leftover. Refresh to see the repo as it is now.");
+  const rest = from.filter((l) => !picks(l));
+  const [shown, hidden] = hide ? [rest, [...to, row]] : [[...to, row], rest];
+  return { ...withLeftovers(state, shown), hidden };
 }
 
 function same(a: Leftover, b: Leftover): boolean {
