@@ -6,6 +6,8 @@ import { CleanupResultPanel } from "../cleanup/CleanupResultPanel";
 import { PastCleanups } from "../cleanup/PastCleanups";
 import { selectable } from "../cleanup/selection";
 import type { Cleanup } from "../cleanup/useCleanup";
+import { RowReview } from "../cleanup/RowReview";
+import type { ToggleName } from "../history/HistoryToggles";
 import { StatusLine } from "./StatusLine";
 
 export type Filter = Verdict | "all";
@@ -26,6 +28,8 @@ interface Props {
   /** Why Refresh cannot be used right now, or null when it can. */
   refreshBlocked?: string | null;
   cleanup: Cleanup;
+  /** Shows the commit in History, turning on the toggle it needs first. */
+  onShowInHistory(commitId: string, toggle: ToggleName | null): void;
   now: Date;
 }
 
@@ -130,28 +134,25 @@ function Chips({ filter, onFilter }: Pick<Props, "filter" | "onFilter">) {
   );
 }
 
-function LeftoverList({ rows, filter, onOpenFolder, onOpenTerminal, terminalName, cleanup }: Omit<Props, "state">) {
+function LeftoverList(props: Omit<Props, "state">) {
+  const { rows, filter } = props;
   const shown = rows.filter((row) => filter === "all" || row.leftover.verdict === filter);
   if (shown.length === 0) return <p className="empty">{rows.length === 0 ? "Nothing here. Agents left your repo tidy." : "Nothing with this verdict."}</p>;
   return (
     <ul className="items" aria-label="Leftovers">
       {shown.map((row) => (
-        <LeftoverRow key={row.key} row={row} onOpenFolder={onOpenFolder} onOpenTerminal={onOpenTerminal} terminalName={terminalName} cleanup={cleanup} />
+        <LeftoverRow key={row.key} row={row} actions={props} />
       ))}
     </ul>
   );
 }
 
-interface RowProps {
-  row: Row;
-  onOpenFolder(path: string): void;
-  onOpenTerminal(path: string): void;
-  terminalName: string | null;
-  cleanup: Cleanup;
-}
+/** What a row's buttons do. The same for every row. */
+type RowActions = Pick<Props, "onOpenFolder" | "onOpenTerminal" | "terminalName" | "cleanup" | "onShowInHistory" | "now">;
 
-function LeftoverRow({ row, onOpenFolder, onOpenTerminal, terminalName, cleanup }: RowProps) {
+function LeftoverRow({ row, actions }: { row: Row; actions: RowActions }) {
   const l = row.leftover;
+  const { cleanup } = actions;
   return (
     <li className={`item selectable${row.flash ? ` flash-${row.flash}` : ""}`} data-flash={row.flash ?? undefined} aria-label={l.name}>
       <Pick row={row} cleanup={cleanup} />
@@ -162,25 +163,14 @@ function LeftoverRow({ row, onOpenFolder, onOpenTerminal, terminalName, cleanup 
         </div>
         <div className="why">{l.reason}</div>
         {l.path && <div className="path">{l.path}</div>}
-        {l.kind === "OrphanedCommit" && selectable(row) && (
-          <div className="item-actions">
+        <RowReview row={row} cleanup={cleanup} onShowInHistory={actions.onShowInHistory} now={actions.now}>
+          {l.kind === "OrphanedCommit" && selectable(row) && (
             <button className="abtn" onClick={() => cleanup.keep(row)} disabled={cleanup.planning || cleanup.busy} aria-label={`Keep ${l.name}`}>
               Keep these
             </button>
-          </div>
-        )}
-        {canOpen(l) && (
-          <div className="item-actions">
-            <button className="abtn" onClick={() => onOpenFolder(l.path!)} aria-label={`Open folder ${l.path}`}>
-              Open folder
-            </button>
-            {l.kind === "Worktree" && (
-              <button className="abtn" onClick={() => onOpenTerminal(l.path!)} aria-label={`Open terminal in ${l.path}`}>
-                {terminalName ? `Open in ${terminalName}` : "Open terminal here"}
-              </button>
-            )}
-          </div>
-        )}
+          )}
+          {canOpen(l) && <OpenButtons leftover={l} actions={actions} />}
+        </RowReview>
       </div>
       <div className="item-side">
         <span className={`verdict ${verdictClass[l.verdict]}`}>{verdictLabels[l.verdict]}</span>
@@ -203,6 +193,22 @@ function Pick({ row, cleanup }: { row: Row; cleanup: Cleanup }) {
       onChange={() => cleanup.toggle(row.key)}
       aria-label={`Select ${row.leftover.name}`}
     />
+  );
+}
+
+function OpenButtons({ leftover, actions }: { leftover: Leftover; actions: RowActions }) {
+  const path = leftover.path!;
+  return (
+    <>
+      <button className="abtn" onClick={() => actions.onOpenFolder(path)} aria-label={`Open folder ${path}`}>
+        Open folder
+      </button>
+      {leftover.kind === "Worktree" && (
+        <button className="abtn" onClick={() => actions.onOpenTerminal(path)} aria-label={`Open terminal in ${path}`}>
+          {actions.terminalName ? `Open in ${actions.terminalName}` : "Open terminal here"}
+        </button>
+      )}
+    </>
   );
 }
 

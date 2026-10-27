@@ -18,6 +18,7 @@ import {
   type AppInfo,
   type CleanupPlanView,
   type CleanupResult,
+  type LeftoverContent,
   type LeftoverPlanView,
   type PastCleanup,
   type SelectedLeftover,
@@ -102,6 +103,8 @@ const leftover = object<Leftover>({
   verdict: oneOf(verdicts),
   commitsAtRisk: nullable(number),
   reason: string,
+  check: nullable(string),
+  commit: nullable(string),
 });
 
 const repoState = object<RepoState>({
@@ -255,6 +258,7 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
       object<LeftoverPlanView>({ kind: oneOf(leftoverKinds), name: string, path: nullable(string), refused: nullable(string), steps: arrayOf(stepView) }),
     ),
   }),
+  "cleanup.inspect": object<LeftoverContent>({ commits: arrayOf(commitEntry), more: boolean }),
   "cleanup.apply": cleanupResult,
   "cleanup.history": arrayOf(
     object<PastCleanup>({

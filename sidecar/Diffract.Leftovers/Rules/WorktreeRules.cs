@@ -49,9 +49,10 @@ public sealed class MergedWorktreeRule : ILeftoverRule
         where Worktrees.IsClean(w) && w.Branch != repo.MainBranch
         let branch = Worktrees.Branch(repo, w)
         where branch is not null && Branches.IsMergedOrGone(branch)
-        select Worktrees.Leftover(repo, config, w, new(Verdict.SafeToRemove, branch.IsMergedIntoMain
-            ? $"Branch merged into {repo.MainBranch}, worktree is clean"
-            : $"Upstream branch was deleted, probably merged; worktree is clean and {Describe.AtRisk(branch.CommitsAtRisk ?? 0)}"));
+        select Worktrees.Leftover(repo, config, w, branch.IsMergedIntoMain
+            ? new(Verdict.SafeToRemove, $"Branch merged into {repo.MainBranch}, worktree is clean")
+            : new(Verdict.SafeToRemove, $"Upstream branch was deleted, probably merged; worktree is clean and {Describe.AtRisk(branch.CommitsAtRisk ?? 0)}",
+                Describe.SquashMerged(branch.CommitsAtRisk ?? 0, repo.MainBranch)));
 }
 
 /// <summary>A clean worktree on an unmerged branch with no activity for <c>staleAfterDays</c>.</summary>
@@ -65,7 +66,8 @@ public sealed class StaleWorktreeRule : ILeftoverRule
         let idle = Worktrees.Idle(w, time)
         where idle >= TimeSpan.FromDays(config.StaleAfterDays)
         select Worktrees.Leftover(repo, config, w, new(Verdict.NeedsReview,
-            $"No activity for {Describe.Age(idle.Value)}, {Describe.AtRisk(branch.CommitsAtRisk ?? 0)}"));
+            $"No activity for {Describe.Age(idle.Value)}, {Describe.AtRisk(branch.CommitsAtRisk ?? 0)}",
+            Describe.LookAtCommits(branch.CommitsAtRisk ?? 0, "on its branch", "Removing it")));
 }
 
 /// <summary>A clean worktree with a detached HEAD has no branch to say whether it is finished.</summary>
@@ -75,7 +77,9 @@ public sealed class DetachedWorktreeRule : ILeftoverRule
         from w in Worktrees.Linked(repo)
         where w.IsDetached && Worktrees.IsClean(w)
         let ahead = w.AheadOfMain ?? 0
-        select Worktrees.Leftover(repo, config, w, new(Verdict.NeedsReview, ahead == 0
-            ? $"Detached HEAD at a commit already on {repo.MainBranch}"
-            : $"Detached HEAD with {Describe.Count(ahead, "commit")} not on {repo.MainBranch}"));
+        select Worktrees.Leftover(repo, config, w, ahead == 0
+            ? new(Verdict.NeedsReview, $"Detached HEAD at a commit already on {repo.MainBranch}",
+                $"It is on a commit {repo.MainBranch} already has. Remove it once nobody works there.")
+            : new(Verdict.NeedsReview, $"Detached HEAD with {Describe.Count(ahead, "commit")} not on {repo.MainBranch}",
+                Describe.LookAtCommits(ahead, "on this detached HEAD", "Removing it")));
 }

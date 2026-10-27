@@ -164,7 +164,7 @@ public sealed class CleanupMethodsTests : IAsyncDisposable
     public async Task Keeping_orphaned_commits_counts_them_again_so_their_rows_go_and_undo_brings_them_back()
     {
         await OpenAsync("OrphanedCommit");
-        var plan = await PlanAsync(Selected("OrphanedCommit", "1 commit"), Selected("OrphanedCommit", "2 commits"));
+        var plan = await PlanAsync(Selected("OrphanedCommit", "49919a09 Experiment"), Selected("OrphanedCommit", "2 commits of session d2061d20"));
         _notifications.Clear();
 
         var kept = Result(await RequestAsync("cleanup.apply", new { repoId = "1", planId = plan.GetProperty("planId").GetString() }));
@@ -175,7 +175,31 @@ public sealed class CleanupMethodsTests : IAsyncDisposable
 
         Result(await RequestAsync("cleanup.undo", new { repoId = "1", cleanupId = kept.GetProperty("cleanupId").GetString() }));
 
-        Assert.Equal(["1 commit", "2 commits"], LastState().GetProperty("leftovers").EnumerateArray().Select(l => l.GetProperty("name").GetString()).Order());
+        Assert.Equal(["2 commits of session d2061d20", "49919a09 Experiment"], LastState().GetProperty("leftovers").EnumerateArray().Select(l => l.GetProperty("name").GetString()).Order());
+    }
+
+    [Fact]
+    public async Task Inspect_lists_the_commits_only_the_row_holds_and_says_what_to_check()
+    {
+        await OpenAsync("AgentBranchUnmerged");
+        var leftover = Assert.Single(_methods.Repos.LeftoversOf(_methods.Repos.Get("1")).Leftovers);
+
+        var content = Result(await RequestAsync("cleanup.inspect", new { repoId = "1", leftover = Selected("LocalBranch", "copilot/add-logging") }));
+
+        Assert.Equal(["Add logging, step 3", "Add logging, step 2", "Add logging, step 1"], content.GetProperty("commits").EnumerateArray().Select(c => c.GetProperty("subject").GetString()));
+        Assert.False(content.GetProperty("more").GetBoolean());
+        Assert.Equal(content.GetProperty("commits")[0].GetProperty("id").GetString(), leftover.Commit);
+        Assert.StartsWith("Look at the 3 commits only on this branch", leftover.Check);
+    }
+
+    [Fact]
+    public async Task Inspect_refuses_a_row_the_repo_no_longer_has()
+    {
+        await OpenAsync("Clean");
+
+        var error = Error(await RequestAsync("cleanup.inspect", new { repoId = "1", leftover = Selected("LocalBranch", "gone") }));
+
+        Assert.Equal("CleanupRefused", error.GetProperty("data").GetProperty("kind").GetString());
     }
 
     /// <summary>The state in the last repo.changed.</summary>

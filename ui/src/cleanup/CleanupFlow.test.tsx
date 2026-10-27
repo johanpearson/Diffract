@@ -47,16 +47,20 @@ const merged: Leftover = {
   verdict: "SafeToRemove",
   commitsAtRisk: 0,
   reason: "Merged into main",
+  check: null,
+  commit: "1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b",
 };
 
 const orphaned: Leftover = {
   kind: "OrphanedCommit",
-  name: "2 commits",
+  name: "2 commits of session d2061d20",
   path: null,
   agent: "GitHub Copilot",
   verdict: "NeedsReview",
   commitsAtRisk: 2,
   reason: "Not on any branch, tag, stash or reflog, so git may delete them in its next cleanup",
+  check: "An agent's session left these. Look at what they hold, then keep them, or let git delete them.",
+  commit: "9fceb02d0ae598e95dc970b74767f19372d61af8",
 };
 
 describe("cleaning up", () => {
@@ -169,14 +173,14 @@ describe("cleaning up", () => {
     sidecar.repos.set(repoRoot.toLowerCase(), { ...state, leftovers: [...state.leftovers, orphaned] });
     await setup(sidecar);
 
-    fireEvent.click(button("Keep 2 commits"));
+    fireEvent.click(button("Keep 2 commits of session d2061d20"));
     const dialog = await screen.findByRole("dialog", { name: "Keep these commits?" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Keep" }));
 
     const result = await screen.findByRole("region", { name: "Cleanup result" });
     expect(within(result).getByRole("heading", { name: "Kept" })).toBeTruthy();
-    expect(within(result).getByRole("list", { name: "Kept as a backup" }).textContent).toContain("Keep 2 commits under a backup tag");
-    await waitFor(() => expect(rowNames()).not.toContain("2 commits"), { timeout: FlashMs * 3 });
+    expect(within(result).getByRole("list", { name: "Kept as a backup" }).textContent).toContain("Keep 2 commits of session d2061d20 under a backup tag");
+    await waitFor(() => expect(rowNames()).not.toContain("2 commits of session d2061d20"), { timeout: FlashMs * 3 });
   });
 
   it("closes the dialog on Cancel and removes nothing", async () => {

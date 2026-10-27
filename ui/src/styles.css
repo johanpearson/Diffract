@@ -646,6 +646,41 @@ body {
   margin-top: 2px;
 }
 
+/* What to look at before removing the row: the one line that says what to do. */
+.check {
+  color: var(--ink);
+  font-size: 12.5px;
+  margin-top: 4px;
+}
+
+.row-commits {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+
+.row-commits li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 1px 0;
+}
+
+.row-commits .subject {
+  color: var(--ink);
+}
+
+.row-commits .kind {
+  margin-left: 0;
+}
+
+.row-commits.empty,
+.row-commits .more {
+  color: var(--ink-3);
+}
+
 .path {
   color: var(--ink-3);
   font-family: var(--mono);

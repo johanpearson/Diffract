@@ -13,6 +13,7 @@ import type { SwitchTo } from "../history/commitMenu";
 import { HistoryView } from "../history/HistoryView";
 import { ChangesView } from "../changes/ChangesView";
 import { useCleanup } from "../cleanup/useCleanup";
+import type { ToggleName } from "../history/HistoryToggles";
 
 /** What the screens need besides the screen itself. */
 export interface ScreenProps {
@@ -32,6 +33,8 @@ export interface ScreenProps {
   work: RepoWork;
   /** Shows History with this commit selected. */
   onReveal(commitId: string): void;
+  /** As onReveal, turning on the History toggle the commit needs first, such as Stashes for a stash. */
+  onShowInHistory(commitId: string, toggle: ToggleName | null): void;
 }
 
 export const SidebarWidth: SizeSpec = { key: "diffract.size.sidebar", initial: 250, min: 180, max: 480 };
@@ -171,12 +174,13 @@ function Leftovers(props: ScreenProps) {
 }
 
 /** One repo's leftovers. Its key is the repo, so a selection or a result never carries over to another repo. */
-function LeftoversScreen({ repo, git, terminals, filter, onFilter, onOpenFolder, now, state }: ScreenProps & { state: RepoState }) {
+function LeftoversScreen({ repo, git, terminals, filter, onFilter, onOpenFolder, onShowInHistory, now, state }: ScreenProps & { state: RepoState }) {
   const cleanup = useCleanup(repo.session.client, state.repoId, repo.rows, repo.session.showNotice);
   return (
     <LeftoversView
       state={state}
       cleanup={cleanup}
+      onShowInHistory={onShowInHistory}
       rows={repo.rows}
       filter={filter}
       onFilter={onFilter}

@@ -384,6 +384,7 @@ export class FakeSidecar {
         this.refsAsked.push({ method, params });
         return answerRefs(this, method, params as Parameters<typeof answerRefs>[2]);
       case "cleanup.plan":
+      case "cleanup.inspect":
       case "cleanup.apply":
       case "cleanup.history":
       case "cleanup.undo":

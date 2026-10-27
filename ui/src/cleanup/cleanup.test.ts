@@ -19,6 +19,8 @@ const leftover = (over: Partial<Leftover>): Leftover => ({
   verdict: "SafeToRemove",
   commitsAtRisk: 0,
   reason: "Merged into main",
+  check: null,
+  commit: null,
   ...over,
 });
 

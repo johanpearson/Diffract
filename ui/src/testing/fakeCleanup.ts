@@ -1,4 +1,21 @@
-import type { CleanupPlanView, CleanupResult, Leftover, LeftoverPlanView, PastCleanup, RepoChange, RepoState, SelectedLeftover, StepRef, StepResult, StepView } from "../protocol";
+import inspectSample from "../../../tests/Diffract.Sidecar.Tests/Contract/cleanup.inspect.json";
+import type {
+  CleanupPlanView,
+  CleanupResult,
+  Leftover,
+  LeftoverContent,
+  LeftoverPlanView,
+  PastCleanup,
+  RepoChange,
+  RepoState,
+  SelectedLeftover,
+  StepRef,
+  StepResult,
+  StepView,
+} from "../protocol";
+
+/** The contract sample, which the sidecar's own tests write. */
+const sampleContent = (inspectSample as { result: LeftoverContent }).result;
 
 /** What the fake's cleanup methods read and change on the fake sidecar. */
 export interface CleanupHost {
@@ -42,11 +59,24 @@ export class FakeCleanups {
         return this.apply(host, p.repoId, p.planId ?? "", p.leaveOut ?? []);
       case "cleanup.history":
         return this.history;
+      case "cleanup.inspect":
+        return this.inspect(host.state(p.repoId), (params as { leftover: SelectedLeftover }).leftover);
       case "cleanup.undo":
         return this.undo(host, p.repoId, p.cleanupId ?? "");
     }
     return undefined;
   }
+
+  /** What a row holds: the commits in `contents` by name, or the contract sample's; nothing for a folder. */
+  private inspect(state: RepoState, selected: SelectedLeftover): LeftoverContent {
+    const leftover = state.leftovers.find((l) => l.kind === selected.kind && l.name === selected.name && l.path === selected.path);
+    if (!leftover) throw refused("It is no longer a leftover. Refresh to see the repo as it is now.");
+    if (leftover.kind === "LeftoverFolder") return { commits: [], more: false };
+    return this.contents.get(leftover.name) ?? sampleContent;
+  }
+
+  /** What `cleanup.inspect` answers for a row, by its name. Any other row gets the contract sample. */
+  readonly contents = new Map<string, LeftoverContent>();
 
   private plan(state: RepoState, selected: SelectedLeftover[]): CleanupPlanView {
     const found = selected.map((s) => state.leftovers.find((l) => l.kind === s.kind && l.name === s.name && l.path === s.path) ?? null);

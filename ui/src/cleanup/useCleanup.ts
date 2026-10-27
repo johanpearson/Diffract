@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCommands } from "../commands/Commands";
 import { messageOf } from "../model/format";
 import type { Row } from "../model/rows";
-import type { CleanupPlanView, CleanupResult, PastCleanup, StepRef } from "../protocol";
+import type { CleanupPlanView, CleanupResult, Leftover, LeftoverContent, PastCleanup, StepRef } from "../protocol";
 import type { RpcClient } from "../rpc";
 import { keepsOnly, needsAttention, outcomeLine, plannedCount, summarize } from "./outcome";
 import { selectedRows, toSelected, withMergedBranches } from "./selection";
@@ -34,6 +34,8 @@ export interface Cleanup {
   /** Past cleanups, newest first. */
   history: PastCleanup[];
   undo(cleanupId: string): void;
+  /** The commits only this leftover holds. Only reads. */
+  inspect(leftover: Leftover): Promise<LeftoverContent>;
   /** A cleanup or undo is running. */
   busy: boolean;
 }
@@ -50,6 +52,7 @@ export function useCleanup(client: RpcClient, repoId: string, rows: Row[], showN
   const [shown, setShown] = useState<Shown | null>(null);
   const [history, loadHistory] = usePastCleanups(client, repoId, showNotice);
   const [busy, setBusy] = useState(false);
+  const inspect = useCallback((leftover: Leftover) => client.call("cleanup.inspect", { repoId, leftover: toSelected(leftover) }), [client, repoId]);
 
   /** Runs an apply or an undo in the command window, then shows what it did and reads the history again. */
   const run = useCallback(
@@ -102,6 +105,7 @@ export function useCleanup(client: RpcClient, repoId: string, rows: Row[], showN
     dismiss: () => setShown(null),
     history,
     undo,
+    inspect,
     busy,
   };
 }

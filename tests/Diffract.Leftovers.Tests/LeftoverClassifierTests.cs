@@ -224,21 +224,36 @@ public class LeftoverClassifierTests
     }
 
     [Fact]
-    public void Orphaned_commits_get_one_row_per_agent_even_with_equal_counts()
+    public void Orphaned_commits_get_a_row_each_unless_an_agents_session_groups_them()
     {
+        const string Session = "d2061d20-a6c1-46ea-9cc3-fcf61843f825";
         var repo = Snap.Repo() with
         {
             UnreachableCommits =
             [
-                new("c1", Snap.Now, "Agent host session s - baseline checkpoint"),
-                new("c2", Snap.Now, "Experiment"),
+                new("c1", Snap.Now.AddMinutes(-2), $"Agent host session {Session} - baseline checkpoint"),
+                new("c2", Snap.Now.AddMinutes(-1), $"Agent host session {Session} - checkpoint 1"),
+                new("c3", Snap.Now, "Experiment"),
+                new("c4", Snap.Now, "Another experiment"),
             ],
         };
 
         var rows = Classify(repo);
 
-        Assert.Equal([("1 commit", (string?)null), ("1 commit", "GitHub Copilot")], rows.Select(l => (l.Name, l.Agent)));
-        Assert.All(rows, l => Assert.Equal((LeftoverKind.OrphanedCommit, Verdict.NeedsReview, 1), (l.Kind, l.Verdict, l.CommitsAtRisk)));
+        Assert.Equal(
+            [("2 commits of session d2061d20", "GitHub Copilot", 2, "c2"), ("c3 Experiment", (string?)null, 1, "c3"), ("c4 Another experiment", null, 1, "c4")],
+            rows.Select(l => (l.Name, l.Agent, l.CommitsAtRisk ?? 0, l.Commit)).OrderBy(r => r.Item1, StringComparer.Ordinal));
+        Assert.All(rows, l => Assert.Equal((LeftoverKind.OrphanedCommit, Verdict.NeedsReview), (l.Kind, l.Verdict)));
+    }
+
+    [Fact]
+    public void An_agents_commit_with_no_session_id_in_its_subject_is_a_row_of_its_own()
+    {
+        var repo = Snap.Repo() with { UnreachableCommits = [new("c1", Snap.Now, "Agent host session s - baseline checkpoint")] };
+
+        var row = Assert.Single(Classify(repo));
+
+        Assert.Equal(("c1 Agent host session s - baseline checkpoint", "GitHub Copilot"), (row.Name, row.Agent));
     }
 
     [Fact]
@@ -250,8 +265,8 @@ public class LeftoverClassifierTests
         var withSetting = Assert.Single(Classify(repo));
         var without = Assert.Single(new LeftoverClassifier().Classify(repo, hintOnly, Time));
 
-        Assert.Equal(("1 checkpoint commit", Verdict.SafeToRemove, "GitHub Copilot"), (withSetting.Name, withSetting.Verdict, withSetting.Agent));
-        Assert.Equal(("1 commit", Verdict.NeedsReview, "GitHub Copilot"), (without.Name, without.Verdict, without.Agent));
+        Assert.Equal(("c1 copilot checkpoint: s @ 1", Verdict.SafeToRemove, "GitHub Copilot"), (withSetting.Name, withSetting.Verdict, withSetting.Agent));
+        Assert.Equal(("c1 copilot checkpoint: s @ 1", Verdict.NeedsReview, "GitHub Copilot"), (without.Name, without.Verdict, without.Agent));
     }
 
     [Fact]

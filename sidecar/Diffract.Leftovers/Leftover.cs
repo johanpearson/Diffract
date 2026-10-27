@@ -24,7 +24,17 @@ public sealed record Leftover(
     string? Agent,
     Verdict Verdict,
     int? CommitsAtRisk,
-    string Reason);
+    string Reason)
+{
+    /// <summary>What to look at before removing it, in plain English. Null when there is nothing to check.</summary>
+    public string? Check { get; init; }
+
+    /// <summary>
+    /// The commit "Show in History" opens: a branch's or tag's commit, a worktree's HEAD, a stash, the newest
+    /// checkpoint or orphaned commit. Null for a folder.
+    /// </summary>
+    public string? Commit { get; init; }
+}
 
 /// <summary>A pure check over a snapshot: no git calls, no file system.</summary>
 public interface ILeftoverRule
