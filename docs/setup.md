@@ -119,6 +119,6 @@ npm run tauri build       # the installer, in src-tauri\target\release\bundle\ns
 
 The Rust tests run with `cargo test` in `src-tauri\`. They need a built UI in `ui\dist`, so run `npm run build` in `ui\` first.
 
-## Later in milestone 2
+## End-to-end tests
 
-- **Playwright browsers.** Phase 4 adds end-to-end tests. Install the browser they use once, with `npx playwright install chromium` in `ui/`.
+The UI's end-to-end tests use Playwright. Install the browser they use once, with `npx playwright install chromium` in `ui/`.

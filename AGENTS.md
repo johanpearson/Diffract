@@ -5,10 +5,31 @@ Rules for any coding agent (Claude Code, GitHub Copilot) working in this repo. J
 ## Read first
 
 1. `docs/brief.md` for what Diffract is and the decisions that are already made.
-2. The current milestone, linked from the "Status" section of `README.md`.
+2. Your issue, which is the spec (see "Starting work").
 3. `docs/visual-plan.html` if you need to see the intended UI. It is a static mock, not code to reuse.
 
 Decisions in the brief are locked. If you think one is wrong, say so in the PR description. Do not quietly work around it.
+
+## Starting work
+
+Work comes from GitHub issues, and the issue is the spec: what to build, how to test it, and any open question. Issues are grouped in GitHub milestones, which replace the old milestone docs.
+
+- **Which issue.** Use the one Johan names. Otherwise take the lowest-numbered open issue in the earliest open GitHub milestone, and say which one you took and why. Read the whole issue and its comments first.
+- **One issue, one PR.** If an issue is too big for one PR, comment on it with a proposed split and wait for Johan.
+- **Open questions.** If the issue has an open question that changes what you build, comment on the issue with your proposal and wait for Johan's answer there. If the question is small and easy to undo, build your proposal and list it under "Needs your decision" in the PR instead.
+- **Checkpoints.** An issue labelled `checkpoint` is Johan's to do, such as a real-world check. Stop and wait for him.
+- **New ideas.** Anything that is not part of your issue becomes a new issue (use the issue template), not extra scope in your PR. If you are not sure he wants it, put it under "Needs your decision".
+- **Where things are written.**
+
+  | What | Where |
+  |---|---|
+  | What to build, open questions, Johan's answers | the issue |
+  | What changed and why | the PR |
+  | Locked decisions and architecture | `docs/brief.md` |
+  | How real git behaves, measured | `docs/findings/` |
+  | How to build and run | `docs/setup.md` |
+
+  If Johan's answer on an issue changes a locked decision, update `docs/brief.md` in the same PR.
 
 ## Safety rules (non-negotiable)
 
@@ -72,11 +93,10 @@ CodeScene's MCP server (`.mcp.json` for Claude Code, `.vscode/mcp.json` for Copi
 ## Workflow
 
 - `main` is protected: no direct pushes, no force pushes, linear history, and the CI job `build` must pass before anything merges. Never try to work around this, and never rename the `build` job.
-- One branch per task, named like `m1/parsers` or `m1/fixtures`.
+- One branch per issue, named `issue-<number>/<short-name>`, such as `issue-74/prune-remote-branches`.
 - Johan merges with either squash or rebase. With rebase, your commits land on main as they are, so every commit must build, pass tests and have a meaningful conventional message (`feat:`, `fix:`, `test:`, `docs:`, `chore:`). No "wip" or "fix typo" commits; squash them locally before opening the PR.
 - Do not merge your own PRs.
-- When the milestone doc says "checkpoint", stop and wait for Johan.
-- When Johan signs off a milestone, the last PR sets its status line to `done` and points the README "Status" section at the next milestone doc, if one exists. If it doesn't, say so under "Needs your decision".
+- When Johan signs off a milestone, he closes its `checkpoint` issue and the GitHub milestone. Nothing needs to be committed.
 
 ## Pull requests
 
@@ -87,8 +107,9 @@ Johan does not review code. He reads the PR description, checks that CI is green
 
 Use `.github/pull_request_template.md` and follow these rules:
 
-- The visible part (TL;DR, Try it, How I know it works, Needs your decision) stays under about 150 words.
-- Write for a person, not a reviewer. Say what is different and why it matters. No file lists, class names or code in the visible part unless a command is needed under "Try it".
+- Put `Closes #<number>` on the first line, for the issue the PR finishes. Merging then closes the issue. If the PR only does part of an issue, write `Refs #<number>` instead. Never close a `checkpoint` issue.
+- The visible part (What and why, Try it, How I know it works, Needs your decision) stays under about 150 words.
+- Write for a person, not a reviewer. "What and why" says what is different and why it matters. No file lists, class names or code in the visible part unless a command is needed under "Try it".
 - Technical detail goes in the collapsed "Technical notes" section, or nowhere.
 - If something needs Johan's decision, it goes under "Needs your decision" and nowhere else, so he can't miss it.
 - Remove all template comments. Tick a checklist item only if it is true; if not, leave it unticked and say why in Technical notes.

@@ -2,9 +2,13 @@
 
 How PRs get merged, what protects main, and how to get unstuck.
 
+## Issues
+
+Work starts as an issue: **New issue**, then "Feature or change" or "Bug". Issues are grouped in GitHub milestones, and the issue is what an agent is given to build. Open questions go in the issue, and so do your answers.
+
 ## Merging a PR
 
-1. Read the TL;DR and "Needs your decision".
+1. Read "What and why" and "Needs your decision". The PR starts with `Closes #<number>`, so merging it closes its issue.
 2. Check that CI is green.
 3. Click **Squash and merge** for most PRs. Use **Rebase and merge** when the separate commits are worth keeping on main.
    Or click **Enable auto-merge** and GitHub merges it as soon as CI passes.

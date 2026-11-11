@@ -108,7 +108,7 @@ Items 3, 5, 6, 8 and 10 are separate from the agent entries on purpose. The brie
 
 ## Decisions
 
-Johan agreed to these on 2026-10-20 when reviewing phase 0. The milestone doc is updated to match.
+Johan agreed to these on 2026-10-20 when reviewing phase 0.
 
 - **Checkpoints are grouped per session.** One leftover per `<session-id>`, with the number of refs. A session whose newest checkpoint is older than `staleAfterDays` is "Needs review". A newer session is not reported.
 - **A branch whose upstream is `gone` counts as probably merged.** This catches squash merges. It is "Safe", and its unique commits are still counted as at risk so the cleanup in milestone 5 keeps a backup tag for them.
@@ -123,7 +123,7 @@ Johan agreed to these on 2026-10-20 when reviewing phase 0. The milestone doc is
 
 ## Still open
 
-- **How to clean up orphaned commits (milestone 5).** Decided on 2026-10-21: only "Keep these" for now, and rows can be hidden. See `docs/milestones/m5-cleanup.md`. Git deletes them by itself once they are older than two weeks, the next time its automatic cleanup (`git gc`) runs. Diffract could offer two actions. "Clean up now" runs that cleanup on purpose after a preview; it cannot be undone, which the brief only allows with a preview. "Keep these" saves the commits under an `archive/` tag first, as the brief already does for unmerged work. To decide when the cleanup milestone is specified.
-- **Checking what a forgotten worktree folder holds (milestone 5).** Diffract cannot tell whether such a folder holds anything not in git, so it shows "Needs review" and "-" as the risk. It could compare each file with the repo's history, as was done by hand in phase 6: both forgotten folders held only a README that was already committed.
+- **How to clean up orphaned commits.** Settled: only "Keep these" is offered, and rows can be hidden. Git deletes orphaned commits by itself once they are older than two weeks, the next time its automatic cleanup (`git gc`) runs. Removing them on purpose would run that cleanup on every unreachable object in the repo, including what the user did not choose, so Diffract does not.
+- **Checking what a forgotten worktree folder holds.** Diffract cannot tell whether such a folder holds anything not in git, so it shows "Needs review" and "-" as the risk. It could compare each file with the repo's history, as was done by hand in phase 6: both forgotten folders held only a README that was already committed. Tracked in issue #104.
 
 - **The other orphaned commits in Repo A.** After the dropped checkpoints, 87 remain: mostly earlier versions of commits that were later rebased or squashed, and a few from dropped stashes. They are probably left from worktrees that were removed, since removing a worktree also removes its reflog. They show as one "Needs review" row.
