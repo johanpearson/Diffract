@@ -7,6 +7,8 @@ import { keepsOnly, leaveOutOf, plannedCount, stepKey } from "./outcome";
 export interface DialogWording {
   title: string;
   confirm: string;
+  /** Said under the intro, such as what undo can and cannot bring back. */
+  note?: string;
 }
 
 interface Props {
@@ -44,6 +46,7 @@ export function CleanupDialog({ plan, onConfirm, onCancel, wording: given }: Pro
       <div className="dialog cleanup-dialog" role="dialog" aria-modal="true" aria-labelledby="cleanup-title" onKeyDown={onKeyDown}>
         <h1 id="cleanup-title">{wording.title}</h1>
         <p>This is exactly what will happen, in this order. Nothing else is touched. A step whose leftover changed meanwhile is skipped, with why.</p>
+        {wording.note && <p>{wording.note}</p>}
         <ol className="cleanup-plan" aria-label="Planned steps">
           {plan.leftovers.map((leftover, l) => (
             <PlannedLeftover key={l} index={l} leftover={leftover} unticked={unticked} onToggle={toggle} />

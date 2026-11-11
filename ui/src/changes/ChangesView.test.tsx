@@ -40,7 +40,7 @@ function setup(sidecar = new FakeSidecar(), openedPath = mainWorktree) {
   const client = new RpcClient(sidecar.transport);
   render(
     <CommandsProvider client={client} autoCloseMs={20}>
-      <BranchBar client={client} state={sampleState} worktree={openedPath} />
+      <BranchBar client={client} state={sampleState} worktree={openedPath} onPrune={() => {}} />
       <Changes client={client} openedPath={openedPath} />
     </CommandsProvider>,
   );

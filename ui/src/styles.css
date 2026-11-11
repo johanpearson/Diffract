@@ -263,6 +263,35 @@ body {
   margin-left: 10px;
 }
 
+/* A button at the end of a heading, such as "Prune" on a remote. */
+.side-heading {
+  display: flex;
+  align-items: center;
+}
+
+.side-action {
+  flex: none;
+  margin-right: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.side-action:hover:not(:disabled) {
+  background: var(--sel);
+  color: var(--ink);
+}
+
+.side-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .side-toggle .count {
   color: var(--ink-3);
   font-weight: 400;

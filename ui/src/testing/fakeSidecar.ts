@@ -399,6 +399,7 @@ export class FakeSidecar {
       case "cleanup.planStash":
         return this.stashes.answer(this, method, params);
       case "cleanup.plan":
+      case "cleanup.planPrune":
       case "cleanup.inspect":
       case "cleanup.hide":
       case "cleanup.unhide":

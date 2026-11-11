@@ -71,6 +71,7 @@ public class RequestContractTests
         ["stash.push"] = () => Node(new StashPushParams { RepoId = Repo, Worktree = Worktree, Message = "Halvfärdigt", IncludeUntracked = true }),
         ["stash.apply"] = () => Node(new StashApplyParams(Repo, Worktree, Commit)),
         ["cleanup.planStash"] = () => Node(new CleanupPlanStashParams(Repo, Commit)),
+        ["cleanup.planPrune"] = () => Node(new CleanupPlanPruneParams(Repo, "origin")),
         ["cleanup.plan"] = () => Node(new CleanupPlanParams(Repo, [new SelectedLeftover(Diffract.Leftovers.LeftoverKind.Worktree, "claude/räksmörgås-fix", Worktree)])),
         ["cleanup.apply"] = () => Node(new CleanupApplyParams(Repo, "3f9a1c2b7d4e", [new Diffract.Leftovers.Cleanup.StepRef(0, 2)])),
         ["cleanup.history"] = () => Node(new CleanupHistoryParams(Repo)),

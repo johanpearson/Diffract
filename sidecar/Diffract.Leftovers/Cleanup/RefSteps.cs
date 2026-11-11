@@ -34,17 +34,25 @@ internal static class RefSteps
     public static IReadOnlyList<CleanupStep> RemoteBranch(BranchInfo branch, BackupTags backups)
     {
         var atRisk = branch.CommitsAtRisk ?? 0;
-        var delete = new CleanupStep
-        {
-            Kind = StepKind.DeleteRemoteBranch,
-            Description = $"Delete remote-tracking branch {branch.Name}, here only",
-            Command = new GitCommandLine(["branch", "-d", "-r", branch.Name], []),
-            Expects = [new Expectation.RefAt(branch.FullName, branch.TargetId)],
-            Undo = Create((branch.FullName, branch.TargetId)),
-            UndoExpects = CanRecreate((branch.FullName, branch.TargetId)),
-        };
-        return BackedUp(atRisk > 0 ? new BackupOf("remote", branch.Name, branch.TargetId, $"remote-tracking branch {branch.Name}", atRisk) : null, delete, backups);
+        return BackedUp(atRisk > 0 ? new BackupOf("remote", branch.Name, branch.TargetId, $"remote-tracking branch {branch.Name}", atRisk) : null, RemoteBranchRemoval(branch, null), backups);
     }
+
+    /// <summary>
+    /// A remote-tracking branch the remote no longer has. No backup, as for a branch whose upstream is gone: these were
+    /// almost always merged, and a tag for every one would only clutter the repo.
+    /// </summary>
+    public static IReadOnlyList<CleanupStep> PrunedRemoteBranch(BranchInfo branch) => [RemoteBranchRemoval(branch, WhileGitKeepsThem)];
+
+    private static CleanupStep RemoteBranchRemoval(BranchInfo branch, string? undoNote) => new()
+    {
+        Kind = StepKind.DeleteRemoteBranch,
+        Description = $"Delete remote-tracking branch {branch.Name}, here only",
+        Command = new GitCommandLine(["branch", "-d", "-r", branch.Name], []),
+        Expects = [new Expectation.RefAt(branch.FullName, branch.TargetId)],
+        Undo = Create((branch.FullName, branch.TargetId)),
+        UndoExpects = CanRecreate((branch.FullName, branch.TargetId)),
+        UndoNote = undoNote,
+    };
 
     /// <summary>Always backed up: a stash's work exists nowhere else. Undo puts it back on top of the list.</summary>
     public static IReadOnlyList<CleanupStep> Stash(StashInfo stash, BackupTags backups)

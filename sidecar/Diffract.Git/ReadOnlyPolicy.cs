@@ -59,15 +59,19 @@ public static class ReadOnlyPolicy
         if (AnyArguments.Contains(subcommand))
             return null;
 
-        return subcommand switch
-        {
-            "worktree" or "stash" => CheckList(args),
-            "reflog" => CheckReflog(args),
-            "config" => CheckConfig(args),
-            "symbolic-ref" => CheckSymbolicRef(args),
-            _ => $"'{subcommand}' is not on the read-only allowlist",
-        };
+        return Checks.TryGetValue(subcommand, out var check) ? check(args) : $"'{subcommand}' is not on the read-only allowlist";
     }
+
+    /// <summary>The subcommands that are reads only with certain arguments, each with the check for them.</summary>
+    private static readonly Dictionary<string, Func<IReadOnlyList<string>, string?>> Checks = new()
+    {
+        ["worktree"] = CheckList,
+        ["stash"] = CheckList,
+        ["reflog"] = CheckReflog,
+        ["config"] = CheckConfig,
+        ["symbolic-ref"] = CheckSymbolicRef,
+        ["ls-remote"] = CheckLsRemote,
+    };
 
     private static string? CheckList(IReadOnlyList<string> args) =>
         args.Count > 1 && args[1] == "list" ? null : $"only '{args[0]} list' is allowed";
@@ -86,6 +90,12 @@ public static class ReadOnlyPolicy
 
         return args.Any(ConfigReadOptions.Contains) ? null : "config needs --get or --list";
     }
+
+    // Reads from the network and writes nothing. Only the branches of a remote named in config, never a URL or an option.
+    private static string? CheckLsRemote(IReadOnlyList<string> args) =>
+        args is ["ls-remote", "--heads", var remote] && PolicySlots.IsPlainName(remote)
+            ? null
+            : "only 'ls-remote --heads <remote>' is allowed";
 
     // One name reads the ref. A second name, -d or -m changes it.
     private static string? CheckSymbolicRef(IReadOnlyList<string> args)

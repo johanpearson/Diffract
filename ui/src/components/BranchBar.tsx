@@ -12,13 +12,15 @@ interface Props {
   state: RepoState;
   /** The worktree the repo was opened from, which Fetch, Pull and Push act on, as the history menu does. */
   worktree: string;
+  /** Prunes the remote the branch follows: asks the remote, then confirms in a dialog. */
+  onPrune(remote: string): void;
 }
 
 /**
  * The branch, how it stands against its upstream, and Fetch, Pull and Push, at the top on every view. Each runs in
  * the command window. An agent's worktree is left alone: its buttons are off, and say why.
  */
-export function BranchBar({ client, state, worktree }: Props) {
+export function BranchBar({ client, state, worktree, onPrune }: Props) {
   const { status, apply } = useWorktreeStatus(client, state.repoId, worktree);
   const remote = useRemote(client, state.repoId, worktree, apply);
   const commands = useCommands();
@@ -27,7 +29,7 @@ export function BranchBar({ client, state, worktree }: Props) {
   return (
     <div className="branch-bar" role="group" aria-label="Branch" title={inUse ?? undefined}>
       <BranchInfo status={status} />
-      <RemoteActions status={status} remote={remote} disabled={commands.busy || inUse !== null} />
+      <RemoteActions status={status} remote={remote} disabled={commands.busy || inUse !== null} onPrune={onPrune} />
     </div>
   );
 }

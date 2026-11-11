@@ -33,3 +33,6 @@ internal sealed record StashApplyResult(bool Conflicts, string Message, Worktree
 
 /// <summary>The params of <c>cleanup.planStash</c>: the stash to drop, by its commit, since its place in the list shifts.</summary>
 internal sealed record CleanupPlanStashParams(string? RepoId, string? Commit);
+
+/// <summary>The params of <c>cleanup.planPrune</c>: the remote whose vanished branches to remove here.</summary>
+internal sealed record CleanupPlanPruneParams(string? RepoId, string? Remote);

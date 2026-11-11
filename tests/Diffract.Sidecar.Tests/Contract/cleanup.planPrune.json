@@ -1,0 +1,24 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "planId": "8c1e4a7f2b60",
+    "leftovers": [
+      {
+        "kind": "RemoteBranch",
+        "name": "origin/fix-1",
+        "path": null,
+        "refused": null,
+        "steps": [
+          {
+            "kind": "DeleteRemoteBranch",
+            "description": "Delete remote-tracking branch origin/fix-1, here only",
+            "undoable": true,
+            "undoNote": "Undo works while git still has the commits.",
+            "optional": false
+          }
+        ]
+      }
+    ]
+  }
+}

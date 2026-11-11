@@ -12,6 +12,10 @@ interface Props {
   context: BranchContext;
   commands: RefCommands;
   storage: AppHost["storage"];
+  /** Prunes the remote-tracking branches of this remote that it no longer has. */
+  onPrune(remote: string): void;
+  /** Something else is running, so pruning waits. */
+  busy: boolean;
 }
 
 /** What every entry needs. */
@@ -27,7 +31,7 @@ interface EntryProps {
  * Clicking a ref shows its commit in History, double-clicking a branch switches to it, and right-clicking opens its
  * menu.
  */
-export function SidebarRefs({ refs, context, commands, storage }: Props) {
+export function SidebarRefs({ refs, context, commands, storage, onPrune, busy }: Props) {
   const groups = useMemo(() => sidebarRefs(refs), [refs]);
   const [menu, setMenu] = useState<{ ref: HistoryRef; x: number; y: number } | null>(null);
   const entry: EntryProps = { context, commands, storage, onMenu: (ref, at) => setMenu({ ref, ...at }) };
@@ -39,7 +43,11 @@ export function SidebarRefs({ refs, context, commands, storage }: Props) {
       </SidebarSection>
       <SidebarSection id="remotes" title="Remotes" count={groups.remotes.length} initial={false} storage={storage}>
         {groups.remotes.map((remote) => (
-          <SidebarSection key={remote.name} id={`remotes/${remote.name}`} title={remote.name} count={countOf(remote.level)} level="folder" initial storage={storage}>
+          <SidebarSection key={remote.name} id={`remotes/${remote.name}`} title={remote.name} count={countOf(remote.level)} level="folder"
+            initial
+            storage={storage}
+            action={{ label: "Prune", title: `Prune remote branches on ${remote.name}`, disabled: busy, onClick: () => onPrune(remote.name) }}
+          >
             <LevelList id={`remotes/${remote.name}`} level={remote.level} {...entry} />
           </SidebarSection>
         ))}

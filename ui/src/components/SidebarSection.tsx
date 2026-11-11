@@ -26,11 +26,13 @@ interface Props {
   storage: AppHost["storage"];
   /** "folder" for a folder inside a section: smaller, and indented. */
   level?: "section" | "folder";
+  /** A button beside the title, such as "Prune" on a remote. It does not open or close the section. */
+  action?: { label: string; title: string; disabled?: boolean; onClick(): void };
   children: ReactNode;
 }
 
 /** A titled part of the sidebar that opens and closes with its title, like a section in Git Extensions. */
-export function SidebarSection({ id, title, count, initial, storage, level = "section", children }: Props) {
+export function SidebarSection({ id, title, count, initial, storage, level = "section", action, children }: Props) {
   const [open, toggle] = useOpen(storage, id, initial);
   const body = useId();
   const Heading = level === "section" ? "h2" : "h3";
@@ -42,6 +44,11 @@ export function SidebarSection({ id, title, count, initial, storage, level = "se
           <span className="side-title">{title}</span>
           {count !== undefined && <span className="count">{count}</span>}
         </button>
+        {action && (
+          <button className="side-action" aria-label={action.title} title={action.title} disabled={action.disabled} onClick={action.onClick}>
+            {action.label}
+          </button>
+        )}
       </Heading>
       <div id={body} hidden={!open}>
         {open && children}
