@@ -1,4 +1,7 @@
-## TL;DR
+<!-- First line: "Closes #74" for the issue this PR finishes, or "Refs #74" if it only does part of one. Never close a checkpoint issue. -->
+Closes #
+
+## What and why
 
 <!-- 2 to 4 plain sentences: what is different now and why it matters. No code, no file lists. -->
 
