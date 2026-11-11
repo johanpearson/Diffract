@@ -1,0 +1,21 @@
+name: Bug
+description: Something is wrong, slow or surprising.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, in order. If it needs a particular repo state, say which.
+  - type: input
+    id: version
+    attributes:
+      label: Diffract and git versions
+      description: Shown at the top right of the app, such as "git 2.47.1 · sidecar 0.1.0".

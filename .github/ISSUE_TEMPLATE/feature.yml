@@ -1,0 +1,30 @@
+name: Feature or change
+description: Something to build or change in Diffract. This is how work reaches the backlog.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An agent is given this issue as its spec, so write it for someone who has not seen the conversation. Plain, short sentences.
+  - type: textarea
+    id: what-and-why
+    attributes:
+      label: What and why
+      description: What should be different, and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: what-to-build
+    attributes:
+      label: What to build
+      description: The pieces, as a short list. Say what is not included.
+  - type: textarea
+    id: how-we-will-know
+    attributes:
+      label: How we will know it works
+      description: The tests, and anything to check by hand. Tests only write to fixture repos in a temp folder.
+  - type: textarea
+    id: open-questions
+    attributes:
+      label: Open questions
+      description: Anything Johan needs to decide first, with a proposal. Leave empty if there is none.
