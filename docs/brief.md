@@ -41,7 +41,7 @@ The full visual plan, with a clickable prototype of every main view, is in `visu
 | Conflict labels | "On main" and "Your commit", never ours and theirs |
 | Repo settings in v1 | Line endings, default branch, identity, commit signing, pull strategy, prune on fetch, .gitignore templates |
 | Code signing | Unsigned for now |
-| Start dogfooding | After changes and commit (milestone 4 since the reorder on 2026-10-21) |
+| Start dogfooding | After changes and commit (done) |
 
 ## Architecture
 
@@ -71,41 +71,28 @@ Key ideas:
 - **Plan, then apply.** Destructive work produces a plan first. The confirm dialog shows the plan, so the dialog and the real operation can never disagree.
 - **Agent attribution is a hint**, derived from config patterns. It is never used to decide what to delete.
 
-## Repo layout (target)
+## Repo layout
 
 ```
 diffract/
-├─ src-tauri/                     Rust core (milestone 2)
-├─ ui/                            React app (milestone 2)
+├─ src-tauri/                     Rust core
+├─ ui/                            React app
 ├─ sidecar/
-│  ├─ Diffract.Sidecar/           JSON-RPC host (milestone 2)
-│  ├─ Diffract.Git/               GitRunner, parsers, snapshot builder (milestone 1)
-│  ├─ Diffract.Leftovers/         rules and config (milestone 1), cleanup (milestone 5)
-│  └─ Diffract.Operations/        merge and rebase sessions (milestones 7 and 8)
+│  ├─ Diffract.Sidecar/           JSON-RPC host
+│  ├─ Diffract.Git/               GitRunner, parsers, snapshot builder, changes and cleanup runners
+│  ├─ Diffract.Leftovers/         rules, config and cleanup planning
+│  └─ Diffract.Operations/        merge and rebase sessions (planned)
 ├─ tools/
-│  └─ Diffract.Spike/             console app for milestone 1
+│  └─ Diffract.Spike/             console app that classifies leftovers in any repo
 ├─ tests/
 │  ├─ Diffract.Fixtures/          shared fixture repo builder
-│  ├─ Diffract.Git.Tests/
-│  ├─ Diffract.Leftovers.Tests/
+│  ├─ Diffract.*.Tests/
 │  └─ fixtures/make-repos.ps1     thin wrapper that creates fixtures for manual runs
 └─ diffract.json                  default config, embedded in Diffract.Leftovers
 ```
 
-## Milestones
+## The plan
 
-1. **Spike: snapshot and rules.** Console app that classifies leftovers in any repo. (Done)
-2. Tauri shell, sidecar and live worktree view. Includes "Open terminal here" for the repo and each worktree (Windows Terminal, falling back to PowerShell), and a git version check at startup that offers to update Git for Windows through winget when git is older than 2.40 or a newer release exists. The update only runs after the user confirms. (Done)
-3. History graph. History becomes the view a repo opens on, because using a repo comes first and cleanup second. Opening a repo shows history and status first; the leftover scan, `git fsck` included, runs in the background and never makes the user wait. (Done)
-4. Changes and commit. *Checkpoint: start dogfooding.*
-5. Safe cleanup with backup tags and undo. Includes a stash view (save, apply, drop with undo) and pruning remote branches.
-6. Repo setup and settings. Includes a setting that turns on git's own background maintenance, so git keeps a commit-graph file that makes history load faster (see `docs/findings/history.md`). Also: clone a repo and init a new one, a list of recent repos, several repos open at once, and blame and the history of one file.
-7. Merge and conflict resolution.
-8. Interactive rebase. *v1.*
-9. Visual experiments. Includes trying a terminal embedded in the app.
+The plan is in GitHub: [milestones](https://github.com/johanpearson/Diffract/milestones) group the work and every piece is an [issue](https://github.com/johanpearson/Diffract/issues). Agents work from an issue, as `AGENTS.md` says. This file only keeps what does not change from issue to issue: the goals and the locked decisions.
 
-On 2026-10-21 Johan moved history and changes ahead of cleanup, which was milestone 3: Diffract becomes something he uses every day once it can replace Git Extensions for daily work, and that comes before cleaning up.
-
-On 2026-10-26, after his first day of use, Johan added a stash view and pruning remote branches to milestone 5, since both need its backup and undo, and clone, init, recent repos, several repos open at once, blame and the history of one file to milestone 6. Polishing the UI and UX waits until these are in place.
-
-Each milestone may revisit how earlier views feel and perform, as new views change what matters most. Changes like that are proposed in the milestone's PR, as any other change to the plan.
+Work may revisit how earlier views feel and perform, as new views change what matters most. Such a change is proposed in its issue or PR, like any other change to the plan.
