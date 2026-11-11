@@ -10,6 +10,7 @@
     "test": "vitest run",
     "build:e2e": "vite build --mode e2e --outDir dist-e2e",
     "e2e": "playwright test",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts",
     "tauri": "cd .. && tauri"
   },
   "dependencies": {
