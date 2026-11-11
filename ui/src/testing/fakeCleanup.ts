@@ -16,7 +16,7 @@ import type {
 } from "../protocol";
 
 /** Every field any cleanup.* method's params have. */
-type Params = { repoId: string; leftovers?: SelectedLeftover[]; leftover?: SelectedLeftover; planId?: string; leaveOut?: StepRef[] | null; cleanupId?: string };
+type Params = { repoId: string; remote?: string; leftovers?: SelectedLeftover[]; leftover?: SelectedLeftover; planId?: string; leaveOut?: StepRef[] | null; cleanupId?: string };
 
 /** The contract sample, which the sidecar's own tests write. */
 const sampleContent = (inspectSample as { result: LeftoverContent }).result;
@@ -69,6 +69,7 @@ export class FakeCleanups {
 
   /** What answers each method, by name. */
   private readonly handlers: Record<string, (host: CleanupHost, p: Params) => unknown> = {
+    "cleanup.planPrune": (host, p) => this.planPrune(host.state(p.repoId).repoId, p.remote ?? ""),
     "cleanup.plan": (host, p) => this.plan(host.state(p.repoId), p.leftovers ?? []),
     "cleanup.apply": (host, p) => this.apply(host, p.repoId, p.planId ?? "", p.leaveOut ?? []),
     "cleanup.history": () => this.history,
@@ -93,6 +94,29 @@ export class FakeCleanups {
     const found = selected.map((s) => state.leftovers.find((l) => l.kind === s.kind && l.name === s.name && l.path === s.path) ?? null);
     const plan: CleanupPlanView = { planId: `plan-${++this.next}`, leftovers: selected.map((s, i) => planOf(s, found[i] ?? null)) };
     this.plans.set(plan.planId, { repoId: state.repoId, plan, leftovers: found });
+    return plan;
+  }
+
+  /** Branches each remote no longer has, by remote name, for `cleanup.planPrune`. A remote not listed has them all. */
+  readonly gone = new Map<string, string[]>();
+  /** Remotes that cannot be reached, with what git says. `cleanup.planPrune` for one fails and removes nothing. */
+  readonly unreachable = new Map<string, string>();
+
+  /** As cleanup.planPrune: one removal per branch the remote lost, with no backup tag. */
+  private planPrune(repoId: string, remote: string): CleanupPlanView {
+    const why = this.unreachable.get(remote);
+    if (why !== undefined) throw { code: -32009, message: `Git could not ask ${remote} which branches it has, so nothing was removed. This is what git said:
+
+${why}`, data: { kind: "RemoteFailed" } };
+    const leftovers = (this.gone.get(remote) ?? []).map((branch) => ({
+      kind: "RemoteBranch" as const,
+      name: `${remote}/${branch}`,
+      path: null,
+      refused: null,
+      steps: [step("DeleteRemoteBranch", `Delete remote-tracking branch ${remote}/${branch}, here only`, { undoNote: "Undo works while git still has the commits." })],
+    }));
+    const plan: CleanupPlanView = { planId: `plan-${++this.next}`, leftovers };
+    this.plans.set(plan.planId, { repoId, plan, leftovers: leftovers.map(() => null) });
     return plan;
   }
 

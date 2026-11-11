@@ -20,6 +20,7 @@ import type { ToggleName } from "../history/HistoryToggles";
 import { folderName } from "../model/format";
 import { inUseReason, samePath } from "../model/worktrees";
 import type { StashTarget } from "../stash/SidebarStashes";
+import { useCommands } from "../commands/Commands";
 import { useStashActions } from "../stash/useStashActions";
 
 /** What the screens need besides the screen itself. */
@@ -42,6 +43,8 @@ export interface ScreenProps {
   onReveal(commitId: string): void;
   /** As onReveal, turning on the History toggle the commit needs first, such as Stashes for a stash. */
   onShowInHistory(commitId: string, toggle: ToggleName | null): void;
+  /** Prunes a remote's vanished branches: asks the remote, then confirms in a dialog. */
+  onPrune(remote: string): void;
 }
 
 export const SidebarWidth: SizeSpec = { key: "diffract.size.sidebar", initial: 250, min: 180, max: 480 };
@@ -61,7 +64,8 @@ export function RepoSidebar(props: ScreenProps) {
 }
 
 /** One repo's sidebar. Its key is the repo, so a drop dialog never carries over to another repo. */
-function ReadySidebar({ repo, terminals, onOpenFolder, work, onReveal, onView, onShowInHistory, state }: ScreenProps & { state: RepoState }) {
+function ReadySidebar({ repo, terminals, onOpenFolder, work, onReveal, onView, onShowInHistory, onPrune, state }: ScreenProps & { state: RepoState }) {
+  const busy = useCommands().busy;
   const storage = repo.session.host.storage;
   const stashActions = useStashActions({ client: repo.session.client, repoId: state.repoId, worktree: work.changesWorktree, showNotice: repo.session.showNotice });
   const refs = work.history.refs.refs;
@@ -93,6 +97,8 @@ function ReadySidebar({ repo, terminals, onOpenFolder, work, onReveal, onView, o
       commands={commands}
       onShowLeftovers={() => onView("leftovers")}
       stashes={stashes}
+      onPrune={onPrune}
+      busy={busy}
     />
   );
 }

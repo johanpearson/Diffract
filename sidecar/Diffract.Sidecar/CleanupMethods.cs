@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Diffract.Git;
+using Diffract.Git.Refs;
 using Diffract.Leftovers;
 using Diffract.Leftovers.Cleanup;
 using Diffract.Sidecar.Rpc;
@@ -58,6 +59,23 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
         var leftover = new Leftover(LeftoverKind.Stash, stash.Name, null, null, Verdict.NeedsReview, 1, $"Stash \"{stash.Message}\"");
         var plan = CleanupPlanner.Plan(snapshot, [leftover], setup.Config, runnerOptions.TimeProvider);
         return Task.FromResult(SidecarMethods.Result(View(Keep(repoId, plan), plan)));
+    }
+
+    /// <summary>
+    /// "Prune remote branches": asks the remote which branches it has (a read, with the network timeout) and plans
+    /// removing the remote-tracking branches it no longer has, here only. No backup tags. Apply it with <c>cleanup.apply</c>.
+    /// </summary>
+    public async Task<JsonElement> PlanPruneAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var request = SidecarMethods.Params<CleanupPlanPruneParams>(parameters);
+        var repoId = SidecarMethods.Required(request.RepoId, "repoId");
+        var remote = SidecarMethods.Required(request.Remote, "remote");
+        var snapshot = repos.LeftoversOf(repos.Get(repoId)).Snapshot;
+        var heads = await RemoteHeads.ReadAsync(RemoteHeads.RunnerFor(snapshot.RepoRoot, runnerOptions), remote, ct).ConfigureAwait(false);
+        if (heads.Count == 0)
+            throw new RemoteFailedException($"{remote} did not report any branches, so nothing was removed. It may be empty, or not answering properly.");
+        var plan = PrunePlanner.Plan(snapshot, remote, heads);
+        return SidecarMethods.Result(View(Keep(repoId, plan), plan));
     }
 
     /// <summary>Keeps a plan the dialog shows, until it is applied, and answers with its id.</summary>

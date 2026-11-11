@@ -14,6 +14,8 @@ import { offeredVersion, useGitUpdate } from "./model/useGitUpdate";
 import { useNow } from "./model/useNow";
 import { useRepoWork, type RepoWork } from "./model/useRepoWork";
 import { useRepoEvents, useRepoSession } from "./model/useRepoSession";
+import { PruneDialog } from "./prune/PruneDialog";
+import { usePruneRemote } from "./prune/usePruneRemote";
 import { useTerminals } from "./model/useTerminals";
 import type { RpcClient } from "./rpc";
 import type { ToggleName } from "./history/HistoryToggles";
@@ -80,6 +82,7 @@ function AppScreens({ host, client, clock = systemClock, initialView = "history"
   const ready = repo.screen.kind === "ready" ? repo.screen.state : null;
   const work = useRepoWork(client, ready, repo.session.repo.current?.path ?? ready?.repoRoot ?? "", host.storage);
   const { reveal, showInHistory } = useShowInHistory(work, setView);
+  const prune = usePruneRemote(client, ready);
 
   const openDownloadPage = useCallback(() => {
     client.call("git.openDownloadPage", undefined).catch((error: unknown) => setNotice(messageOf(error)));
@@ -97,12 +100,13 @@ function AppScreens({ host, client, clock = systemClock, initialView = "history"
     repo, git, terminals, offered, filter, onFilter: setFilter, view, onView: setView, onOpenFolder: openFolder, onDownloadPage: openDownloadPage, now, work,
     onReveal: reveal,
     onShowInHistory: showInHistory,
+    onPrune: prune.start,
   };
 
   return (
     <div className="app">
       <TopBar info={info} canOpen={repo.screen.kind !== "starting" && repo.screen.kind !== "gitProblem"} updating={git.running} onOpen={repo.pickAndOpen}>
-        {ready && <BranchBar key={ready.repoId} client={client} state={ready} worktree={work.current.path} />}
+        {ready && <BranchBar key={ready.repoId} client={client} state={ready} worktree={work.current.path} onPrune={prune.start} />}
       </TopBar>
       <GitUpdateOutcome git={git} offered={offered} onDownloadPage={openDownloadPage} />
       <GitUpdateOffer git={git} info={info} offered={offered} />
@@ -113,6 +117,7 @@ function AppScreens({ host, client, clock = systemClock, initialView = "history"
           <MainScreen {...screens} />
         </main>
       </div>
+      {prune.plan && <PruneDialog prune={prune.plan} onConfirm={prune.confirm} onCancel={prune.cancel} />}
       <GitUpdateConfirmDialog git={git} info={info} onUpdated={afterUpdate} />
     </div>
   );

@@ -119,6 +119,13 @@ public class ContractTests
                 new StepView(StepKind.DropStash, "Drop stash \"On main: Halvfärdigt\"", true, "Undo puts it back on top of the list.", false),
             ]),
         ])),
+        ["cleanup.planPrune"] = () => Response(new CleanupPlanView("8c1e4a7f2b60",
+        [
+            new LeftoverPlanView(LeftoverKind.RemoteBranch, "origin/fix-1", null, null,
+            [
+                new StepView(StepKind.DeleteRemoteBranch, "Delete remote-tracking branch origin/fix-1, here only", true, "Undo works while git still has the commits.", false),
+            ]),
+        ])),
         ["cleanup.apply"] = () => Response(Applied),
         ["cleanup.undo"] = () => Response(new CleanupResult("7c0e5b9d2f41",
         [

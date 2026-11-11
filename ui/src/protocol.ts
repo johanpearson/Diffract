@@ -704,6 +704,11 @@ export interface Methods {
   "cleanup.plan": { params: { repoId: string; leftovers: SelectedLeftover[] }; result: CleanupPlanView };
   /** Plans dropping one stash, by its commit, with a backup tag first, as for a stash leftover. Apply it with `cleanup.apply`. */
   "cleanup.planStash": { params: { repoId: string; commit: string }; result: CleanupPlanView };
+  /**
+   * "Prune remote branches": asks `remote` which branches it has, then plans removing the remote-tracking branches it
+   * no longer has, here only and without backup tags. A read from the network that can take a while. Apply it with `cleanup.apply`.
+   */
+  "cleanup.planPrune": { params: { repoId: string; remote: string }; result: CleanupPlanView };
   /** What one row holds: the newest commits only it has. One read-only git call, none for a folder. */
   "cleanup.inspect": { params: { repoId: string; leftover: SelectedLeftover }; result: LeftoverContent };
   /** Leaves the row out of the list and its counts until it changes. Changes nothing in the repo. Answers with the new state. */
