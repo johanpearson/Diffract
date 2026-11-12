@@ -737,6 +737,12 @@ export interface Methods {
   /** Plans dropping one stash, by its commit, with a backup tag first, as for a stash leftover. Apply it with `cleanup.apply`. */
   "cleanup.planStash": { params: { repoId: string; commit: string }; result: CleanupPlanView };
   /**
+   * "Delete branch" in the history menu: plans deleting one local branch, a backup tag first when it holds work that
+   * exists nowhere else. A branch checked out in a worktree is refused in the plan. Starts no git. Apply it with
+   * `cleanup.apply`, and take it back with `cleanup.undo`.
+   */
+  "cleanup.planBranch": { params: { repoId: string; branch: string }; result: CleanupPlanView };
+  /**
    * "Prune remote branches": asks `remote` which branches it has, then plans removing the remote-tracking branches it
    * no longer has, here only and without backup tags. A read from the network that can take a while. Apply it with `cleanup.apply`.
    */

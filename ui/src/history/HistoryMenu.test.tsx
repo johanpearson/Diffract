@@ -33,6 +33,14 @@ async function openOnRoot(name: string | RegExp) {
   fireEvent.click(item(name));
 }
 
+const sent = (sidecar: FakeSidecar, method: string) => sidecar.transport.sent.filter((m) => m.method === method).map((m) => m.params);
+
+/** The root commit with a branch on it, as `fix/räksmörgås`. */
+function withBranchOnRoot(sidecar: FakeSidecar, name = "fix/räksmörgås") {
+  sidecar.refs = [...sidecar.refs, { name, kind: "Branch", targetId: root.id, agent: null }];
+  return sidecar;
+}
+
 describe("the history row's menu", () => {
   it("opens on a right-click, selects the row and lists what is safe in this milestone", async () => {
     setup();
@@ -157,5 +165,78 @@ describe("the history row's menu", () => {
 
     await screen.findByText("Copied the hash.");
     expect(writeText).toHaveBeenCalledWith(root.id);
+  });
+
+  it("deletes a merged branch after a dialog that says no backup is made, then undoes it", async () => {
+    const sidecar = withBranchOnRoot(new FakeSidecar());
+    setup(sidecar);
+    await ready();
+    await openOnRoot("Delete branch fix/räksmörgås…");
+
+    const confirm = await screen.findByRole("dialog", { name: "Delete branch fix/räksmörgås?" });
+    expect(sent(sidecar, "cleanup.planBranch")).toEqual([{ repoId: sampleState.repoId, branch: "fix/räksmörgås" }]);
+    expect(within(confirm).getByText("Delete branch fix/räksmörgås", { selector: "li *" })).toBeTruthy();
+    expect(within(confirm).queryByText(/backup tag archive/)).toBeNull();
+    expect(confirm.textContent).toContain("no backup tag is made");
+    expect(sent(sidecar, "cleanup.apply")).toEqual([]);
+
+    fireEvent.click(within(confirm).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(sent(sidecar, "cleanup.apply")).toHaveLength(1));
+    expect(sidecar.refs.some((r) => r.name === "fix/räksmörgås")).toBe(false);
+    fireEvent.click(await screen.findByRole("button", { name: "Undo delete" }));
+    await waitFor(() => expect(sent(sidecar, "cleanup.undo")).toHaveLength(1));
+    await waitFor(() => expect(sidecar.refs.some((r) => r.name === "fix/räksmörgås")).toBe(true));
+  });
+
+  it("lists the backup tag first when the branch has work nowhere else", async () => {
+    const sidecar = withBranchOnRoot(new FakeSidecar(), "wip");
+    sidecar.cleanups.atRisk.set("wip", 2);
+    setup(sidecar);
+    await ready();
+    await openOnRoot("Delete branch wip…");
+
+    const confirm = await screen.findByRole("dialog", { name: "Delete branch wip?" });
+
+    const steps = within(within(confirm).getByRole("list", { name: "Planned steps" })).getAllByText(/backup tag|Delete branch/).map((e) => e.textContent);
+    expect(steps).toEqual(["Keep a backup tag archive/branch/wip-2026-10-21 for 2 commits that exist nowhere else", "Delete branch wip"]);
+    expect(confirm.textContent).toContain("a backup tag keeps them first");
+  });
+
+  it("removes nothing when the dialog is cancelled", async () => {
+    const sidecar = withBranchOnRoot(new FakeSidecar());
+    setup(sidecar);
+    await ready();
+    await openOnRoot("Delete branch fix/räksmörgås…");
+
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Delete branch fix/räksmörgås?" })).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog", { name: /^Delete branch/ })).toBeNull();
+    expect(sent(sidecar, "cleanup.apply")).toEqual([]);
+    expect(sidecar.refs.some((r) => r.name === "fix/räksmörgås")).toBe(true);
+  });
+
+  it("opens no dialog when the sidecar refuses, because the branch was checked out meanwhile", async () => {
+    const sidecar = withBranchOnRoot(new FakeSidecar());
+    setup(sidecar);
+    await ready();
+    sidecar.change(sampleState.repoId, (s) => ({
+      ...s,
+      snapshot: { ...s.snapshot, worktrees: [...s.snapshot.worktrees, { ...s.snapshot.worktrees[0]!, path: "C:\src\shop\.claude\worktrees\fix", isMain: false, branch: "fix/räksmörgås" }] },
+    }));
+    await openOnRoot("Delete branch fix/räksmörgås…");
+
+    expect(await screen.findByText("In use, so it is never cleaned up.")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: /^Delete branch fix/ })).toBeNull();
+    expect(sent(sidecar, "cleanup.apply")).toEqual([]);
+  });
+
+  it("does not offer a branch that is checked out in a worktree", async () => {
+    setup();
+    await ready();
+
+    fireEvent.contextMenu(row(0), { clientX: 40, clientY: 80 });
+
+    expect(within(menu()).queryAllByRole("menuitem", { name: /^Delete branch/ })).toEqual([]);
   });
 });

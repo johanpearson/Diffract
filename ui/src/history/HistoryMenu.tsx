@@ -5,8 +5,10 @@ import type { CommitEntry, HistoryRef, RepoState } from "../protocol";
 import type { RpcClient } from "../rpc";
 import { commitMenuItems, type CurrentWorktree } from "./commitMenu";
 import type { Marker } from "./markers";
+import { DeleteBranchDialog } from "./DeleteBranchDialog";
 import { NameDialog, ResetDialog } from "./RefDialogs";
 import { resetPreview } from "./resetPreview";
+import { useDeleteBranch } from "./useDeleteBranch";
 import type { RefActions } from "./useRefActions";
 
 /** A row's open menu: which commit, and where. */
@@ -32,6 +34,7 @@ interface Props {
 export function HistoryMenu({ client, state, commits, refs, markers, current, actions, menu, onClose }: Props) {
   const localBranches = useMemo(() => new Set(refs.filter((r) => r.kind === "Branch").map((r) => r.name)), [refs]);
   const commit = menu ? commits[menu.index] : undefined;
+  const deletion = useDeleteBranch(client, state.repoId);
   return (
     <>
       {menu && commit && (
@@ -48,10 +51,12 @@ export function HistoryMenu({ client, state, commits, refs, markers, current, ac
               createTag: (c) => actions.open({ kind: "Tag", commit: c }),
               switchTo: actions.switchTo,
               reset: (c) => actions.open({ kind: "Reset", commit: c }),
+              deleteBranch: deletion.start,
             },
           )}
         />
       )}
+      {deletion.plan && <DeleteBranchDialog delete={deletion.plan} onConfirm={deletion.confirm} onCancel={deletion.cancel} />}
       <OpenDialog client={client} repoId={state.repoId} commits={commits} refs={refs} current={current} actions={actions} />
     </>
   );

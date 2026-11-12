@@ -62,7 +62,7 @@ internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, Cance
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit", "remote.fetch", "remote.pull", "remote.push", "ref.checkName", "branch.create", "branch.switch", "tag.create", "branch.reset", "branch.undoReset", "stash.push", "stash.apply", "cleanup.plan", "cleanup.planStash", "cleanup.planPrune", "cleanup.planDiscard", "cleanup.inspect", "cleanup.apply", "cleanup.history", "cleanup.undo", "cleanup.hide", "cleanup.unhide"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit", "remote.fetch", "remote.pull", "remote.push", "ref.checkName", "branch.create", "branch.switch", "tag.create", "branch.reset", "branch.undoReset", "stash.push", "stash.apply", "cleanup.plan", "cleanup.planStash", "cleanup.planBranch", "cleanup.planPrune", "cleanup.planDiscard", "cleanup.inspect", "cleanup.apply", "cleanup.history", "cleanup.undo", "cleanup.hide", "cleanup.unhide"];
 
     /// <summary>
     /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only or changes
@@ -168,6 +168,7 @@ internal sealed class SidecarMethods : IDisposable
             ["stash.apply"] = _stash.ApplyAsync,
             ["cleanup.plan"] = _cleanup.PlanAsync,
             ["cleanup.planStash"] = _cleanup.PlanStashAsync,
+            ["cleanup.planBranch"] = _cleanup.PlanBranchAsync,
             ["cleanup.planPrune"] = _cleanup.PlanPruneAsync,
             ["cleanup.planDiscard"] = _cleanup.PlanDiscardAsync,
             ["cleanup.inspect"] = _cleanup.InspectAsync,
