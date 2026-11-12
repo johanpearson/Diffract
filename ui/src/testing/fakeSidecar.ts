@@ -176,6 +176,21 @@ export class FakeSidecar {
     return worktree;
   }
 
+  /** cleanup.planBranch: the branch ref goes on apply and comes back on undo, as the sidecar would leave the repo. */
+  private planBranch({ repoId, branch }: { repoId: string; branch: string }) {
+    const ref = this.refs.find((r) => r.kind === "Branch" && r.name === branch);
+    if (!ref) throw { code: -32011, message: "It is no longer there. Refresh to see the repo as it is now.", data: { kind: "CleanupRefused" } };
+    const checkedOutIn = this.state(repoId).snapshot.worktrees.find((w) => w.branch === branch)?.path ?? null;
+    const set = (refs: HistoryRef[]) => {
+      this.refs = refs;
+      this.change(repoId, (s) => ({ ...s, takenAt: new Date(Date.parse(s.takenAt) + 1000).toISOString() }));
+    };
+    return this.cleanups.planBranch(repoId, branch, checkedOutIn, {
+      apply: () => set(this.refs.filter((r) => r !== ref)),
+      undo: () => set([...this.refs, ref]),
+    });
+  }
+
   private changes(method: keyof Methods, params: unknown): unknown {
     const p = params as { repoId: string; worktree: string; path?: string; staged?: boolean; paths?: string[]; hunk?: { path: string; id: string }; message?: string; amend?: boolean };
     const worktree = this.worktree(p.worktree);
@@ -404,6 +419,8 @@ export class FakeSidecar {
         return this.stashes.answer(this, method, params);
       case "cleanup.planDiscard":
         return this.discards.answer(this, params as Parameters<FakeDiscards["answer"]>[1]);
+      case "cleanup.planBranch":
+        return this.planBranch(params as { repoId: string; branch: string });
       case "cleanup.plan":
       case "cleanup.planPrune":
       case "cleanup.inspect":

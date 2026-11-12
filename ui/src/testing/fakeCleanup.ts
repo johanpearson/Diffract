@@ -120,6 +120,21 @@ ${why}`, data: { kind: "RemoteFailed" } };
     return plan;
   }
 
+  /** Commits at risk by branch name, for `cleanup.planBranch`. A branch not listed holds nothing that exists nowhere else. */
+  readonly atRisk = new Map<string, number>();
+
+  /** As cleanup.planBranch: a backup tag when the branch holds work nowhere else, then the delete, which `effect` carries out when applied. */
+  planBranch(repoId: string, branch: string, checkedOutIn: string | null, effect: Effect): CleanupPlanView {
+    const base = { kind: "LocalBranch" as const, name: branch, path: null };
+    const risk = this.atRisk.get(branch) ?? 0;
+    const planned: LeftoverPlanView = checkedOutIn !== null
+      ? { ...base, refused: "In use, so it is never cleaned up.", steps: [] }
+      : { ...base, refused: null, steps: stepsOf(branchLeftover(branch, risk)) };
+    const plan: CleanupPlanView = { planId: `plan-${++this.next}`, leftovers: [planned] };
+    this.plans.set(plan.planId, { repoId, plan, leftovers: [null], effect });
+    return plan;
+  }
+
   /** As cleanup.planStash: a backup tag, then the drop, which `effect` carries out on the fake when applied. */
   planStash(repoId: string, stash: HistoryRef, effect: Effect): CleanupPlanView {
     const steps = [
@@ -235,6 +250,10 @@ const step = (kind: StepView["kind"], description: string, over: Partial<StepVie
   optional: false,
   ...over,
 });
+
+function branchLeftover(name: string, commitsAtRisk: number): Leftover {
+  return { kind: "LocalBranch", name, path: null, agent: null, verdict: "NeedsReview", commitsAtRisk, reason: "Picked in the history.", check: null, commit: null };
+}
 
 function backup(leftover: Leftover): StepView[] {
   const commits = leftover.commitsAtRisk ?? 0;

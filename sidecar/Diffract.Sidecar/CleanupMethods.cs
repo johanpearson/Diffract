@@ -63,6 +63,21 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
     }
 
     /// <summary>
+    /// "Delete branch" in the history menu: one local branch, whether or not it is a leftover. The same steps as a branch
+    /// leftover, a backup tag first when it holds work that exists nowhere else, applied with <c>cleanup.apply</c>.
+    /// A branch checked out in a worktree is refused. Starts no git.
+    /// </summary>
+    public Task<JsonElement> PlanBranchAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var request = SidecarMethods.Params<CleanupPlanBranchParams>(parameters);
+        var repoId = SidecarMethods.Required(request.RepoId, "repoId");
+        var branch = SidecarMethods.Required(request.Branch, "branch");
+        var snapshot = repos.LeftoversOf(repos.Get(repoId)).Snapshot;
+        var plan = BranchPlanner.Plan(snapshot, branch, setup.Config, runnerOptions.TimeProvider);
+        return Task.FromResult(SidecarMethods.Result(View(Keep(repoId, plan), plan)));
+    }
+
+    /// <summary>
     /// "Prune remote branches": asks the remote which branches it has (a read, with the network timeout) and plans
     /// removing the remote-tracking branches it no longer has, here only. No backup tags. Apply it with <c>cleanup.apply</c>.
     /// </summary>

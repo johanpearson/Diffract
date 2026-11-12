@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { needsAttention, outcomeLine, summarize } from "../cleanup/outcome";
+import { useUndoCleanup } from "../cleanup/useUndoCleanup";
 import { useCommands } from "../commands/Commands";
 import type { CleanupPlanView, CleanupResult, RepoState, StepRef } from "../protocol";
 import type { RpcClient } from "../rpc";
@@ -44,7 +45,7 @@ export function usePruneRemote(client: RpcClient, repo: RepoState | null): Prune
     [commands, client, repoId],
   );
 
-  const undo = useUndo(client, repoId);
+  const undo = useUndoCleanup(client, repoId, "Undo the prune");
   const confirm = useCallback(
     (leaveOut: StepRef[]) => {
       if (!plan) return;
@@ -64,20 +65,6 @@ export function usePruneRemote(client: RpcClient, repo: RepoState | null): Prune
   );
 
   return { start: (remote) => void start(remote), plan, cancel: () => setPlan(null), confirm };
-}
-
-function useUndo(client: RpcClient, repoId: string) {
-  const commands = useCommands();
-  return useCallback(
-    (cleanupId: string) =>
-      void commands.run({
-        kind: "cleanup",
-        title: "Undo the prune",
-        call: (operation) => client.call("cleanup.undo", { repoId, cleanupId, operation }),
-        outcome: (r) => ({ message: outcomeLine(summarize(r, true), true), tone: needsAttention(r, []) ? "warning" : "done" }),
-      }),
-    [commands, client, repoId],
-  );
 }
 
 /** What the check found, said in the window when nothing needs removing, since no dialog follows. */

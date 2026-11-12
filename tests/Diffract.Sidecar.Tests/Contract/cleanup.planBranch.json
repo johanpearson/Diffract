@@ -1,0 +1,31 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "planId": "4a7d1e9c3b52",
+    "leftovers": [
+      {
+        "kind": "LocalBranch",
+        "name": "fix/räksmörgås",
+        "path": null,
+        "refused": null,
+        "steps": [
+          {
+            "kind": "Backup",
+            "description": "Keep a backup tag archive/branch/fix/räksmörgås-2026-10-21 for branch fix/räksmörgås (2 commits)",
+            "undoable": true,
+            "undoNote": null,
+            "optional": false
+          },
+          {
+            "kind": "DeleteBranch",
+            "description": "Delete branch fix/räksmörgås",
+            "undoable": true,
+            "undoNote": null,
+            "optional": false
+          }
+        ]
+      }
+    ]
+  }
+}

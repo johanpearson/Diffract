@@ -21,6 +21,7 @@ export interface MenuActions {
   createTag(commit: CommitEntry): void;
   switchTo(target: SwitchTo): void;
   reset(commit: CommitEntry): void;
+  deleteBranch(branch: string): void;
 }
 
 export interface MenuContext {
@@ -43,6 +44,7 @@ export function commitMenuItems(context: MenuContext, actions: MenuActions): Men
     { label: "Check out this commit (detached)", disabled: current.branch === null && current.head === commit.id, run: () => actions.switchTo({ commit: commit.id }) },
     { label: "Create tag here…", run: () => actions.createTag(commit) },
     ...resetItems(context, actions),
+    ...deleteItems(context, actions),
   ];
 }
 
@@ -58,6 +60,13 @@ function switchItems({ markers, current, localBranches }: MenuContext, actions: 
 function branchItem(m: Marker, actions: MenuActions): MenuItem {
   if (m.worktree !== null) return { label: `Switch to ${m.name} (checked out in ${folderName(m.worktree)})`, disabled: true, run: () => {} };
   return { label: `Switch to ${m.name}`, run: () => actions.switchTo({ branch: m.name }) };
+}
+
+/** Delete a branch on the commit, unless it is checked out in a worktree: that one is not offered. */
+function deleteItems({ markers }: MenuContext, actions: MenuActions): MenuItem[] {
+  return markers
+    .filter((m) => m.kind === "Branch" && m.worktree === null)
+    .map((m) => ({ label: `Delete branch ${m.name}…`, run: () => actions.deleteBranch(m.name) }));
 }
 
 function resetItems({ commit, current }: MenuContext, actions: MenuActions): MenuItem[] {

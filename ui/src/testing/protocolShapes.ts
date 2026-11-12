@@ -273,6 +273,7 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "stash.push": object<StashPushResult>({ commitId: string, message: string, status: worktreeChanges }),
   "stash.apply": object<StashApplyResult>({ conflicts: boolean, message: string, status: worktreeChanges }),
   "cleanup.plan": cleanupPlan,
+  "cleanup.planBranch": cleanupPlan,
   "cleanup.planPrune": cleanupPlan,
   "cleanup.planDiscard": cleanupPlan,
   "cleanup.planStash": cleanupPlan,

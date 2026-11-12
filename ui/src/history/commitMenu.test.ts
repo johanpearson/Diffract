@@ -20,7 +20,7 @@ function context(fields: Partial<MenuContext> = {}): MenuContext {
 }
 
 function actions() {
-  return { copy: vi.fn(), createBranch: vi.fn(), createTag: vi.fn(), switchTo: vi.fn(), reset: vi.fn() };
+  return { copy: vi.fn(), createBranch: vi.fn(), createTag: vi.fn(), switchTo: vi.fn(), reset: vi.fn(), deleteBranch: vi.fn() };
 }
 
 const labels = (c: MenuContext) => commitMenuItems(c, actions()).map((i) => (i.disabled ? `(${i.label})` : i.label));
@@ -41,6 +41,24 @@ describe("a history row's menu", () => {
     const markers = [marker("main", "Branch"), marker("topic", "Branch"), marker("claude/fix", "Branch", "C:\\src\\shop\\.claude\\worktrees\\fix"), marker("v1", "Tag")];
 
     expect(labels(context({ markers })).filter((l) => l.includes("Switch"))).toEqual(["Switch to topic", "(Switch to claude/fix (checked out in fix))"]);
+  });
+
+  it("offers to delete each branch on the commit, the current one too if it is not checked out, but never one checked out in a worktree", () => {
+    const markers = [marker("main", "Branch", "C:\src\shop"), marker("topic", "Branch"), marker("claude/fix", "Branch", "C:\src\shop\.claude\worktrees\fix"), marker("räksmörgås", "Branch"), marker("origin/topic", "RemoteBranch"), marker("v1", "Tag")];
+
+    expect(labels(context({ markers })).filter((l) => l.includes("Delete"))).toEqual(["Delete branch topic…", "Delete branch räksmörgås…"]);
+  });
+
+  it("offers no delete on a commit without a branch", () => {
+    expect(labels(context({ markers: [marker("v1", "Tag"), marker("origin/topic", "RemoteBranch")] })).some((l) => l.includes("Delete"))).toBe(false);
+  });
+
+  it("asks to delete the branch the item names", () => {
+    const given = actions();
+
+    commitMenuItems(context({ markers: [marker("topic", "Branch")] }), given).find((i) => i.label.startsWith("Delete branch"))!.run();
+
+    expect(given.deleteBranch).toHaveBeenCalledWith("topic");
   });
 
   it("offers a remote branch as a new local branch, unless a local one has its name", () => {

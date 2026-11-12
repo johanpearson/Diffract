@@ -125,6 +125,14 @@ public class ContractTests
                 new StepView(StepKind.DropStash, "Drop stash \"On main: Halvfärdigt\"", true, "Undo puts it back on top of the list.", false),
             ]),
         ])),
+        ["cleanup.planBranch"] = () => Response(new CleanupPlanView("4a7d1e9c3b52",
+        [
+            new LeftoverPlanView(LeftoverKind.LocalBranch, "fix/räksmörgås", null, null,
+            [
+                new StepView(StepKind.Backup, "Keep a backup tag archive/branch/fix/räksmörgås-2026-10-21 for branch fix/räksmörgås (2 commits)", true, null, false),
+                new StepView(StepKind.DeleteBranch, "Delete branch fix/räksmörgås", true, null, false),
+            ]),
+        ])),
         ["cleanup.planPrune"] = () => Response(new CleanupPlanView("8c1e4a7f2b60",
         [
             new LeftoverPlanView(LeftoverKind.RemoteBranch, "origin/fix-1", null, null,
