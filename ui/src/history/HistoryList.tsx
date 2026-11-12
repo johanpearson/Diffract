@@ -8,7 +8,7 @@ import { MarkerChip } from "./MarkerChip";
 import { laneColor, useGraphColors } from "./useGraphColors";
 import type { History } from "./useHistory";
 import { useViewport } from "./useViewport";
-import { anchoredScrollTop, anchorAt, moveSelection, scrollToShow, visibleRange, type ScrollAnchor } from "./viewport";
+import { anchoredScrollTop, anchorAt, moveSelection, scrollToShow, visibleRange } from "./viewport";
 
 interface Props {
   history: History;
@@ -102,27 +102,29 @@ export function HistoryList({ history, markers, faded, selected, followsTip, onS
 
 /**
  * Keeps the commits in view where they are when commits are added or removed above them. At the very top, new
- * commits come into view instead. Returns the scroll handler, which also remembers where the view is.
+ * commits come into view instead. The view is read as it is when the commits change, against the list from just
+ * before: a scroll event comes a frame after the scroll, so a position remembered from one would put a hard scroll
+ * back where it was. Returns the scroll handler.
  */
 function useScrollAnchor(scrollRef: RefObject<HTMLElement | null>, { commits, version }: History, onScroll: () => void): () => void {
-  const anchor = useRef<ScrollAnchor | null>(null);
+  const before = useRef(commits);
   const latest = useRef(commits);
   latest.current = commits;
-  const remember = useCallback(() => {
-    anchor.current = anchorAt(scrollRef.current?.scrollTop ?? 0, rowHeight, (i) => latest.current[i]?.id);
-    onScroll();
-  }, [scrollRef, onScroll]);
 
   useLayoutEffect(() => {
     const element = scrollRef.current;
-    if (!element) return;
-    const indexById = new Map(latest.current.map((c, i) => [c.id, i]));
-    const top = anchoredScrollTop(anchor.current, (id) => indexById.get(id) ?? -1, rowHeight);
-    if (top !== null) element.scrollTop = top;
-    remember();
-  }, [version, scrollRef, remember]);
+    if (element) {
+      const anchor = anchorAt(element.scrollTop, rowHeight, (i) => before.current[i]?.id);
+      const indexById = new Map(latest.current.map((c, i) => [c.id, i]));
+      const top = anchoredScrollTop(anchor, (id) => indexById.get(id) ?? -1, rowHeight);
+      // Only when the commits in view moved: writing the position also stops a scroll that is still gliding.
+      if (top !== null && Math.abs(top - element.scrollTop) >= 1) element.scrollTop = top;
+    }
+    before.current = latest.current;
+    onScroll();
+  }, [version, scrollRef, onScroll]);
 
-  return remember;
+  return onScroll;
 }
 
 /**

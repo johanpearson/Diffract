@@ -83,6 +83,25 @@ describe("live history", () => {
     expect(selected()).toBe("Commit c1");
   });
 
+  it("keeps the view where the user has scrolled to, even when commits arrive before the scroll event does", async () => {
+    // 300 commits in a line, newest first. jsdom has no layout, so the scroll position is set by hand.
+    const lineage = Array.from({ length: 300 }, (_, i) => commit(`c${300 - i}`, i === 299 ? [] : [`c${299 - i}`]));
+    const { sidecar, changed } = setup(lineage, [ref("main", "c300")]);
+    await loaded("300 commits");
+    const scroller = list();
+    scroller.scrollTop = 28 * 200;
+    fireEvent.scroll(scroller);
+    // A hard wheel spin: the view is already further up, and the scroll event for it has not come yet.
+    scroller.scrollTop = 28 * 100;
+
+    sidecar.history = [commit("c302", ["c301"]), commit("c301", ["c300"]), ...sidecar.history];
+    sidecar.refs = [ref("main", "c302")];
+    changed();
+
+    await loaded("302 commits");
+    expect(scroller.scrollTop).toBe(28 * 100 + 2 * 28);
+  });
+
   it("moves a branch's marker with it", async () => {
     const { sidecar, changed } = setup([commit("c1")], [ref("main", "c1")]);
     await loaded("1 commit");
