@@ -45,7 +45,7 @@ for (const scheme of ["light", "dark"] as const) {
       const { overflows, boxes, barRight } = await pieces(page);
 
       expect(overflows).toBe(false);
-      const sorted = boxes.toSorted((a, b) => a.left - b.left);
+      const sorted = [...boxes].sort((a, b) => a.left - b.left);
       for (const [i, box] of sorted.entries()) {
         expect(box.width, box.name).toBeGreaterThan(0);
         expect(box.right, box.name).toBeLessThanOrEqual(barRight);
