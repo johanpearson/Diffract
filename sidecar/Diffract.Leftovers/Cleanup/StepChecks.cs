@@ -1,4 +1,5 @@
 using Diffract.Git;
+using Diffract.Git.Changes;
 using Diffract.Git.Parsing;
 
 namespace Diffract.Leftovers.Cleanup;
@@ -37,8 +38,24 @@ internal sealed class StepChecks(string repoPath, GitRunnerOptions git, IFolderO
         {
             Expectation.NoFilesInUse free => folders.InUse(free.Path),
             Expectation.PathAbsent absent when Path.Exists(absent.Path) => $"Something is at {absent.Path} now, so the worktree is not added there again.",
+            Expectation.FileIs file => FileChanged(file),
             _ => null,
         }).FirstOrDefault(why => why is not null);
+
+    /// <summary>A discard throws away only the file the dialog showed. If it changed since, nothing is touched.</summary>
+    private static string? FileChanged(Expectation.FileIs file)
+    {
+        try
+        {
+            return FileState.HashOf(WorktreeFile.Resolve(file.Worktree, file.Path)) == file.Hash
+                ? null
+                : $"{file.Path} has changed since the dialog showed it, so it was left as it is.";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return $"{file.Path} could not be read, so it was left as it is.";
+        }
+    }
 
     private async Task<string?> RefsAsync(IReadOnlyList<Expectation> expects, CancellationToken ct)
     {

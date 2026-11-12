@@ -1,5 +1,5 @@
 import type { KeyboardEvent, ReactNode } from "react";
-import { changeName, letterOf, type Entry, type Lists } from "./entries";
+import { canDiscard, changeName, letterOf, type Entry, type Lists } from "./entries";
 
 interface Props {
   lists: Lists;
@@ -8,6 +8,8 @@ interface Props {
   /** Stages an unstaged row, or unstages a staged one. */
   onToggle(entry: Entry): void;
   onStageAll(): void;
+  /** Opens the dialog that throws an unstaged row's changes away. */
+  onDiscard(entry: Entry): void;
   /** Nothing can be staged while an action runs, or until an in-use worktree's warning is accepted. */
   locked: boolean;
 }
@@ -16,7 +18,7 @@ interface Props {
  * The Unstaged and Staged lists, as one list box so up and down move through both. Space stages or unstages the
  * selected row, as its button does.
  */
-export function FileLists({ lists, selected, onSelect, onToggle, onStageAll, locked }: Props) {
+export function FileLists({ lists, selected, onSelect, onToggle, onStageAll, onDiscard, locked }: Props) {
   const all = [...lists.unstaged, ...lists.staged];
   const stageable = lists.unstaged.filter((e) => e.blocked === null);
 
@@ -34,12 +36,12 @@ export function FileLists({ lists, selected, onSelect, onToggle, onStageAll, loc
 
   return (
     <div className="change-lists" role="listbox" aria-label="Changed files" tabIndex={0} onKeyDown={onKeyDown} aria-activedescendant={selected ? idOf(selected) : undefined}>
-      <Group title="Unstaged" entries={lists.unstaged} empty="Nothing to stage. The worktree matches the index." {...{ selected, onSelect, onToggle, locked }}>
+      <Group title="Unstaged" entries={lists.unstaged} empty="Nothing to stage. The worktree matches the index." {...{ selected, onSelect, onToggle, onDiscard, locked }}>
         <button className="abtn small" tabIndex={-1} disabled={locked || stageable.length === 0} onClick={onStageAll}>
           Stage all
         </button>
       </Group>
-      <Group title="Staged" entries={lists.staged} empty="Nothing staged yet. Stage files to commit them." {...{ selected, onSelect, onToggle, locked }} />
+      <Group title="Staged" entries={lists.staged} empty="Nothing staged yet. Stage files to commit them." {...{ selected, onSelect, onToggle, onDiscard, locked }} />
     </div>
   );
 }
@@ -52,7 +54,7 @@ function moveTo(key: string, index: number, count: number): number | null {
   return key === "End" ? count - 1 : null;
 }
 
-interface GroupProps extends Pick<Props, "selected" | "onSelect" | "onToggle" | "locked"> {
+interface GroupProps extends Pick<Props, "selected" | "onSelect" | "onToggle" | "onDiscard" | "locked"> {
   title: string;
   entries: Entry[];
   empty: string;
@@ -74,7 +76,7 @@ function Group({ title, entries, empty, children, ...rows }: GroupProps) {
   );
 }
 
-function Row({ entry, selected, onSelect, onToggle, locked }: { entry: Entry } & Pick<Props, "selected" | "onSelect" | "onToggle" | "locked">) {
+function Row({ entry, selected, onSelect, onToggle, onDiscard, locked }: { entry: Entry } & Pick<Props, "selected" | "onSelect" | "onToggle" | "onDiscard" | "locked">) {
   const { file } = entry;
   const action = entry.side === "unstaged" ? "Stage" : "Unstage";
   return (
@@ -84,18 +86,34 @@ function Row({ entry, selected, onSelect, onToggle, locked }: { entry: Entry } &
       </span>
       <span className="change-path">{file.oldPath && entry.side === "staged" ? `${file.oldPath} → ${file.path}` : file.path}</span>
       {entry.blocked === null ? (
-        <button
-          className="abtn small"
-          tabIndex={-1}
-          disabled={locked}
-          aria-label={`${action} ${file.path}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggle(entry);
-          }}
-        >
-          {action}
-        </button>
+        <span className="change-actions">
+          {canDiscard(entry) && (
+            <button
+              className="abtn small danger"
+              tabIndex={-1}
+              disabled={locked}
+              aria-label={`Discard ${file.path}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onDiscard(entry);
+              }}
+            >
+              Discard
+            </button>
+          )}
+          <button
+            className="abtn small"
+            tabIndex={-1}
+            disabled={locked}
+            aria-label={`${action} ${file.path}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggle(entry);
+            }}
+          >
+            {action}
+          </button>
+        </span>
       ) : (
         <span className="change-blocked" title={entry.blocked}>
           {file.kind === "Conflicted" ? "Conflict" : "Not stageable"}

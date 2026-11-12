@@ -126,6 +126,14 @@ public class ContractTests
                 new StepView(StepKind.DeleteRemoteBranch, "Delete remote-tracking branch origin/fix-1, here only", true, "Undo works while git still has the commits.", false),
             ]),
         ])),
+        ["cleanup.planDiscard"] = () => Response(new CleanupPlanView("2d7f0a9c4e81",
+        [
+            new LeftoverPlanView(LeftoverKind.DiscardedChange, "src/räksmörgås.cs", $"{AgentWorktree}\\src\\räksmörgås.cs", null,
+            [
+                new StepView(StepKind.DiscardChanges, "Discard the change at line 12 (replaces your 2 lines with 1 line) in src/räksmörgås.cs", true,
+                    "Undo puts the file back as it is now, for as long as Diffract stays open.", false),
+            ]),
+        ])),
         ["cleanup.apply"] = () => Response(Applied),
         ["cleanup.undo"] = () => Response(new CleanupResult("7c0e5b9d2f41",
         [

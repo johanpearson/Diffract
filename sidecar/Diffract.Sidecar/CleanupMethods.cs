@@ -9,7 +9,7 @@ using Diffract.Sidecar.Rpc;
 namespace Diffract.Sidecar;
 
 /// <summary>What a cleanup needs besides git: the rules, where the operation log lives, and how folders are moved.</summary>
-internal sealed record CleanupSetup(DiffractConfig Config, OperationLog Log, IFolderOperations Folders);
+internal sealed record CleanupSetup(DiffractConfig Config, OperationLog Log, IFolderOperations Folders, DiscardBackups Backups);
 
 /// <summary>
 /// Plan, then apply. <c>cleanup.plan</c> keeps the plan and answers with its id; <c>cleanup.apply</c> runs that plan,
@@ -24,6 +24,7 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
     private sealed record KeptPlan(string RepoId, CleanupPlan Plan);
 
     private readonly ConcurrentDictionary<string, KeptPlan> _plans = new();
+    private readonly RepoWorktrees _worktrees = new(repos);
 
     /// <summary>Starts no git: it plans from the repo's latest snapshot, which the watcher keeps current.</summary>
     public Task<JsonElement> PlanAsync(JsonElement? parameters, CancellationToken ct)
@@ -76,6 +77,33 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
             throw new RemoteFailedException($"{remote} did not report any branches, so nothing was removed. It may be empty, or not answering properly.");
         var plan = PrunePlanner.Plan(snapshot, remote, heads);
         return SidecarMethods.Result(View(Keep(repoId, plan), plan));
+    }
+
+    /// <summary>
+    /// "Discard" in the Changes view: whole files or one hunk, planned like any cleanup and applied with
+    /// <c>cleanup.apply</c>. The step copies each file first, so <c>cleanup.undo</c> can write it back.
+    /// </summary>
+    public async Task<JsonElement> PlanDiscardAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var request = SidecarMethods.Params<CleanupPlanDiscardParams>(parameters);
+        var repoId = SidecarMethods.Required(request.RepoId, "repoId");
+        var worktree = _worktrees.Resolve(repoId, request.Worktree);
+        var targets = new DiscardTargets(runnerOptions);
+        var picked = (request.Paths, request.Hunk) switch
+        {
+            ({ } paths, null) => await targets.FilesAsync(worktree, paths, ct).ConfigureAwait(false),
+            (null, { } hunk) => await targets.HunkAsync(worktree, hunk, ct).ConfigureAwait(false),
+            _ => throw new RpcException(RpcErrorCodes.InvalidParams, "Give either 'paths' or 'hunk'."),
+        };
+        try
+        {
+            var plan = DiscardPlanner.Plan(picked);
+            return SidecarMethods.Result(View(Keep(repoId, plan), plan));
+        }
+        catch (ArgumentException e)
+        {
+            throw new RpcException(RpcErrorCodes.InvalidParams, e.Message);
+        }
     }
 
     /// <summary>Keeps a plan the dialog shows, until it is applied, and answers with its id.</summary>
@@ -182,7 +210,7 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
             : throw new CleanupLogException("This plan is no longer there, or was applied already. Select the leftovers again.");
 
     private CleanupExecutor Executor(string repoRoot, JsonElement? parameters) =>
-        new(repoRoot, new CleanupOptions { Git = outputs.For(runnerOptions, parameters), Log = setup.Log, Folders = setup.Folders });
+        new(repoRoot, new CleanupOptions { Git = outputs.For(runnerOptions, parameters), Log = setup.Log, Folders = setup.Folders, Backups = setup.Backups });
 
     private static bool Picks(SelectedLeftover selected, Leftover leftover) =>
         selected.Kind == leftover.Kind && selected.Name == leftover.Name && SamePath(selected.Path, leftover.Path);

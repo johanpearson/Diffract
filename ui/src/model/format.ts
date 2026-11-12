@@ -16,6 +16,7 @@ export const kindLabels: Record<LeftoverKind, string> = {
   OrphanedCommit: "Orphaned commits",
   BackupTag: "Backup tag",
   LeftoverFolder: "Folder",
+  DiscardedChange: "Discarded change",
 };
 
 /** "-" when the count is unknown, as the milestone asks. */

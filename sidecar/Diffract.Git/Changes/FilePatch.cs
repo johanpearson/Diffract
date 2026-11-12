@@ -23,6 +23,9 @@ public sealed record Hunk
     public required int NewLines { get; init; }
 }
 
+/// <summary>A hunk with the patch that applies just it.</summary>
+public sealed record HunkPatch(Hunk Hunk, byte[] Patch);
+
 /// <summary>Which diff of a file to read.</summary>
 /// <param name="OldPath">The path before a staged rename, so its two paths are read as one diff. Null otherwise.</param>
 /// <param name="Staged">HEAD against the index when true, the index against the worktree when false.</param>
@@ -67,7 +70,11 @@ public sealed partial class FilePatch
     }
 
     /// <summary>The patch that applies just this hunk: its file's header and the hunk. Null when no hunk has the id.</summary>
-    public byte[]? PatchFor(string hunkId) => _hunks.FirstOrDefault(h => h.Hunk.Id == hunkId).Patch;
+    public byte[]? PatchFor(string hunkId) => Find(hunkId)?.Patch;
+
+    /// <summary>The hunk and its patch. Null when no hunk has the id.</summary>
+    public HunkPatch? Find(string hunkId) =>
+        _hunks.FirstOrDefault(h => h.Hunk?.Id == hunkId) is { Hunk: not null } found ? new HunkPatch(found.Hunk, found.Patch) : null;
 
     /// <summary>Each file in the diff: its header lines, then its hunks, each starting at an "@@" line.</summary>
     private static List<Section> Sections(IEnumerable<PatchLine> lines)

@@ -15,6 +15,8 @@ export const leftoverKinds = [
   "OrphanedCommit",
   "BackupTag",
   "LeftoverFolder",
+  /** A file, or a hunk of one, being discarded from the Changes view. No rule finds it. */
+  "DiscardedChange",
 ] as const;
 export type LeftoverKind = (typeof leftoverKinds)[number];
 
@@ -496,6 +498,8 @@ export const stepKinds = [
   "RecycleFolder",
   /** "Keep these": a commit is made to hold several orphaned commits, and tagged. Nothing is removed. */
   "KeepCommits",
+  /** Throws a file's unstaged changes, or one hunk, away, after Diffract copies the file. Undo writes the copy back. */
+  "DiscardChanges",
 ] as const;
 export type StepKind = (typeof stepKinds)[number];
 
@@ -606,6 +610,9 @@ export type ChangesStageParams = { repoId: string; worktree: string } & (
   | { hunk: { path: string; oldPath?: string | null; id: string }; paths?: undefined }
 );
 
+/** Params of `cleanup.planDiscard`: unstaged changes to throw away, whole files or one hunk, never both. */
+export type CleanupPlanDiscardParams = ChangesStageParams;
+
 /** Every method the sidecar answers, with its params and result. */
 export interface Methods {
   "app.info": { params: undefined; result: AppInfo };
@@ -709,6 +716,8 @@ export interface Methods {
    * no longer has, here only and without backup tags. A read from the network that can take a while. Apply it with `cleanup.apply`.
    */
   "cleanup.planPrune": { params: { repoId: string; remote: string }; result: CleanupPlanView };
+  /** Plans discarding unstaged changes in a worktree. Apply it with `cleanup.apply`, and take it back with `cleanup.undo`. */
+  "cleanup.planDiscard": { params: CleanupPlanDiscardParams; result: CleanupPlanView };
   /** What one row holds: the newest commits only it has. One read-only git call, none for a folder. */
   "cleanup.inspect": { params: { repoId: string; leftover: SelectedLeftover }; result: LeftoverContent };
   /** Leaves the row out of the list and its counts until it changes. Changes nothing in the repo. Answers with the new state. */

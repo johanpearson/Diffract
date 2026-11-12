@@ -13,7 +13,8 @@
     "CheckpointSession",
     "OrphanedCommit",
     "BackupTag",
-    "LeftoverFolder"
+    "LeftoverFolder",
+    "DiscardedChange"
   ],
   "errorKind": [
     "NotARepo",
@@ -109,7 +110,8 @@
     "DeleteRefs",
     "DeleteTag",
     "RecycleFolder",
-    "KeepCommits"
+    "KeepCommits",
+    "DiscardChanges"
   ],
   "stepOutcome": [
     "Done",

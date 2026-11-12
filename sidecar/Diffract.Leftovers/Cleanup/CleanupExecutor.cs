@@ -10,6 +10,9 @@ public sealed record CleanupOptions
     public required OperationLog Log { get; init; }
 
     public IFolderOperations Folders { get; init; } = WindowsFolders.Instance;
+
+    /// <summary>Where the copies of discarded files are kept. They last until Diffract closes.</summary>
+    public DiscardBackups Backups { get; init; } = DiscardBackups.Default;
 }
 
 /// <summary>A cleanup that cannot be applied or undone as asked, such as one the log does not have. Says why in plain words.</summary>
@@ -34,6 +37,7 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
     private const string LeftOutByUser = "Left out, as chosen.";
 
     private readonly StepChecks _checks = new(repoPath, options.Git, options.Folders);
+    private readonly DiscardRunner _discards = new(options.Git, options.Backups);
 
     public Task<CleanupResult> ApplyAsync(CleanupPlan plan, CancellationToken ct) => ApplyAsync(plan, [], ct);
 
@@ -62,10 +66,10 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
             ?? throw new CleanupLogException($"The operation log of this repo has no cleanup {cleanupId}.");
         if (cleanup.Started.Undoes is not null)
             throw new CleanupLogException("An undo cannot be undone. Clean up again instead.");
-        if (!cleanup.Steps.Any(s => IsDone(s) && s.Undo is not null))
+        if (!cleanup.Steps.Any(s => IsDone(s) && s.CanUndo))
             throw new CleanupLogException(NothingUndoable(cleanup));
         var left = StillToUndo(history, cleanup);
-        if (!left.Any(s => s.Undo is not null))
+        if (!left.Any(s => s.CanUndo))
             throw new CleanupLogException("Everything in this cleanup that can be undone is undone already.");
 
         var leftovers = left.GroupBy(s => s.Result.Leftover).OrderByDescending(g => g.Key)
@@ -81,7 +85,7 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
         [
             .. history.Reverse().Select(c => new PastCleanup(
                 c.Started.CleanupId, c.Started.At, c.Started.Undoes, c.Started.Leftovers, [.. c.Steps.Select(s => s.Result)],
-                c.Started.Undoes is null && StillToUndo(history, c).Any(s => s.Undo is not null))),
+                c.Started.Undoes is null && StillToUndo(history, c).Any(s => s.CanUndo))),
         ];
     }
 
@@ -111,6 +115,7 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
         Command = step.Command,
         Expects = step.Expects,
         Folder = step.Folder,
+        Discard = step.Discard,
         Planned = step,
         NotRun = leaveOut.Contains(at) ? LeftOutByUser : null,
     };
@@ -118,6 +123,8 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
     private static PendingStep FromLog(StepLogged step)
     {
         var result = step.Result with { Description = $"Undo: {step.Result.Description}" };
+        if (step.UndoFile is { } file)
+            return new PendingStep { Result = result, RestoreFile = file };
         return step.Undo is { } undo
             ? new PendingStep { Result = result, Command = new GitCommandLine(undo.Arguments, undo.Input), Expects = step.UndoExpects }
             : new PendingStep { Result = result, NotRun = step.UndoNote ?? "This step cannot be undone." };
@@ -140,8 +147,8 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
         var stopped = false;
         foreach (var step in steps)
         {
-            var result = stopped ? step.As(StepOutcome.Skipped, EarlierStepDidNotRun) : await RunOneAsync(step, runner, ct).ConfigureAwait(false);
-            Log(cleanupId, step, result);
+            var (result, fileUndo) = stopped ? (step.As(StepOutcome.Skipped, EarlierStepDidNotRun), null) : await RunOneAsync(step, runner, ct).ConfigureAwait(false);
+            Log(cleanupId, step, result, fileUndo);
             results.Add(result);
             stopped |= result.Outcome != StepOutcome.Done && step.NotRun is null;
         }
@@ -149,21 +156,31 @@ public sealed class CleanupExecutor(string repoPath, CleanupOptions options)
         return results;
     }
 
-    private async Task<StepResult> RunOneAsync(PendingStep step, StepRunner runner, CancellationToken ct)
+    private async Task<(StepResult Result, FileUndo? Undo)> RunOneAsync(PendingStep step, StepRunner runner, CancellationToken ct)
     {
         if (step.NotRun is { } why)
-            return step.As(StepOutcome.Skipped, why);
+            return (step.As(StepOutcome.Skipped, why), null);
         var check = await _checks.CheckAsync(step.Expects, ct).ConfigureAwait(false);
         if (check.Broken is { } broken)
-            return step.As(StepOutcome.Skipped, broken);
+            return (step.As(StepOutcome.Skipped, broken), null);
+        if (await DiscardOrRestoreAsync(step, ct).ConfigureAwait(false) is { } outcome)
+            return (step.As(outcome.Outcome, outcome.Reason), outcome.Undo);
         var failed = await runner.RunAsync(step, check, ct).ConfigureAwait(false);
-        return failed is null ? step.As(StepOutcome.Done, null) : step.As(StepOutcome.Failed, failed);
+        return (failed is null ? step.As(StepOutcome.Done, null) : step.As(StepOutcome.Failed, failed), null);
     }
 
+    /// <summary>A discard, or the undo of one. Null for any other step, which the runner takes.</summary>
+    private async Task<DiscardOutcome?> DiscardOrRestoreAsync(PendingStep step, CancellationToken ct) => step switch
+    {
+        { Discard: { } work } => await _discards.DiscardAsync(work, ct).ConfigureAwait(false),
+        { RestoreFile: { } undo } => _discards.Restore(undo),
+        _ => null,
+    };
+
     /// <summary>A done step keeps what takes it back. Written before the next step runs.</summary>
-    private void Log(string cleanupId, PendingStep step, StepResult result)
+    private void Log(string cleanupId, PendingStep step, StepResult result, FileUndo? fileUndo)
     {
         var undo = result.Outcome == StepOutcome.Done && step.Planned?.Undo is { } command ? new LoggedCommand(command.Arguments, command.Input) : null;
-        options.Log.Append(repoPath, new StepLogged(cleanupId, result, undo, step.Planned?.UndoExpects ?? [], step.Planned?.UndoNote));
+        options.Log.Append(repoPath, new StepLogged(cleanupId, result, undo, step.Planned?.UndoExpects ?? [], step.Planned?.UndoNote, fileUndo));
     }
 }

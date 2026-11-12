@@ -15,6 +15,12 @@ internal sealed record PendingStep
 
     public string? Folder { get; init; }
 
+    /// <summary>The file to throw changes away from, for a discard.</summary>
+    public DiscardWork? Discard { get; init; }
+
+    /// <summary>The copy of a discarded file to write back, for the undo of a discard.</summary>
+    public FileUndo? RestoreFile { get; init; }
+
     /// <summary>The step in the plan, whose undo the log keeps once it is done. Null for an undo, which is not undone.</summary>
     public CleanupStep? Planned { get; init; }
 

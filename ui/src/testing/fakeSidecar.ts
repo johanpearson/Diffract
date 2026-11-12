@@ -26,6 +26,7 @@ import { sampleWorktrees, type FakeWorktree } from "./fakeChanges";
 import { answerRefs } from "./fakeRefs";
 import { FakeCleanups } from "./fakeCleanup";
 import { FakeStashes } from "./fakeStash";
+import { FakeDiscards } from "./fakeDiscard";
 import { detailsOf, generateHistory, sampleFiles } from "./fakeHistory";
 import { FakeTransport } from "./fakeTransport";
 
@@ -208,6 +209,9 @@ export class FakeSidecar {
 
   /** Saves, applies and plans dropping stashes, as Stash refs. Tests set `conflicts` and read `asked`. */
   readonly stashes = new FakeStashes();
+
+  /** Plans discarding unstaged changes. Applying and undoing go through `cleanups`. Tests read `asked`. */
+  readonly discards = new FakeDiscards();
 
   /** Every fetch, pull and push asked for, as "remote.pull C:\\src\\shop". */
   readonly remoteAsked: string[] = [];
@@ -398,6 +402,8 @@ export class FakeSidecar {
       case "stash.apply":
       case "cleanup.planStash":
         return this.stashes.answer(this, method, params);
+      case "cleanup.planDiscard":
+        return this.discards.answer(this, params as Parameters<FakeDiscards["answer"]>[1]);
       case "cleanup.plan":
       case "cleanup.planPrune":
       case "cleanup.inspect":

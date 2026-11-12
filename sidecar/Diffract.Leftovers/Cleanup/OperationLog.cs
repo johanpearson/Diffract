@@ -23,8 +23,15 @@ public sealed record LoggedLeftover(LeftoverKind Kind, string Name, string? Path
 }
 
 /// <summary>A step that ran, or was skipped, with what takes it back when it was done.</summary>
-public sealed record StepLogged(string CleanupId, StepResult Result, LoggedCommand? Undo, IReadOnlyList<Expectation> UndoExpects, string? UndoNote)
-    : LogLine(CleanupId);
+/// <param name="UndoFile">For a discard, the copy of the file that Undo writes back. Null for every other step.</param>
+public sealed record StepLogged(
+    string CleanupId, StepResult Result, LoggedCommand? Undo, IReadOnlyList<Expectation> UndoExpects, string? UndoNote, FileUndo? UndoFile = null)
+    : LogLine(CleanupId)
+{
+    /// <summary>Git or a copy of a file can take the step back.</summary>
+    [JsonIgnore]
+    public bool CanUndo => Undo is not null || UndoFile is not null;
+}
 
 /// <summary>A git command as the log keeps it: cleanup commands only ever write lines to standard input.</summary>
 public sealed record LoggedCommand(IReadOnlyList<string> Arguments, IReadOnlyList<string> Input);
