@@ -82,7 +82,10 @@ public class RequestContractTests
         ["cleanup.undo"] = () => Node(new CleanupUndoParams(Repo, "a1b2c3d4e5f6")),
         ["branch.undoReset"] = () => Node(new BranchUndoResetParams(Repo, Worktree, new ResetResult
         {
-            Branch = "claude/räksmörgås-fix", OldCommit = "9fceb02d0ae598e95dc970b74767f19372d61af8", NewCommit = Commit, Mode = ResetMode.Soft,
+            Branch = "claude/räksmörgås-fix", OldCommit = "9fceb02d0ae598e95dc970b74767f19372d61af8", NewCommit = Commit, Mode = ResetMode.Hard,
+            Kept = new KeptWork(
+                [new KeptFile("src/räksmörgås.cs", "0123456789abcdef0123456789abcdef", "9b74c9897bac770ffc029102a200c5de1b8c1f3ba3a3f1b5e0c9d9b4b3a8f1aa"), new KeptFile("new file.txt", "fedcba9876543210fedcba9876543210", "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae")],
+                [new StagedEntry("src/räksmörgås.cs", "100644", "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"), new StagedEntry("new file.txt", "000000", "0000000000000000000000000000000000000000")]),
         })),
     };
 

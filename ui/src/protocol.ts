@@ -451,8 +451,11 @@ export interface RemoteSyncResult {
 export const refNameKinds = ["Branch", "Tag"] as const;
 export type RefNameKind = (typeof refNameKinds)[number];
 
-/** Soft keeps what is staged; mixed puts the changes back as unstaged. Neither touches the files. */
-export const resetModes = ["Soft", "Mixed"] as const;
+/**
+ * Soft keeps what is staged; mixed puts the changes back as unstaged. Neither touches the files. Hard also puts the
+ * files back as the commit has them, so uncommitted work is thrown away, after Diffract has kept a copy.
+ */
+export const resetModes = ["Soft", "Mixed", "Hard"] as const;
 export type ResetMode = (typeof resetModes)[number];
 
 /** Command: the command about to run. Line: a line git wrote. Progress: a progress line the next one replaces. */
@@ -478,12 +481,34 @@ export interface RefChange {
   message: string;
 }
 
+/** A file a hard reset threw away, and the copy that brings it back. The copy lasts until Diffract closes. */
+export interface KeptFile {
+  path: string;
+  backupName: string | null;
+  afterHash: string | null;
+}
+
+/** An index entry a hard reset threw away. A mode of 000000 means the path was not staged. */
+export interface StagedEntry {
+  path: string;
+  mode: string;
+  id: string;
+}
+
+/** What a hard reset kept so undo can bring it back. */
+export interface KeptWork {
+  files: KeptFile[];
+  staged: StagedEntry[];
+}
+
 /** Result of `branch.reset` and `branch.undoReset`. Pass a reset's result as it is to undo it. */
 export interface ResetResult {
   branch: string;
   oldCommit: string;
   newCommit: string;
   mode: ResetMode;
+  /** For a hard reset, the uncommitted work that was kept. Null for the other modes and after an undo. */
+  kept: KeptWork | null;
 }
 
 /** What a cleanup step does. The dialog words and groups steps by it. */

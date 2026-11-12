@@ -119,6 +119,21 @@ describe("the history row's menu", () => {
     expect(sidecar.refsAsked.map((a) => a.method)).toEqual(["branch.reset", "branch.undoReset"]);
   });
 
+  it("warns before a hard reset, names it, and undoes it", async () => {
+    const sidecar = setup();
+    await ready();
+    await openOnRoot("Reset main to here…");
+
+    fireEvent.click(within(dialog()).getByRole("radio", { name: /Hard/ }));
+    expect(dialog().textContent).toContain("Diffract copies every file that changes first");
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Reset" }));
+
+    await screen.findByText(`Reset main (hard) from ${merge.id.slice(0, 8)} to ${root.id.slice(0, 8)}. Nothing uncommitted was lost.`);
+    expect(sidecar.refsAsked[0]!.params).toMatchObject({ mode: "Hard" });
+    fireEvent.click(screen.getByRole("button", { name: "Undo reset" }));
+    await screen.findByText(`Undid the reset: main is back at ${merge.id.slice(0, 8)}.`);
+  });
+
   it("shows git's words when it refuses to switch", async () => {
     const sidecar = new FakeSidecar();
     sidecar.failures.set("branch.switch", {

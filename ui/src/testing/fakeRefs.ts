@@ -79,7 +79,8 @@ function switchTo(host: RefsHost, p: Params): RefChange {
 function reset(host: RefsHost, p: Params): ResetResult {
   const branch = worktreeOf(host, p).branch!;
   const ref = host.refs.find((r) => r.kind === "Branch" && r.name === branch)!;
-  const result: ResetResult = { branch, oldCommit: ref.targetId, newCommit: p.commit ?? "", mode: p.mode ?? "Soft" };
+  const mode = p.mode ?? "Soft";
+  const result: ResetResult = { branch, oldCommit: ref.targetId, newCommit: p.commit ?? "", mode, kept: mode === "Hard" ? { files: [], staged: [] } : null };
   move(host, p, branch, result.newCommit);
   return result;
 }
@@ -89,7 +90,7 @@ function undoReset(host: RefsHost, p: Params): ResetResult {
   const ref = host.refs.find((r) => r.kind === "Branch" && r.name === done.branch)!;
   if (ref.targetId !== done.newCommit) throw refused(`${done.branch} is no longer where the reset left it, so undo did nothing. Something has changed it since.`);
   move(host, p, done.branch, done.oldCommit);
-  return { ...done, oldCommit: done.newCommit, newCommit: done.oldCommit };
+  return { ...done, oldCommit: done.newCommit, newCommit: done.oldCommit, kept: null };
 }
 
 function move(host: RefsHost, p: Params, branch: string, commit: string): void {

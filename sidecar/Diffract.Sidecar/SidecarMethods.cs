@@ -131,7 +131,7 @@ internal sealed class SidecarMethods : IDisposable
         var outputs = new CommandOutputs(_notify);
         _changes = new ChangesMethods(worktrees, RunnerOptions, outputs);
         _remote = new RemoteMethods(worktrees, RunnerOptions, outputs);
-        _refs = new RefMethods(worktrees, RunnerOptions, outputs);
+        _refs = new RefMethods(worktrees, RunnerOptions, outputs, d.DiscardBackups);
         _stash = new StashMethods(worktrees, RunnerOptions, outputs);
         _cleanup = new CleanupMethods(_repos, RunnerOptions, outputs, new CleanupSetup(d.Config, new OperationLog(d.OperationLogFolder), d.Folders, d.DiscardBackups));
         _handlers = CreateHandlers();

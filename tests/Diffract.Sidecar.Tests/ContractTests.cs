@@ -98,7 +98,13 @@ public class ContractTests
         ["branch.create"] = () => Response(new RefChange("refs/heads/fix/räksmörgås", "Created branch fix/räksmörgås at e83c5163, and switched to it.")),
         ["branch.switch"] = () => Response(new RefChange(null, "Checked out e83c5163 on a detached HEAD.")),
         ["tag.create"] = () => Response(new RefChange("refs/tags/v1.0", "Created tag v1.0 at e83c5163.")),
-        ["branch.reset"] = () => Response(new ResetResult { Branch = "claude/räksmörgås-fix", OldCommit = Merge, NewCommit = Side, Mode = ResetMode.Mixed }),
+        ["branch.reset"] = () => Response(new ResetResult
+        {
+            Branch = "claude/räksmörgås-fix", OldCommit = Merge, NewCommit = Side, Mode = ResetMode.Hard,
+            Kept = new KeptWork(
+                [new KeptFile("src/räksmörgås.cs", "0123456789abcdef0123456789abcdef", "9b74c9897bac770ffc029102a200c5de1b8c1f3ba3a3f1b5e0c9d9b4b3a8f1aa"), new KeptFile("new file.txt", null, null)],
+                [new StagedEntry("src/räksmörgås.cs", "100644", "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"), new StagedEntry("new file.txt", "000000", "0000000000000000000000000000000000000000")]),
+        }),
         ["branch.undoReset"] = () => Response(new ResetResult { Branch = "claude/räksmörgås-fix", OldCommit = Side, NewCommit = Merge, Mode = ResetMode.Mixed }),
         ["changes.file"] = () => Response(ChangesFile.From(new FileDiff(
             new FileContent(FileContentKind.Text, "one\r\ntwo\r\n"),

@@ -32,6 +32,9 @@ public class ChangesPolicyTests
         $"tag -a v1.0 {Commit} -F -",
         $"reset --soft {Commit}",
         $"reset --mixed {Commit}",
+        $"reset --hard {Commit}",
+        $"reset --keep {Commit}",
+        "update-index -z --index-info",
         "stash push",
         "stash push --include-untracked",
         "stash push -m Halvfärdigt",
@@ -75,9 +78,13 @@ public class ChangesPolicyTests
     [InlineData("commit -n -F -")]
     [InlineData("commit -m message")]
     [InlineData("commit --allow-empty -F -")]
-    [InlineData($"reset --hard {Commit}")]
     [InlineData($"reset --merge {Commit}")]
-    [InlineData($"reset --keep {Commit}")]
+    [InlineData("reset --hard HEAD~1")]
+    [InlineData("reset --keep main")]
+    [InlineData($"reset --hard --keep {Commit}")]
+    [InlineData("update-index --index-info")]
+    [InlineData("update-index -z --add --index-info")]
+    [InlineData("update-index --assume-unchanged file.txt")]
     [InlineData("reset --soft HEAD~1")]
     [InlineData("reset --mixed")]
     [InlineData("reset")]
