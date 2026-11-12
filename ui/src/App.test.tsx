@@ -50,7 +50,11 @@ describe("App", () => {
     setup();
 
     expect(await screen.findByRole("heading", { name: "Open a repo" })).toBeTruthy();
-    expect(screen.getByText("git 2.47.1 · sidecar 0.1.0")).toBeTruthy();
+    expect(screen.queryByText("git 2.47.1 · sidecar 0.1.0")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
+    expect(within(screen.getByRole("region", { name: "About Diffract" })).getByText("git 2.47.1 · sidecar 0.1.0")).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "About Diffract" })).toBeNull();
   });
 
   it("opens the last repo again on start", async () => {
@@ -707,6 +711,7 @@ describe("Git for Windows update", () => {
     sidecar.info = { ...sidecar.info, gitVersion: "2.55.0" };
     act(() => sidecar.release());
 
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
     expect(await screen.findByText("git 2.55.0 · sidecar 0.1.0")).toBeTruthy();
     await waitFor(() => expect(sent(sidecar, "repo.refresh").at(-1)?.params).toEqual({ repoId: "1", includeUnreachable: false }));
     await waitFor(() => expect(sent(sidecar, "git.checkUpdate")).toHaveLength(2));

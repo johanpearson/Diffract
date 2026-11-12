@@ -1,3 +1,5 @@
+import { IconButton } from "../components/IconButton";
+import { FetchIcon, PruneIcon, PullIcon, PushIcon } from "../components/icons";
 import type { WorktreeChanges } from "../protocol";
 import { pullAction, pushAction, type RemoteAction, type RemoteKind } from "./remoteActions";
 import type { Remote } from "./useRemote";
@@ -11,15 +13,21 @@ interface Props {
   onPrune(remote: string): void;
 }
 
-/** Fetch, Pull and Push in the bar. What runs, and what came of it, shows in the command window. */
+const icons: Record<RemoteKind, () => React.JSX.Element> = { fetch: FetchIcon, pull: PullIcon, push: PushIcon };
+
+/** Fetch, Pull and Push in the bar, as icons. What runs, and what came of it, shows in the command window. */
 export function RemoteActions({ status, remote, disabled, onPrune }: Props) {
   const off = disabled || remote.running !== null;
   return (
     <div className="remote-actions" role="group" aria-label="Remote">
       <RemoteButton kind="fetch" action={{ label: "Fetch", reason: null }} remote={remote} disabled={off} />
-      <button className="abtn small" disabled={off} title={`Remove the copies of branches that ${remoteOf(status)} no longer has`} onClick={() => onPrune(remoteOf(status))}>
-        Prune
-      </button>
+      <IconButton
+        label="Prune"
+        title={`Prune: remove the copies of branches that ${remoteOf(status)} no longer has`}
+        icon={<PruneIcon />}
+        disabled={off}
+        onClick={() => onPrune(remoteOf(status))}
+      />
       <RemoteButton kind="pull" action={pullAction(status)} remote={remote} disabled={off} />
       <RemoteButton kind="push" action={pushAction(status)} remote={remote} disabled={off} />
     </div>
@@ -27,10 +35,15 @@ export function RemoteActions({ status, remote, disabled, onPrune }: Props) {
 }
 
 function RemoteButton({ kind, action, remote, disabled }: { kind: RemoteKind; action: RemoteAction; remote: Remote; disabled: boolean }) {
+  const Glyph = icons[kind];
   return (
-    <button className="abtn small" disabled={disabled || action.reason !== null} title={action.reason ?? undefined} onClick={() => remote.start(kind, action.label)}>
-      {action.label}
-    </button>
+    <IconButton
+      label={action.label}
+      title={action.reason ?? undefined}
+      icon={<Glyph />}
+      disabled={disabled || action.reason !== null}
+      onClick={() => remote.start(kind, action.label)}
+    />
   );
 }
 

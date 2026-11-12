@@ -404,7 +404,8 @@ describe("fetch, pull and push in the branch bar", () => {
     await ready();
 
     const bar = screen.getByRole("group", { name: "Branch" });
-    await waitFor(() => expect(bar.textContent).toContain("main1 ahead origin/main"));
+    await waitFor(() => expect(bar.textContent).toBe("main↑1"));
+    expect(within(bar).getByRole("img", { name: "1 ahead origin/main" }).getAttribute("title")).toBe("1 ahead origin/main");
     expect(within(bar).queryByRole("status")).toBeNull();
   });
 

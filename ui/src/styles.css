@@ -83,6 +83,7 @@ body {
 .topbar {
   display: flex;
   align-items: center;
+  min-width: 0;
   gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--line);
@@ -90,6 +91,7 @@ body {
 }
 
 .brand {
+  flex: none;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -106,13 +108,48 @@ body {
   font-size: 13px;
 }
 
-.branch-bar .muted {
+.branch-bar > * {
+  flex-shrink: 0;
+}
+
+/* The name gives way first: it shrinks to an ellipsis, so nothing runs over its neighbours. */
+.branch-bar > .branch-name {
+  flex: 0 1 auto;
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.versions {
-  color: var(--ink-3);
+.sync-badge {
+  color: var(--ink-2);
   font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+}
+
+.about {
+  position: relative;
+  flex: none;
+}
+
+.about-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  white-space: nowrap;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--ink-2);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.25);
 }
 
 .grow {
@@ -180,6 +217,25 @@ body {
   font-size: 11.5px;
   padding: 3px 9px;
   margin-top: 8px;
+}
+
+.abtn.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+}
+
+.abtn.icon[aria-pressed="true"] {
+  background: var(--sel);
+}
+
+.abtn:focus-visible {
+  outline: 2px solid var(--lane-0);
+  outline-offset: 1px;
 }
 
 .abtn:disabled {
@@ -1707,7 +1763,7 @@ body {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .changes .bar > .muted {

@@ -102,7 +102,8 @@ test("pushes in the command window, which closes by itself, and the bar shows it
   await expect(commandWindow(page)).toContainText("Pushed main to origin/main.");
   await expect(commandWindow(page).getByRole("log", { name: "Git output" })).toContainText("> git push");
   await expect(commandWindow(page)).toBeHidden();
-  await expect(page.getByRole("group", { name: "Branch" })).toContainText("Up to date with origin/main");
+  await expect(page.getByRole("group", { name: "Branch" })).toContainText("✓");
+  await expect(page.getByRole("img", { name: "Up to date with origin/main" })).toBeVisible();
   expect(await page.evaluate(() => window.diffractTest.sidecar.remoteAsked)).toEqual([`remote.push ${repoRoot}`]);
 });
 
