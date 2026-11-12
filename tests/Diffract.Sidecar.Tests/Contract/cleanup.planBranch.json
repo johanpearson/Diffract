@@ -15,14 +15,16 @@
             "description": "Keep a backup tag archive/branch/fix/räksmörgås-2026-10-21 for branch fix/räksmörgås (2 commits)",
             "undoable": true,
             "undoNote": null,
-            "optional": false
+            "optional": false,
+            "remote": null
           },
           {
             "kind": "DeleteBranch",
             "description": "Delete branch fix/räksmörgås",
             "undoable": true,
             "undoNote": null,
-            "optional": false
+            "optional": false,
+            "remote": null
           }
         ]
       }

@@ -928,6 +928,19 @@ body {
   margin-top: 10px;
 }
 
+/* The extra tick for a change that leaves this computer, such as deleting a branch on a remote. */
+.dialog .acknowledge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--red);
+  border-radius: 7px;
+  background: var(--red-soft);
+  font-weight: 600;
+}
+
 .dialog .cleanup-steps {
   margin: 4px 0 0;
   padding-left: 18px;

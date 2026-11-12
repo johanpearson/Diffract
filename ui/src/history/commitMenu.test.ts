@@ -20,7 +20,7 @@ function context(fields: Partial<MenuContext> = {}): MenuContext {
 }
 
 function actions() {
-  return { copy: vi.fn(), createBranch: vi.fn(), createTag: vi.fn(), switchTo: vi.fn(), reset: vi.fn(), deleteBranch: vi.fn() };
+  return { copy: vi.fn(), createBranch: vi.fn(), createTag: vi.fn(), switchTo: vi.fn(), reset: vi.fn(), deleteBranch: vi.fn(), deleteRemoteBranch: vi.fn() };
 }
 
 const labels = (c: MenuContext) => commitMenuItems(c, actions()).map((i) => (i.disabled ? `(${i.label})` : i.label));
@@ -46,11 +46,23 @@ describe("a history row's menu", () => {
   it("offers to delete each branch on the commit, the current one too if it is not checked out, but never one checked out in a worktree", () => {
     const markers = [marker("main", "Branch", "C:\src\shop"), marker("topic", "Branch"), marker("claude/fix", "Branch", "C:\src\shop\.claude\worktrees\fix"), marker("räksmörgås", "Branch"), marker("origin/topic", "RemoteBranch"), marker("v1", "Tag")];
 
-    expect(labels(context({ markers })).filter((l) => l.includes("Delete"))).toEqual(["Delete branch topic…", "Delete branch räksmörgås…"]);
+    expect(labels(context({ markers })).filter((l) => l.includes("Delete"))).toEqual(["Delete branch topic…", "Delete branch räksmörgås…", "Delete topic on origin…"]);
   });
 
-  it("offers no delete on a commit without a branch", () => {
-    expect(labels(context({ markers: [marker("v1", "Tag"), marker("origin/topic", "RemoteBranch")] })).some((l) => l.includes("Delete"))).toBe(false);
+  it("offers no delete on a commit without a branch, nor one on a tag or the remote's HEAD", () => {
+    expect(labels(context({ markers: [marker("v1", "Tag"), marker("origin/HEAD", "RemoteBranch")] })).some((l) => l.includes("Delete"))).toBe(false);
+  });
+
+  it("offers to delete a remote branch on its remote, whose label says so", () => {
+    expect(labels(context({ markers: [marker("origin/feature/åäö", "RemoteBranch")] })).filter((l) => l.includes("Delete"))).toEqual(["Delete feature/åäö on origin…"]);
+  });
+
+  it("asks to delete the remote branch on the remote the item names, however many slashes the branch has", () => {
+    const given = actions();
+
+    commitMenuItems(context({ markers: [marker("origin/feature/åäö", "RemoteBranch")] }), given).find((i) => i.label.includes(" on origin"))!.run();
+
+    expect(given.deleteRemoteBranch).toHaveBeenCalledWith("origin", "feature/åäö");
   });
 
   it("asks to delete the branch the item names", () => {

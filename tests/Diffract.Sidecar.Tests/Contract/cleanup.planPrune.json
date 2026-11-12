@@ -15,7 +15,8 @@
             "description": "Delete remote-tracking branch origin/fix-1, here only",
             "undoable": true,
             "undoNote": "Undo works while git still has the commits.",
-            "optional": false
+            "optional": false,
+            "remote": null
           }
         ]
       }

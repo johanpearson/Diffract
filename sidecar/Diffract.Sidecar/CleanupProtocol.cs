@@ -30,7 +30,13 @@ internal sealed record LeftoverPlanView(LeftoverKind Kind, string Name, string? 
 /// <param name="Undoable">Git can take it back. When false, the dialog says it cannot be undone, with <see cref="UndoNote"/> when there is one.</param>
 /// <param name="UndoNote">A limit on undo, or what to do instead, such as "Restore it from the Recycle Bin."</param>
 /// <param name="Optional">Has its own checkbox, ticked by default. Its place can be sent in <c>leaveOut</c>.</param>
+/// <param name="Remote">
+/// The remote the step changes, for everyone, as "Delete remote branch" does. The dialog says so in plain words and asks
+/// for its own tick before applying. Null for a step that changes only this computer's repo.
+/// </param>
 internal sealed record StepView(StepKind Kind, string Description, bool Undoable, string? UndoNote, bool Optional)
 {
-    public static StepView Of(CleanupStep step) => new(step.Kind, step.Description, step.CanUndo, step.UndoNote, step.Optional);
+    public string? Remote { get; init; }
+
+    public static StepView Of(CleanupStep step) => new(step.Kind, step.Description, step.CanUndo, step.UndoNote, step.Optional) { Remote = step.Remote };
 }

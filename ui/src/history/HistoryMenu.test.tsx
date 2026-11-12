@@ -56,6 +56,7 @@ describe("the history row's menu", () => {
       "Check out this commit (detached)",
       "Create tag here…",
       "Reset main to here…",
+      "Delete main on origin…",
     ]);
   });
 

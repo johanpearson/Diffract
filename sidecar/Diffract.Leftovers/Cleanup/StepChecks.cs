@@ -1,6 +1,7 @@
 using Diffract.Git;
 using Diffract.Git.Changes;
 using Diffract.Git.Parsing;
+using Diffract.Git.Refs;
 
 namespace Diffract.Leftovers.Cleanup;
 
@@ -22,12 +23,16 @@ internal sealed class StepChecks(string repoPath, GitRunnerOptions git, IFolderO
 
     private readonly GitRunner _reads = new(repoPath, ReadOnly(git));
 
+    /// <summary>For asking a remote, which may wait on a slow network or a sign-in window.</summary>
+    private readonly GitRunner _network = RemoteHeads.RunnerFor(repoPath, git);
+
     public async Task<Checked> CheckAsync(IReadOnlyList<Expectation> expects, CancellationToken ct)
     {
         var broken = Folders(expects)
             ?? await RefsAsync(expects, ct).ConfigureAwait(false)
             ?? await ObjectsAsync(expects, ct).ConfigureAwait(false)
-            ?? await WorktreesAsync(expects, ct).ConfigureAwait(false);
+            ?? await WorktreesAsync(expects, ct).ConfigureAwait(false)
+            ?? await RemotesAsync(expects, ct).ConfigureAwait(false);
         return broken is null ? await StashAsync(expects, ct).ConfigureAwait(false) : new Checked(broken);
     }
 
@@ -106,6 +111,47 @@ internal sealed class StepChecks(string repoPath, GitRunnerOptions git, IFolderO
         var missing = output.Split('\n').FirstOrDefault(line => line.EndsWith(" missing", StringComparison.Ordinal));
         return missing is null ? null : $"Git no longer has {Short(missing)}, so it cannot be put back.";
     }
+
+    /// <summary>
+    /// Asks each remote a step names, once, over the network: what it has now. A remote that cannot be reached stops the
+    /// step with git's own words, since nothing can then be known about it.
+    /// </summary>
+    private async Task<string?> RemotesAsync(IReadOnlyList<Expectation> expects, CancellationToken ct)
+    {
+        foreach (var remote in expects.Select(RemoteOf).OfType<string>().Distinct())
+        {
+            IReadOnlyDictionary<string, string> heads;
+            try
+            {
+                heads = await RemoteHeads.ReadWithIdsAsync(_network, remote, ct).ConfigureAwait(false);
+            }
+            catch (GitException e)
+            {
+                return e.Message;
+            }
+
+            if (expects.Select(e => RemoteBroken(e, remote, heads)).FirstOrDefault(why => why is not null) is { } broken)
+                return broken;
+        }
+
+        return null;
+    }
+
+    private static string? RemoteOf(Expectation expectation) => expectation switch
+    {
+        Expectation.RemoteBranchAt e => e.Remote,
+        Expectation.RemoteBranchAbsent e => e.Remote,
+        _ => null,
+    };
+
+    private static string? RemoteBroken(Expectation expectation, string remote, IReadOnlyDictionary<string, string> heads) => expectation switch
+    {
+        Expectation.RemoteBranchAt e when e.Remote == remote => !heads.TryGetValue(e.Branch, out var now) ? $"{remote} does not have {e.Branch} any more."
+            : now != e.ObjectId ? $"{e.Branch} on {remote} moved: it is at {Short(now)} now, not {Short(e.ObjectId)}, so it was left as it is."
+            : null,
+        Expectation.RemoteBranchAbsent e when e.Remote == remote && heads.ContainsKey(e.Branch) => $"{remote} has a branch {e.Branch} again, so it was left as it is.",
+        _ => null,
+    };
 
     private async Task<string?> WorktreesAsync(IReadOnlyList<Expectation> expects, CancellationToken ct)
     {

@@ -30,6 +30,7 @@ public class ReadOnlyPolicyTests
     [InlineData("cat-file blob 0123456789abcdef0123456789abcdef01234567")]
     [InlineData("check-ref-format refs/heads/topic")]
     [InlineData("ls-remote --heads origin")]
+    [InlineData("ls-remote --symref origin HEAD")]
     public void Allows_reads(string commandLine)
     {
         Assert.True(ReadOnlyPolicy.IsAllowed(commandLine.Split(' '), out var reason), reason);
@@ -71,6 +72,12 @@ public class ReadOnlyPolicyTests
     [InlineData("ls-remote --heads https://example.com/repo.git")]
     [InlineData("ls-remote --heads --upload-pack=evil origin")]
     [InlineData("ls-remote --exit-code --heads origin")]
+    [InlineData("ls-remote --symref origin")]
+    [InlineData("ls-remote --symref origin refs/heads/main")]
+    [InlineData("ls-remote --symref https://example.com/repo.git HEAD")]
+    [InlineData("ls-remote --symref --upload-pack=evil origin HEAD")]
+    [InlineData("push --delete origin main")]
+    [InlineData("push origin --delete main")]
     [InlineData("symbolic-ref -m reason HEAD")]
     [InlineData("log --output=out.txt")]
     [InlineData("log --output out.txt")]

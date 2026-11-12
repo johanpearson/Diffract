@@ -67,6 +67,6 @@ function leftover(path: string, description: string): LeftoverPlanView {
     name: path,
     path,
     refused: null,
-    steps: [{ kind: "DiscardChanges", description, undoable: true, undoNote, optional: false }],
+    steps: [{ kind: "DiscardChanges", description, undoable: true, undoNote, optional: false, remote: null }],
   };
 }

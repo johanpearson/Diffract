@@ -73,6 +73,7 @@ export const paramShapes: { [M in WithParams]: Shape } = {
   "stash.apply": object<Params<"stash.apply">>({ repoId: string, worktree: string, commit: string, ...watched }),
   "cleanup.plan": object<Params<"cleanup.plan">>({ repoId: string, leftovers: arrayOf(selectedLeftover) }),
   "cleanup.planBranch": object<Params<"cleanup.planBranch">>({ repoId: string, branch: string }),
+  "cleanup.planRemoteBranch": object<Params<"cleanup.planRemoteBranch">>({ repoId: string, remote: string, branch: string }),
   "cleanup.planPrune": object<Params<"cleanup.planPrune">>({ repoId: string, remote: string }),
   "cleanup.planDiscard": stage,
   "cleanup.planStash": object<Params<"cleanup.planStash">>({ repoId: string, commit: string }),

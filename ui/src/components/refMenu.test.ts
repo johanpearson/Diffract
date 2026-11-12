@@ -27,11 +27,12 @@ describe("switchTarget", () => {
 });
 
 describe("refMenu", () => {
-  const commands = () => ({ reveal: vi.fn(), switchTo: vi.fn(), copy: vi.fn() });
+  const commands = () => ({ reveal: vi.fn(), switchTo: vi.fn(), copy: vi.fn(), deleteRemoteBranch: vi.fn() });
   const labels = (r: HistoryRef) => refMenu(r, context, commands()).map((i) => [i.label, i.disabled ?? false]);
 
   it("shows, switches and copies, saying what switching does", () => {
     expect(labels(ref("feature/x", "Branch"))).toEqual([["Show in History", false], ["Switch to feature/x", false], ["Copy name", false]]);
+    expect(labels(ref("v1.0", "Tag")).map(([label]) => label)).toEqual(["Show in History", "Check out v1.0 (detached)", "Copy name"]);
     expect(labels(ref("origin/new", "RemoteBranch"))[1]).toEqual(["Switch to origin/new as new branch new", false]);
     expect(labels(ref("origin/feature/x", "RemoteBranch"))[1]).toEqual(["Switch to feature/x", false]);
     expect(labels(ref("v1.0", "Tag"))[1]).toEqual(["Check out v1.0 (detached)", false]);
@@ -53,6 +54,18 @@ describe("refMenu", () => {
     expect(c.reveal).toHaveBeenCalledWith("origin/new-id");
     expect(c.switchTo).toHaveBeenCalledWith({ remoteBranch: "origin/new" }, "origin/new-id");
     expect(c.copy).toHaveBeenCalledWith("origin/new", "the name");
+  });
+
+  it("offers a remote branch to be deleted on its remote, saying so, and never the remote's HEAD", () => {
+    const c = commands();
+
+    const items = refMenu(ref("origin/feature/åäö", "RemoteBranch"), context, c);
+
+    expect(items.at(-1)!.label).toBe("Delete feature/åäö on origin…");
+    items.at(-1)!.run();
+    expect(c.deleteRemoteBranch).toHaveBeenCalledWith("origin", "feature/åäö");
+    expect(labels(ref("origin/HEAD", "RemoteBranch")).some(([label]) => String(label).startsWith("Delete"))).toBe(false);
+    expect(labels(ref("feature/x", "Branch")).some(([label]) => String(label).startsWith("Delete"))).toBe(false);
   });
 
   it("checks out a tag's commit, detached, from the menu", () => {

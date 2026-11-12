@@ -37,6 +37,9 @@ internal sealed record CleanupPlanStashParams(string? RepoId, string? Commit);
 /// <summary>The params of <c>cleanup.planBranch</c>: the local branch to delete, by name.</summary>
 internal sealed record CleanupPlanBranchParams(string? RepoId, string? Branch);
 
+/// <summary>The params of <c>cleanup.planRemoteBranch</c>: the branch to delete on a remote, by the remote's name and the branch's own, such as "origin" and "fix/x".</summary>
+internal sealed record CleanupPlanRemoteBranchParams(string? RepoId, string? Remote, string? Branch);
+
 /// <summary>The params of <c>cleanup.planPrune</c>: the remote whose vanished branches to remove here.</summary>
 internal sealed record CleanupPlanPruneParams(string? RepoId, string? Remote);
 

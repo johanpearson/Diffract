@@ -135,6 +135,27 @@ ${why}`, data: { kind: "RemoteFailed" } };
     return plan;
   }
 
+  /** The remote's default branch, which `cleanup.planRemoteBranch` refuses. */
+  remoteDefault = "main";
+  /** Remote branches whose delete the remote rejects, by "remote/branch", with what it says: apply fails the step. */
+  readonly rejectedByRemote = new Map<string, string>();
+
+  /** As cleanup.planRemoteBranch: a backup tag when it holds work nowhere else, then the delete on the remote, for everyone. */
+  planRemoteBranch(repoId: string, target: { remote: string; branch: string; atRisk: number }, effect: Effect): CleanupPlanView {
+    const { remote, branch, atRisk } = target;
+    const why = this.unreachable.get(remote);
+    if (why !== undefined) throw { code: -32009, message: `Git could not ask ${remote} which branches it has, so nothing was removed. This is what git said:
+
+${why}`, data: { kind: "RemoteFailed" } };
+    const base = { kind: "RemoteBranch" as const, name: `${remote}/${branch}`, path: null };
+    const planned: LeftoverPlanView = branch === this.remoteDefault
+      ? { ...base, refused: `${branch} is the default branch of ${remote}. Diffract does not delete it.`, steps: [] }
+      : { ...base, refused: null, steps: [...backup(branchLeftover(`${remote}/${branch}`, atRisk), "remote"), onRemote(remote, branch)] };
+    const plan: CleanupPlanView = { planId: `plan-${++this.next}`, leftovers: [planned] };
+    this.plans.set(plan.planId, { repoId, plan, leftovers: [null], effect });
+    return plan;
+  }
+
   /** As cleanup.planStash: a backup tag, then the drop, which `effect` carries out on the fake when applied. */
   planStash(repoId: string, stash: HistoryRef, effect: Effect): CleanupPlanView {
     const steps = [
@@ -185,6 +206,8 @@ ${why}`, data: { kind: "RemoteFailed" } };
       const result = { leftover: index, step: s, kind: step.kind, description: step.description };
       if (skip !== undefined) return { ...result, outcome: "Skipped" as const, reason: s === 0 ? skip : EarlierStep };
       if (leftOut.has(`${index}/${s}`)) return { ...result, outcome: "Skipped" as const, reason: "Left out, as chosen." };
+      const rejected = step.kind === "DeleteOnRemote" ? this.rejectedByRemote.get(leftover.name) : undefined;
+      if (rejected !== undefined) return { ...result, outcome: "Failed" as const, reason: `Git refused: ${rejected}` };
       return { ...result, outcome: "Done" as const, reason: null };
     });
   }
@@ -248,6 +271,7 @@ const step = (kind: StepView["kind"], description: string, over: Partial<StepVie
   undoable: true,
   undoNote: null,
   optional: false,
+  remote: null,
   ...over,
 });
 
@@ -255,12 +279,18 @@ function branchLeftover(name: string, commitsAtRisk: number): Leftover {
   return { kind: "LocalBranch", name, path: null, agent: null, verdict: "NeedsReview", commitsAtRisk, reason: "Picked in the history.", check: null, commit: null };
 }
 
-function backup(leftover: Leftover): StepView[] {
+function backup(leftover: Leftover, kind = "branch"): StepView[] {
   const commits = leftover.commitsAtRisk ?? 0;
   if (commits === 0) return [];
   const what = commits === 1 ? "1 commit" : `${commits} commits`;
-  return [step("Backup", `Keep a backup tag archive/branch/${leftover.name}-2026-10-21 for ${what} that exist nowhere else`)];
+  return [step("Backup", `Keep a backup tag archive/${kind}/${leftover.name}-2026-10-21 for ${what} that exist nowhere else`)];
 }
+
+const onRemote = (remote: string, branch: string): StepView =>
+  step("DeleteOnRemote", `Delete branch ${branch} on ${remote}, for everyone`, {
+    remote,
+    undoNote: "Undo pushes it back to the commit it had, while the remote accepts it and git still has the commit.",
+  });
 
 function stepsOf(leftover: Leftover): StepView[] {
   switch (leftover.kind) {

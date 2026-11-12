@@ -13,6 +13,12 @@ public enum StepKind
     DeleteRemoteBranch,
 
     /// <summary>
+    /// Deletes a branch on the remote itself, with <c>git push --delete</c>, for everyone who uses it. The only step that
+    /// changes anything but this computer. See <see cref="CleanupStep.Remote"/>.
+    /// </summary>
+    DeleteOnRemote,
+
+    /// <summary>
     /// Drops a stash. The command names the stash's place when the plan was made; the executor finds its place again
     /// by its commit right before, since git takes no commit there and agents shift the list.
     /// </summary>
@@ -57,8 +63,19 @@ public sealed record KeepTag(string Name, string Message);
 [JsonDerivedType(typeof(StashPresent), "stashPresent")]
 [JsonDerivedType(typeof(StashAbsent), "stashAbsent")]
 [JsonDerivedType(typeof(FileIs), "fileIs")]
+[JsonDerivedType(typeof(RemoteBranchAt), "remoteBranchAt")]
+[JsonDerivedType(typeof(RemoteBranchAbsent), "remoteBranchAbsent")]
 public abstract record Expectation
 {
+    /// <summary>
+    /// The remote itself, asked just now over the network, has this branch at exactly this commit. A delete only runs
+    /// on the branch as the dialog showed it, so a branch someone pushed to meanwhile is left alone.
+    /// </summary>
+    public sealed record RemoteBranchAt(string Remote, string Branch, string ObjectId) : Expectation;
+
+    /// <summary>The remote has no such branch, so one can be pushed there again.</summary>
+    public sealed record RemoteBranchAbsent(string Remote, string Branch) : Expectation;
+
     /// <summary>
     /// A file in a worktree has exactly these bytes, by SHA-256, or is not there when the hash is null. A discard expects
     /// the file as the dialog showed it, so it can only throw away what the user saw.
@@ -120,6 +137,12 @@ public sealed record CleanupStep
 
     /// <summary>The dialog gives it its own checkbox, ticked, such as deleting a removed worktree's branch.</summary>
     public bool Optional { get; init; }
+
+    /// <summary>
+    /// The remote this step changes, for everyone, when it is not only this computer's repo: a delete on the remote, and
+    /// its undo. The dialog says so in plain words and asks for its own tick before it applies. Null for any other step.
+    /// </summary>
+    public string? Remote { get; init; }
 
     /// <summary>The folder a <see cref="StepKind.RecycleFolder"/> step moves.</summary>
     public string? Folder { get; init; }

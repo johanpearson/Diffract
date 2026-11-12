@@ -15,7 +15,8 @@
             "description": "Discard the change at line 12 (replaces your 2 lines with 1 line) in src/räksmörgås.cs",
             "undoable": true,
             "undoNote": "Undo puts the file back as it is now, for as long as Diffract stays open.",
-            "optional": false
+            "optional": false,
+            "remote": null
           }
         ]
       }

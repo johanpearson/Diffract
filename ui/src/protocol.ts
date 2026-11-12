@@ -517,6 +517,8 @@ export const stepKinds = [
   "RemoveWorktree",
   "DeleteBranch",
   "DeleteRemoteBranch",
+  /** Deletes a branch on the remote itself, for everyone. The only step that changes anything but this computer. */
+  "DeleteOnRemote",
   "DropStash",
   "DeleteRefs",
   "DeleteTag",
@@ -549,6 +551,8 @@ export interface StepView {
   undoNote: string | null;
   /** Has its own checkbox, ticked by default. Send its place in `leaveOut` when unticked. */
   optional: boolean;
+  /** The remote this step changes, for everyone, not only this computer's repo. The dialog says so and asks for its own tick. */
+  remote: string | null;
 }
 
 export interface LeftoverPlanView {
@@ -742,6 +746,13 @@ export interface Methods {
    * `cleanup.apply`, and take it back with `cleanup.undo`.
    */
   "cleanup.planBranch": { params: { repoId: string; branch: string }; result: CleanupPlanView };
+  /**
+   * "Delete remote branch": asks `remote` what it has right now, then plans deleting `branch` there, for everyone, a
+   * backup tag first when it holds work that exists nowhere else. The remote's default branch is refused in the plan,
+   * with why. A read from the network that can take a while, and the plan changes nothing. Apply it with
+   * `cleanup.apply`, which asks the remote again right before it pushes, and take it back with `cleanup.undo`.
+   */
+  "cleanup.planRemoteBranch": { params: { repoId: string; remote: string; branch: string }; result: CleanupPlanView };
   /**
    * "Prune remote branches": asks `remote` which branches it has, then plans removing the remote-tracking branches it
    * no longer has, here only and without backup tags. A read from the network that can take a while. Apply it with `cleanup.apply`.

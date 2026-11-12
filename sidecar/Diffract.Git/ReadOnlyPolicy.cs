@@ -91,11 +91,19 @@ public static class ReadOnlyPolicy
         return args.Any(ConfigReadOptions.Contains) ? null : "config needs --get or --list";
     }
 
-    // Reads from the network and writes nothing. Only the branches of a remote named in config, never a URL or an option.
+    // Reads from the network and writes nothing. Only the branches of a remote named in config, or which branch its HEAD
+    // is, never a URL or an option.
     private static string? CheckLsRemote(IReadOnlyList<string> args) =>
-        args is ["ls-remote", "--heads", var remote] && PolicySlots.IsPlainName(remote)
+        RemoteOf(args) is { } remote && PolicySlots.IsPlainName(remote)
             ? null
-            : "only 'ls-remote --heads <remote>' is allowed";
+            : "only 'ls-remote --heads <remote>' and 'ls-remote --symref <remote> HEAD' are allowed";
+
+    private static string? RemoteOf(IReadOnlyList<string> args) => args switch
+    {
+        ["ls-remote", "--heads", var remote] => remote,
+        ["ls-remote", "--symref", var remote, "HEAD"] => remote,
+        _ => null,
+    };
 
     // One name reads the ref. A second name, -d or -m changes it.
     private static string? CheckSymbolicRef(IReadOnlyList<string> args)
