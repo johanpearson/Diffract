@@ -63,7 +63,7 @@ export function HistoryView({ client, state, now, work, storage }: Props) {
       <RefNoteBar actions={actions} />
       <div className="history-body" style={{ gridTemplateColumns: `minmax(0, 1fr) auto ${detailsWidth}px` }}>
         <div className="history-main">
-          <HistoryList history={history} markers={markers} faded={faded} selected={selection.index} onSelect={selection.select} onOpen={() => panel.current?.focus()} onMenu={menu.open} now={now} />
+          <HistoryList history={history} markers={markers} faded={faded} selected={selection.index} followsTip={selection.followsTip} onSelect={selection.select} onOpen={() => panel.current?.focus()} onMenu={menu.open} now={now} />
           {diff.file && <DiffArea client={client} repoId={state.repoId} file={diff.file} storage={storage} onClose={diff.close} />}
         </div>
         <Splitter label="Resize commit details" orientation="vertical" spec={DetailsWidth} size={detailsWidth} onSize={setDetailsWidth} growsForward={false} />
@@ -137,17 +137,17 @@ function shownRefs(refs: HistoryRef[], toggles: Toggles): HistoryRef[] {
 }
 
 /**
- * The selected commit: the first one read until the user picks one. Kept by id, so it stays put as pages arrive and
- * as new commits come in above it.
+ * The selected commit: the top one, which follows the newest commit as it changes (after a pull, say), until the user
+ * picks one. A commit the user picked is kept by id, so it stays put as pages arrive and as new commits come in above it.
  */
 function useSelection({ commits }: History) {
   const [chosen, setChosen] = useState<string | null>(null);
-  const first = useRef<string | null>(null);
-  first.current ??= commits[0]?.id ?? null;
   const indexById = useMemo(() => new Map(commits.map((c, i) => [c.id, i])), [commits]);
-  const id = chosen ?? first.current;
+  const id = chosen ?? commits[0]?.id ?? null;
   return {
     id,
+    /** Nobody picked it: it is the top commit, so it moves without moving the view. */
+    followsTip: chosen === null,
     index: id === null ? -1 : (indexById.get(id) ?? -1),
     select: (index: number) => setChosen(commits[index]?.id ?? null),
     choose: setChosen,
