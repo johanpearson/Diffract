@@ -133,6 +133,15 @@ public class ContractTests
                 new StepView(StepKind.DeleteBranch, "Delete branch fix/räksmörgås", true, null, false),
             ]),
         ])),
+        ["cleanup.planRemoteBranch"] = () => Response(new CleanupPlanView("6d2b8e4f1a73",
+        [
+            new LeftoverPlanView(LeftoverKind.RemoteBranch, "origin/fix/räksmörgås", null, null,
+            [
+                new StepView(StepKind.Backup, "Keep a backup tag archive/remote/origin/fix/räksmörgås-2026-10-21 for 2 commits that exist nowhere else", true, null, false),
+                new StepView(StepKind.DeleteOnRemote, "Delete branch fix/räksmörgås on origin, for everyone", true,
+                    "Undo pushes it back to the commit it had, while the remote accepts it and git still has the commit.", false) { Remote = "origin" },
+            ]),
+        ])),
         ["cleanup.planPrune"] = () => Response(new CleanupPlanView("8c1e4a7f2b60",
         [
             new LeftoverPlanView(LeftoverKind.RemoteBranch, "origin/fix-1", null, null,

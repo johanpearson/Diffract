@@ -207,7 +207,7 @@ export const selectedLeftover = object<SelectedLeftover>({ kind: oneOf(leftoverK
 
 export const stepRef = object<StepRef>({ leftover: number, step: number });
 
-const stepView = object<StepView>({ kind: oneOf(stepKinds), description: string, undoable: boolean, undoNote: nullable(string), optional: boolean });
+const stepView = object<StepView>({ kind: oneOf(stepKinds), description: string, undoable: boolean, undoNote: nullable(string), optional: boolean, remote: nullable(string) });
 
 const stepResult = object<StepResult>({
   leftover: number,
@@ -274,6 +274,7 @@ export const resultShapes: { [M in keyof Methods]: Shape } = {
   "stash.apply": object<StashApplyResult>({ conflicts: boolean, message: string, status: worktreeChanges }),
   "cleanup.plan": cleanupPlan,
   "cleanup.planBranch": cleanupPlan,
+  "cleanup.planRemoteBranch": cleanupPlan,
   "cleanup.planPrune": cleanupPlan,
   "cleanup.planDiscard": cleanupPlan,
   "cleanup.planStash": cleanupPlan,

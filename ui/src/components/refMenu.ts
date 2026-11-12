@@ -1,4 +1,4 @@
-import { localName, type SwitchTo } from "../history/commitMenu";
+import { localName, remoteOf, type SwitchTo } from "../history/commitMenu";
 import type { HistoryRef } from "../protocol";
 import type { MenuItem } from "./ContextMenu";
 
@@ -7,6 +7,8 @@ export interface RefCommands {
   reveal(commitId: string): void;
   switchTo(target: SwitchTo, commitId: string): void;
   copy(text: string, what: string): void;
+  /** Deletes the branch on its remote, for everyone, after asking the remote and confirming. */
+  deleteRemoteBranch(remote: string, branch: string): void;
 }
 
 /** What the sidebar knows about the branches, to say what switching does. */
@@ -35,7 +37,14 @@ export function refMenu(ref: HistoryRef, context: BranchContext, commands: RefCo
     { label: "Show in History", run: () => commands.reveal(ref.targetId) },
     switchItem(ref, context, commands),
     { label: "Copy name", run: () => commands.copy(ref.name, "the name") },
+    ...deleteItems(ref, commands),
   ];
+}
+
+/** A remote branch can be deleted on its remote, which says so in its label, since that changes more than this computer. */
+function deleteItems(ref: HistoryRef, commands: RefCommands): MenuItem[] {
+  if (ref.kind !== "RemoteBranch" || localName(ref.name) === "HEAD") return [];
+  return [{ label: `Delete ${localName(ref.name)} on ${remoteOf(ref.name)}…`, run: () => commands.deleteRemoteBranch(remoteOf(ref.name), localName(ref.name)) }];
 }
 
 function switchItem(ref: HistoryRef, context: BranchContext, commands: RefCommands): MenuItem {

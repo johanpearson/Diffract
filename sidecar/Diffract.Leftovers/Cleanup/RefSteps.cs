@@ -54,6 +54,29 @@ internal static class RefSteps
         UndoNote = undoNote,
     };
 
+    /// <summary>
+    /// A branch deleted on the remote itself, for everyone. A backup tag first when it holds work that exists nowhere
+    /// else, as for any removal. The remote-tracking branch here is not touched by Diffract: git removes it when the
+    /// push has succeeded, so a push that fails leaves it as it was. Undo pushes the branch back to the commit it had,
+    /// while the remote has no such branch and git still has the commit.
+    /// </summary>
+    public static IReadOnlyList<CleanupStep> DeletedOnRemote(RemoteTarget target, string commit, int commitsAtRisk, BackupTags backups)
+    {
+        var (remote, branch) = target;
+        var delete = new CleanupStep
+        {
+            Kind = StepKind.DeleteOnRemote,
+            Description = $"Delete branch {branch} on {remote}, for everyone",
+            Remote = remote,
+            Command = new GitCommandLine(["push", remote, "--delete", branch], []),
+            Expects = [new Expectation.RemoteBranchAt(remote, branch, commit)],
+            Undo = new GitCommandLine(["push", remote, $"{commit}:refs/heads/{branch}"], []),
+            UndoExpects = [new Expectation.RemoteBranchAbsent(remote, branch), new Expectation.ObjectExists(commit)],
+            UndoNote = "Undo pushes it back to the commit it had, while the remote accepts it and git still has the commit.",
+        };
+        return BackedUp(commitsAtRisk > 0 ? new BackupOf("remote", $"{remote}/{branch}", commit, $"branch {branch} on {remote}", commitsAtRisk) : null, delete, backups);
+    }
+
     /// <summary>Always backed up: a stash's work exists nowhere else. Undo puts it back on top of the list.</summary>
     public static IReadOnlyList<CleanupStep> Stash(StashInfo stash, BackupTags backups)
     {

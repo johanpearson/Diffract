@@ -15,21 +15,24 @@
             "description": "Keep a backup tag archive/worktree/claude/räksmörgås-fix-2026-10-21 for 2 commits that exist nowhere else",
             "undoable": true,
             "undoNote": null,
-            "optional": false
+            "optional": false,
+            "remote": null
           },
           {
             "kind": "RemoveWorktree",
             "description": "Remove worktree C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix",
             "undoable": true,
             "undoNote": null,
-            "optional": false
+            "optional": false,
+            "remote": null
           },
           {
             "kind": "DeleteBranch",
             "description": "Delete branch claude/räksmörgås-fix",
             "undoable": true,
             "undoNote": null,
-            "optional": true
+            "optional": true,
+            "remote": null
           }
         ]
       },
@@ -44,7 +47,8 @@
             "description": "Move folder C:\\src\\shop\\.claude\\worktrees\\old-task to the Recycle Bin",
             "undoable": false,
             "undoNote": "Restore it from the Recycle Bin.",
-            "optional": false
+            "optional": false,
+            "remote": null
           }
         ]
       },

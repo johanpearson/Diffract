@@ -15,14 +15,16 @@
             "description": "Keep a backup tag archive/stash/e83c5163316f-2026-10-21 for stash \"On main: Halvfärdigt\"",
             "undoable": true,
             "undoNote": null,
-            "optional": false
+            "optional": false,
+            "remote": null
           },
           {
             "kind": "DropStash",
             "description": "Drop stash \"On main: Halvfärdigt\"",
             "undoable": true,
             "undoNote": "Undo puts it back on top of the list.",
-            "optional": false
+            "optional": false,
+            "remote": null
           }
         ]
       }

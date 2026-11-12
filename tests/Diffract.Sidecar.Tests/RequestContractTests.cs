@@ -72,6 +72,7 @@ public class RequestContractTests
         ["stash.apply"] = () => Node(new StashApplyParams(Repo, Worktree, Commit)),
         ["cleanup.planStash"] = () => Node(new CleanupPlanStashParams(Repo, Commit)),
         ["cleanup.planBranch"] = () => Node(new CleanupPlanBranchParams(Repo, "fix/räksmörgås")),
+        ["cleanup.planRemoteBranch"] = () => Node(new CleanupPlanRemoteBranchParams(Repo, "origin", "fix/räksmörgås")),
         ["cleanup.planPrune"] = () => Node(new CleanupPlanPruneParams(Repo, "origin")),
         ["cleanup.planDiscard"] = () => Node(new CleanupPlanDiscardParams(Repo, Worktree, ["src/räksmörgås.cs"], new ChangesHunkParams { Path = "src/räksmörgås.cs", OldPath = "src/cart.cs", Id = "5d41402abc4b2a76b9719d911017c592" })),
         ["cleanup.plan"] = () => Node(new CleanupPlanParams(Repo, [new SelectedLeftover(Diffract.Leftovers.LeftoverKind.Worktree, "claude/räksmörgås-fix", Worktree)])),

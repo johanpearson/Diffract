@@ -4,7 +4,8 @@ namespace Diffract.Git;
 
 /// <summary>
 /// The changes a cleanup makes, and its undo, as exact command shapes: milestone 5's allowlist. Anything else is
-/// rejected before a process starts. Nothing on it forces, fetches, pushes or prunes. <c>update-ref --stdin</c> may
+/// rejected before a process starts. Nothing on it forces, fetches or prunes, and the only pushes are the two that
+/// delete one branch on a remote and put it back (the only writes that leave the computer). <c>update-ref --stdin</c> may
 /// only create refs, or delete checkpoints and other refs outside branches, tags and remote-tracking branches from an
 /// expected value; its standard input is checked for that.
 /// </summary>
@@ -21,6 +22,11 @@ public static class CleanupPolicy
         ["tag", "-d", CommandPart.Ref],
         ["stash", "drop", CommandPart.StashEntry],
         ["stash", "store", "-m", CommandPart.Message, CommandPart.Object],
+        // Delete one branch on a remote, for everyone. Undo pushes it back to the commit it had, as a plain push that is
+        // never forced. A plain push can still fast-forward a branch that exists again, so undo first asks the remote
+        // that it has none (docs/findings/cleanup.md).
+        ["push", CommandPart.Ref, "--delete", CommandPart.Ref],
+        ["push", CommandPart.Ref, CommandPart.RemoteBranchAt],
         ["update-ref", "--stdin"],
         // With no input, writes git's empty tree, which a commit holding orphaned commits uses. Checked below.
         ["mktree"],
@@ -71,6 +77,12 @@ internal sealed record CommandPart(string Text, Func<string, bool> Accepts)
 
     /// <summary>A branch, tag or remote-tracking branch name.</summary>
     public static readonly CommandPart Ref = new("<ref>", PolicySlots.IsPlainName);
+
+    /// <summary>
+    /// A full commit id, then ":refs/heads/" and a branch name: the refspec that creates a branch on a remote. Never
+    /// forced (no "+"), and never an empty side, which would delete.
+    /// </summary>
+    public static readonly CommandPart RemoteBranchAt = new("<object>:refs/heads/<ref>", PolicySlots.IsCommitAtRemoteBranch);
 
     /// <summary>A full object id, never a revision expression.</summary>
     public static readonly CommandPart Object = new("<object>", ObjectId.IsValid);

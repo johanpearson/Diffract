@@ -9,6 +9,11 @@ export interface DialogWording {
   confirm: string;
   /** Said under the intro, such as what undo can and cannot bring back. */
   note?: string;
+  /**
+   * An extra tick that must be set before the confirm button works, for a change that leaves this computer. Its text
+   * says what the user is agreeing to.
+   */
+  acknowledge?: string;
 }
 
 interface Props {
@@ -28,6 +33,7 @@ export function CleanupDialog({ plan, onConfirm, onCancel, wording: given }: Pro
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => cancel.current?.focus(), []);
   const [unticked, setUnticked] = useState<ReadonlySet<string>>(new Set());
+  const [understood, setUnderstood] = useState(false);
   const planned = plannedCount(plan);
   const wording = given ?? wordingOf(plan, planned);
 
@@ -52,12 +58,18 @@ export function CleanupDialog({ plan, onConfirm, onCancel, wording: given }: Pro
             <PlannedLeftover key={l} index={l} leftover={leftover} unticked={unticked} onToggle={toggle} />
           ))}
         </ol>
+        {wording.acknowledge && (
+          <label className="chk acknowledge">
+            <input type="checkbox" checked={understood} onChange={(e) => setUnderstood(e.target.checked)} />
+            {wording.acknowledge}
+          </label>
+        )}
         <div className="panel-actions">
           {/* Cancel first and focused, so Enter on a dialog that just opened never removes anything. */}
           <button ref={cancel} className="abtn" onClick={onCancel}>
             Cancel
           </button>
-          <button className="abtn primary" disabled={planned === 0} onClick={() => onConfirm(leaveOutOf(plan, unticked))}>
+          <button className="abtn primary" disabled={planned === 0 || (wording.acknowledge !== undefined && !understood)} onClick={() => onConfirm(leaveOutOf(plan, unticked))}>
             {wording.confirm}
           </button>
         </div>

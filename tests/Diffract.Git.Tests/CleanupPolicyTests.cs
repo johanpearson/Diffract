@@ -27,6 +27,8 @@ public class CleanupPolicyTests
         "tag|-d|archive/branch/old-2026-09-01",
         "stash|drop|stash@{12}",
         $"stash|store|-m|-starts with a dash|{Commit}",
+        "push|origin|--delete|claude/räksmörgås-fix",
+        $"push|origin|{Commit}:refs/heads/claude/räksmörgås-fix",
         "update-ref|--stdin",
         "mktree",
         $"commit-tree|{EmptyTree}|-p|{Commit}|-p|{Other}|-F|-",
@@ -79,7 +81,9 @@ public class CleanupPolicyTests
     [InlineData("commit-tree", EmptyTree, "-p", Commit, Other, "-F", "-")]
     [InlineData("commit", "-m", "x")]
     // Never part of a cleanup.
-    [InlineData("push", "origin", "--delete", "x")]
+    [InlineData("push", "origin", "x")]
+    [InlineData("push")]
+    [InlineData("push", "--force", "origin", "x")]
     [InlineData("fetch", "--prune", "origin")]
     [InlineData("reset", "--hard", Commit)]
     [InlineData("clean", "-fd")]
@@ -91,6 +95,45 @@ public class CleanupPolicyTests
     // Reads go through the read-only runner.
     [InlineData("status", "--porcelain=v2")]
     public void Rejects_anything_else(params string[] args)
+    {
+        Assert.False(Allowed(Line(args)));
+    }
+
+    [Theory]
+    // The one push that deletes names one branch and one remote. Nothing may be added, forced or turned into a refspec.
+    [InlineData("push", "origin", "--delete", "main", "other")]
+    [InlineData("push", "origin", "--delete", "--force", "main")]
+    [InlineData("push", "origin", "--delete", "-f", "main")]
+    [InlineData("push", "--force", "origin", "--delete", "main")]
+    [InlineData("push", "--delete", "origin", "main")]
+    [InlineData("push", "origin", "--delete", "refs/heads/main:refs/heads/main")]
+    [InlineData("push", "origin", "--delete", ":main")]
+    [InlineData("push", "origin", "--delete", "+main")]
+    [InlineData("push", "origin", "--delete", "-main")]
+    [InlineData("push", "origin", "--delete", "")]
+    [InlineData("push", "--delete", "--delete", "main")]
+    [InlineData("push", "-d", "origin", "main")]
+    [InlineData("push", "--mirror", "origin")]
+    [InlineData("push", "--all", "origin")]
+    [InlineData("push", "--tags", "origin")]
+    [InlineData("push", "--porcelain", "origin", "--delete", "main")]
+    [InlineData("push", "origin", ":main")]
+    [InlineData("push", "origin", "main")]
+    [InlineData("push", "origin", "HEAD")]
+    // Undo puts a branch back by a full commit id, never forced and never a deletion.
+    [InlineData("push", "origin", $"+{Commit}:refs/heads/main")]
+    [InlineData("push", "origin", $"{Commit}:refs/heads/")]
+    [InlineData("push", "origin", $"{Commit}:refs/tags/v1")]
+    [InlineData("push", "origin", $"{Commit}:refs/heads/main", "--force")]
+    [InlineData("push", "--force", "origin", $"{Commit}:refs/heads/main")]
+    [InlineData("push", "origin", "main:refs/heads/main")]
+    [InlineData("push", "origin", "HEAD:refs/heads/main")]
+    [InlineData("push", "origin", $"{Commit}:refs/heads/-x")]
+    [InlineData("push", "origin", $"{Commit}:refs/heads/a b")]
+    [InlineData("push", "origin", $"{Commit}:refs/heads/a:b")]
+    [InlineData("push", "-o", "ci.skip", "origin", "--delete", "main")]
+    [InlineData("push", "--delete", "origin", "main", "--receive-pack=evil")]
+    public void Pushes_only_a_single_delete_and_its_undo(params string[] args)
     {
         Assert.False(Allowed(Line(args)));
     }

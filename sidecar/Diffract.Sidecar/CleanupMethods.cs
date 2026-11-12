@@ -78,6 +78,24 @@ internal sealed class CleanupMethods(RepoSessions repos, GitRunnerOptions runner
     }
 
     /// <summary>
+    /// "Delete remote branch": one branch on a remote, for everyone. Asks the remote what it has right now (a read, with
+    /// the network timeout), then plans the delete from that, so the dialog shows the branch as the remote has it. A
+    /// backup tag first when it holds work that exists nowhere else. The default branch of the remote is refused. Apply it
+    /// with <c>cleanup.apply</c>, which asks the remote once more right before it pushes. The plan changes nothing.
+    /// </summary>
+    public async Task<JsonElement> PlanRemoteBranchAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var request = SidecarMethods.Params<CleanupPlanRemoteBranchParams>(parameters);
+        var repoId = SidecarMethods.Required(request.RepoId, "repoId");
+        var remote = SidecarMethods.Required(request.Remote, "remote");
+        var branch = SidecarMethods.Required(request.Branch, "branch");
+        var snapshot = repos.LeftoversOf(repos.Get(repoId)).Snapshot;
+        var answer = await RemoteBranchPlanner.ReadAsync(snapshot, runnerOptions, new RemoteTarget(remote, branch), ct).ConfigureAwait(false);
+        var plan = RemoteBranchPlanner.Plan(snapshot, answer, branch, runnerOptions.TimeProvider);
+        return SidecarMethods.Result(View(Keep(repoId, plan), plan));
+    }
+
+    /// <summary>
     /// "Prune remote branches": asks the remote which branches it has (a read, with the network timeout) and plans
     /// removing the remote-tracking branches it no longer has, here only. No backup tags. Apply it with <c>cleanup.apply</c>.
     /// </summary>

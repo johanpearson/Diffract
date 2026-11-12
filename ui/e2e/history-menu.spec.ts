@@ -114,3 +114,41 @@ test("the sidebar shows a tag's commit on click, and switches to a branch on dou
   await expect(sidebar.getByRole("button", { name: "räksmörgås-fix" })).toHaveAttribute("aria-current", "true");
   expect(await asked(page)).toEqual(["branch.switch"]);
 });
+
+test("deletes a branch on its remote only after the dialog and its extra tick, then undoes it", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Open a repo" })).toBeVisible();
+  await page.evaluate(() => {
+    const sidecar = window.diffractTest.sidecar;
+    const root = sidecar.refs.find((r) => r.name === "origin/main")!;
+    sidecar.refs = [...sidecar.refs, { name: "origin/fix/räksmörgås", kind: "RemoteBranch", targetId: root.targetId, agent: null }];
+  });
+  await page.evaluate((path) => (window.diffractTest.nextFolder = path), repoRoot);
+  await page.getByRole("button", { name: "Open repo…" }).first().click();
+  await expect(rows(page)).toHaveCount(2);
+  await onRoot(page, "Delete fix/räksmörgås on origin…");
+
+  const confirm = page.getByRole("dialog", { name: "Delete fix/räksmörgås on origin?" });
+  await expect(confirm).toContainText("This changes origin, not only this computer.");
+  const button = confirm.getByRole("button", { name: "Delete on origin" });
+  await expect(button).toBeDisabled();
+  await confirm.getByRole("checkbox", { name: "I understand this removes it on origin" }).check();
+  await button.click();
+
+  await expect(page.getByRole("button", { name: "Undo delete" })).toBeVisible();
+  expect(await page.evaluate(() => window.diffractTest.sidecar.refs.some((r) => r.name === "origin/fix/räksmörgås"))).toBe(false);
+  await page.getByRole("button", { name: "Undo delete" }).click();
+  await expect.poll(() => page.evaluate(() => window.diffractTest.sidecar.refs.some((r) => r.name === "origin/fix/räksmörgås"))).toBe(true);
+});
+
+test("the remote's default branch is refused with why, from the sidebar's remote list", async ({ page }) => {
+  await openHistory(page);
+  const sidebar = page.getByRole("navigation", { name: "Repository" });
+  await sidebar.getByRole("button", { name: /^Remotes(, \d+)?$/ }).click();
+
+  await sidebar.getByRole("button", { name: "main" }).last().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete main on origin…" }).click();
+
+  await expect(page.getByText("main is the default branch of origin. Diffract does not delete it.")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: /^Delete main/ })).toBeHidden();
+});

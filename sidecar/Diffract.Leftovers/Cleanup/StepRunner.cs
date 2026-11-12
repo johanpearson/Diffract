@@ -13,6 +13,9 @@ internal sealed class StepRunner(string repoPath, GitRunnerOptions git, IFolderO
     private const int StoppedPartWay = 255;
 
     private readonly GitRunner _cleanup = new(repoPath, git with { CleanupOnly = true });
+
+    /// <summary>The same, with the network's patience, for the pushes that delete a branch on a remote and put it back.</summary>
+    private readonly GitRunner _network = new(repoPath, git with { CleanupOnly = true, Timeout = Git.Refs.RemoteHeads.Patience });
     private GitRunner? _tagger;
 
     public async Task<string?> RunAsync(PendingStep step, Checked check, CancellationToken ct)
@@ -23,7 +26,7 @@ internal sealed class StepRunner(string repoPath, GitRunnerOptions git, IFolderO
         {
             if (step.Planned?.Keep is { } keep)
                 return await KeepAsync(command, keep, ct).ConfigureAwait(false);
-            var runner = command.Arguments is ["tag", "-a", ..] ? await TaggerAsync(ct).ConfigureAwait(false) : _cleanup;
+            var runner = await RunnerForAsync(command, ct).ConfigureAwait(false);
             await runner.RunAsync(ForNow(command, check), ct).ConfigureAwait(false);
             return null;
         }
@@ -36,6 +39,14 @@ internal sealed class StepRunner(string repoPath, GitRunnerOptions git, IFolderO
             return $"Git refused: {Reason(e)}";
         }
     }
+
+    /// <summary>A backup tag carries the tagger's identity, a push waits on the network, and everything else runs as it is.</summary>
+    private async Task<GitRunner> RunnerForAsync(GitCommandLine command, CancellationToken ct) => command.Arguments switch
+    {
+        ["tag", "-a", ..] => await TaggerAsync(ct).ConfigureAwait(false),
+        ["push", ..] => _network,
+        _ => _cleanup,
+    };
 
     /// <summary>
     /// Makes the commit that holds the orphaned commits, then tags the id git answers with. Both carry the same

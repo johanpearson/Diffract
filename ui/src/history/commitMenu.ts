@@ -22,6 +22,8 @@ export interface MenuActions {
   switchTo(target: SwitchTo): void;
   reset(commit: CommitEntry): void;
   deleteBranch(branch: string): void;
+  /** Deletes the branch on the remote itself, for everyone. `remote` is "origin" and `branch` "topic" for "origin/topic". */
+  deleteRemoteBranch(remote: string, branch: string): void;
 }
 
 export interface MenuContext {
@@ -62,16 +64,29 @@ function branchItem(m: Marker, actions: MenuActions): MenuItem {
   return { label: `Switch to ${m.name}`, run: () => actions.switchTo({ branch: m.name }) };
 }
 
-/** Delete a branch on the commit, unless it is checked out in a worktree: that one is not offered. */
+/**
+ * Delete a branch on the commit, unless it is checked out in a worktree: that one is not offered. A remote branch can
+ * be deleted on its remote too, which says so in its label, since it changes more than this computer.
+ */
 function deleteItems({ markers }: MenuContext, actions: MenuActions): MenuItem[] {
-  return markers
+  const local = markers
     .filter((m) => m.kind === "Branch" && m.worktree === null)
     .map((m) => ({ label: `Delete branch ${m.name}…`, run: () => actions.deleteBranch(m.name) }));
+  const remote = markers
+    .filter((m) => m.kind === "RemoteBranch" && remoteOf(m.name) !== m.name && localName(m.name) !== "HEAD")
+    .map((m) => ({ label: `Delete ${localName(m.name)} on ${remoteOf(m.name)}…`, run: () => actions.deleteRemoteBranch(remoteOf(m.name), localName(m.name)) }));
+  return [...local, ...remote];
 }
 
 function resetItems({ commit, current }: MenuContext, actions: MenuActions): MenuItem[] {
   if (current.branch === null) return [];
   return [{ label: `Reset ${current.branch} to here…`, disabled: current.head === commit.id, run: () => actions.reset(commit) }];
+}
+
+/** "origin" for "origin/topic". */
+export function remoteOf(remoteBranch: string): string {
+  const slash = remoteBranch.indexOf("/");
+  return slash < 0 ? remoteBranch : remoteBranch.slice(0, slash);
 }
 
 /** "topic" for "origin/topic". */

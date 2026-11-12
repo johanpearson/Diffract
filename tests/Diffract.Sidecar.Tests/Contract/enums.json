@@ -107,6 +107,7 @@
     "RemoveWorktree",
     "DeleteBranch",
     "DeleteRemoteBranch",
+    "DeleteOnRemote",
     "DropStash",
     "DeleteRefs",
     "DeleteTag",

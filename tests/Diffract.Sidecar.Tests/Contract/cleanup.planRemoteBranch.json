@@ -1,0 +1,33 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "planId": "6d2b8e4f1a73",
+    "leftovers": [
+      {
+        "kind": "RemoteBranch",
+        "name": "origin/fix/räksmörgås",
+        "path": null,
+        "refused": null,
+        "steps": [
+          {
+            "kind": "Backup",
+            "description": "Keep a backup tag archive/remote/origin/fix/räksmörgås-2026-10-21 for 2 commits that exist nowhere else",
+            "undoable": true,
+            "undoNote": null,
+            "optional": false,
+            "remote": null
+          },
+          {
+            "kind": "DeleteOnRemote",
+            "description": "Delete branch fix/räksmörgås on origin, for everyone",
+            "undoable": true,
+            "undoNote": "Undo pushes it back to the commit it had, while the remote accepts it and git still has the commit.",
+            "optional": false,
+            "remote": "origin"
+          }
+        ]
+      }
+    ]
+  }
+}

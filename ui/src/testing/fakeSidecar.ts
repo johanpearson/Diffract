@@ -191,6 +191,24 @@ export class FakeSidecar {
     });
   }
 
+  /**
+   * cleanup.planRemoteBranch: the remote branch is the remote-tracking ref here. It goes on apply, as git removes it
+   * after a successful push, and comes back on undo. `cleanups.remoteDefault` is refused, as the sidecar refuses the
+   * remote's default branch.
+   */
+  private planRemoteBranch({ repoId, remote, branch }: { repoId: string; remote: string; branch: string }) {
+    const ref = this.refs.find((r) => r.kind === "RemoteBranch" && r.name === `${remote}/${branch}`);
+    if (!ref) throw { code: -32011, message: `${remote} does not have ${branch} any more. Fetch with prune to tidy up.`, data: { kind: "CleanupRefused" } };
+    const set = (refs: HistoryRef[]) => {
+      this.refs = refs;
+      this.change(repoId, (s) => ({ ...s, takenAt: new Date(Date.parse(s.takenAt) + 1000).toISOString() }));
+    };
+    return this.cleanups.planRemoteBranch(repoId, { remote, branch, atRisk: this.cleanups.atRisk.get(ref.name) ?? 0 }, {
+      apply: () => set(this.refs.filter((r) => r !== ref)),
+      undo: () => set([...this.refs, ref]),
+    });
+  }
+
   private changes(method: keyof Methods, params: unknown): unknown {
     const p = params as { repoId: string; worktree: string; path?: string; staged?: boolean; paths?: string[]; hunk?: { path: string; id: string }; message?: string; amend?: boolean };
     const worktree = this.worktree(p.worktree);
@@ -419,6 +437,8 @@ export class FakeSidecar {
         return this.stashes.answer(this, method, params);
       case "cleanup.planDiscard":
         return this.discards.answer(this, params as Parameters<FakeDiscards["answer"]>[1]);
+      case "cleanup.planRemoteBranch":
+        return this.planRemoteBranch(params as { repoId: string; remote: string; branch: string });
       case "cleanup.planBranch":
         return this.planBranch(params as { repoId: string; branch: string });
       case "cleanup.plan":

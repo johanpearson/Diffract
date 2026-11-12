@@ -10,7 +10,9 @@ import { Sidebar } from "./Sidebar";
 import { Splitter, useStoredSize, type SizeSpec } from "./Splitter";
 import { tabId, Tabs, type View } from "./Tabs";
 import type { SwitchTo } from "../history/commitMenu";
+import { DeleteRemoteBranchDialog } from "../history/DeleteRemoteBranchDialog";
 import { HistoryView } from "../history/HistoryView";
+import { useDeleteRemoteBranch } from "../history/useDeleteRemoteBranch";
 import { ChangesView } from "../changes/ChangesView";
 import { useCallback } from "react";
 import { useCleanup } from "../cleanup/useCleanup";
@@ -68,6 +70,7 @@ function ReadySidebar({ repo, terminals, onOpenFolder, work, onReveal, onView, o
   const busy = useCommands().busy;
   const storage = repo.session.host.storage;
   const stashActions = useStashActions({ client: repo.session.client, repoId: state.repoId, worktree: work.changesWorktree, showNotice: repo.session.showNotice });
+  const remoteDeletion = useDeleteRemoteBranch(repo.session.client, state.repoId);
   const refs = work.history.refs.refs;
   const branches = { current: work.current.branch, localBranches: new Set(refs.filter((r) => r.kind === "Branch").map((r) => r.name)) };
   const commands = {
@@ -78,6 +81,7 @@ function ReadySidebar({ repo, terminals, onOpenFolder, work, onReveal, onView, o
       work.actions.switchTo(target);
     },
     copy: work.actions.copy,
+    deleteRemoteBranch: remoteDeletion.start,
   };
   const stashes = {
     actions: stashActions,
@@ -85,21 +89,24 @@ function ReadySidebar({ repo, terminals, onOpenFolder, work, onReveal, onView, o
     onShow: (commitId: string) => onShowInHistory(commitId, "stashes"),
   };
   return (
-    <Sidebar
-      state={state}
-      terminals={terminals.list}
-      terminal={terminals.current}
-      onOpenFolder={onOpenFolder}
-      onOpenTerminal={terminals.open}
-      storage={storage}
-      refs={refs}
-      branches={branches}
-      commands={commands}
-      onShowLeftovers={() => onView("leftovers")}
-      stashes={stashes}
-      onPrune={onPrune}
-      busy={busy}
-    />
+    <>
+      <Sidebar
+        state={state}
+        terminals={terminals.list}
+        terminal={terminals.current}
+        onOpenFolder={onOpenFolder}
+        onOpenTerminal={terminals.open}
+        storage={storage}
+        refs={refs}
+        branches={branches}
+        commands={commands}
+        onShowLeftovers={() => onView("leftovers")}
+        stashes={stashes}
+        onPrune={onPrune}
+        busy={busy}
+      />
+      {remoteDeletion.plan && <DeleteRemoteBranchDialog delete={remoteDeletion.plan} onConfirm={remoteDeletion.confirm} onCancel={remoteDeletion.cancel} />}
+    </>
   );
 }
 

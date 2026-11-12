@@ -160,6 +160,7 @@ internal static class RpcJson
 [JsonSerializable(typeof(StashApplyResult))]
 [JsonSerializable(typeof(CleanupPlanStashParams))]
 [JsonSerializable(typeof(CleanupPlanBranchParams))]
+[JsonSerializable(typeof(CleanupPlanRemoteBranchParams))]
 [JsonSerializable(typeof(CleanupPlanPruneParams))]
 [JsonSerializable(typeof(CleanupPlanDiscardParams))]
 internal sealed partial class RpcJsonContext : JsonSerializerContext;

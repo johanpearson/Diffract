@@ -49,3 +49,16 @@ The spike from milestone 5, phase 0, step 1: every command the cleanup, the stas
 ## Checked in phase 5
 
 - **A commit that holds orphaned commits.** `git commit-tree <empty tree> -p <commit> -p <commit> -F -` makes one commit with all of them as parents, so one tag keeps them all. Git knows the empty tree, `4b825dc6…`, without storing it, so the command works in any repo. But `git fsck` then reports the new commit as broken, with a missing tree. `git mktree` with no input stores the empty tree, and fsck is clean after that. Diffract runs it first, every time; it changes nothing when the tree is already stored.
+
+## Checked for deleting a branch on a remote (issue 122)
+
+Checked on 2026-11-12 with Git for Windows 2.56.0.windows.3, in temp fixture repos with a bare repo as the remote, and a branch name with å ä ö.
+
+- **`git push origin --delete <branch>` deletes it on the remote and removes the remote-tracking branch here**, but only after the push succeeded. A push that is refused leaves the remote-tracking branch as it was, so Diffract never removes it itself.
+- **Undo is `git push origin <sha>:refs/heads/<branch>`.** It makes the branch on the remote at the same commit, and git makes the remote-tracking branch here again.
+- **A plain push can move a branch that exists again.** When the remote has the branch at a commit that is an ancestor of the one pushed, the push fast-forwards it. So undo is not safe on its own: right before it runs, Diffract asks the remote with `git ls-remote --heads <remote>` and skips the undo when the branch is there. Between that check and the push a person could still create it, which git would only accept as a fast-forward. Nothing is ever forced.
+- **A delete cannot say which commit it expects.** `--delete` has no lease. Diffract asks the remote with `ls-remote` right before the push and skips the delete when the branch is not at the commit the dialog showed. A push that lands between the check and the delete is not caught.
+- **The remote's default branch is refused by the remote too.** With the default `receive.denyDeleteCurrent`, deleting the branch its HEAD points at ends with "! [remote rejected] main (deletion of the current branch prohibited)". Diffract refuses it earlier, in the plan, using `git ls-remote --symref <remote> HEAD`, which prints `ref: refs/heads/main<TAB>HEAD`. A remote that names no default branch is refused too, since nothing then says which one it is.
+- **A remote that forbids deletes** (`receive.denyDeletes`) ends with "! [remote rejected] <branch> (deletion prohibited)", exit code 1. Nothing changes here or there.
+- **A branch the remote no longer has** ends with "unable to delete '<branch>': remote ref does not exist", exit code 1.
+- **A remote that cannot be reached** ends with "fatal: ... does not appear to be a git repository" and exit code 128. Diffract finds out first, from the `ls-remote` check, and skips the step with git's words.
