@@ -5,7 +5,7 @@ import { useWorktreeStatus } from "../model/statusReads";
 import { inUseReason } from "../model/worktrees";
 import type { RepoState } from "../protocol";
 import type { RpcClient } from "../rpc";
-import { BranchInfo } from "./BranchInfo";
+import { BranchChip } from "./BranchChip";
 
 interface Props {
   client: RpcClient;
@@ -28,7 +28,7 @@ export function BranchBar({ client, state, worktree, onPrune }: Props) {
   const inUse = inUseReason(state, worktree);
   return (
     <div className="branch-bar" role="group" aria-label="Branch" title={inUse ?? undefined}>
-      <BranchInfo status={status} />
+      <BranchChip status={status} />
       <RemoteActions status={status} remote={remote} disabled={commands.busy || inUse !== null} onPrune={onPrune} />
     </div>
   );

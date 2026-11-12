@@ -7,12 +7,17 @@ import type { WorktreeChanges } from "../protocol";
 export function BranchInfo({ status, live = false }: { status: WorktreeChanges; live?: boolean }) {
   return (
     <>
-      <span className="ref branch">{status.branch ?? `detached at ${status.headCommit?.slice(0, 8) ?? "nothing yet"}`}</span>
+      <span className="ref branch">{branchLabel(status)}</span>
       <span className="muted" role={live ? "status" : undefined}>
         {upstreamText(status)}
       </span>
     </>
   );
+}
+
+/** The branch name, or where a detached HEAD sits. */
+export function branchLabel(status: WorktreeChanges): string {
+  return status.branch ?? `detached at ${status.headCommit?.slice(0, 8) ?? "nothing yet"}`;
 }
 
 export function upstreamText({ upstream, ahead, behind }: WorktreeChanges): string {
