@@ -17,6 +17,8 @@ interface Props {
   faded: ReadonlySet<string>;
   /** The selected row, or -1. */
   selected: number;
+  /** The selection is the top commit, which nobody picked. It moves with the top commit, and the view does not follow it. */
+  followsTip: boolean;
   onSelect(index: number): void;
   /** Enter: move to the details. */
   onOpen(): void;
@@ -28,7 +30,7 @@ interface Props {
 const { rowHeight } = graphMetrics;
 
 /** Every commit, one row each, with the graph on the left. Only the rows in view are drawn. */
-export function HistoryList({ history, markers, faded, selected, onSelect, onOpen, onMenu, now }: Props) {
+export function HistoryList({ history, markers, faded, selected, followsTip, onSelect, onOpen, onMenu, now }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const viewport = useViewport(scrollRef);
   const { scrollTop, height } = viewport;
@@ -41,7 +43,7 @@ export function HistoryList({ history, markers, faded, selected, onSelect, onOpe
     [rows, commits, faded],
   );
   const onScroll = useScrollAnchor(scrollRef, history, viewport.onScroll);
-  useSelectionInView(scrollRef, { index: selected, id: commits[selected]?.id }, height, onScroll);
+  useSelectionInView(scrollRef, { index: selected, id: commits[selected]?.id, followsTip }, height, onScroll);
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Enter") return onOpen();
@@ -127,17 +129,19 @@ function useScrollAnchor(scrollRef: RefObject<HTMLElement | null>, { commits, ve
  * Scrolls the selection into view when it moves to another commit, however it moved. Commits added above it move
  * its row, not the selection, so they leave the view where it is.
  */
-function useSelectionInView(scrollRef: RefObject<HTMLElement | null>, selected: { index: number; id: string | undefined }, height: number, onScroll: () => void) {
+function useSelectionInView(scrollRef: RefObject<HTMLElement | null>, selected: { index: number; id: string | undefined; followsTip: boolean }, height: number, onScroll: () => void) {
   const index = useRef(selected.index);
   index.current = selected.index;
-  const selectedId = selected.id;
+  const { id: selectedId, followsTip } = selected;
   useEffect(() => {
     const element = scrollRef.current;
     if (!element || index.current < 0) return;
+    // A selection nobody picked is the top commit: the view stays where the user left it.
+    if (followsTip) return;
     element.scrollTop = scrollToShow(index.current, element.scrollTop, element.clientHeight || height, rowHeight);
     // The scroll event comes a frame later; the rows around the selection are needed now.
     onScroll();
-  }, [scrollRef, selectedId, height, onScroll]);
+  }, [scrollRef, selectedId, followsTip, height, onScroll]);
 }
 
 interface RowProps {

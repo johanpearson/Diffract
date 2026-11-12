@@ -65,7 +65,7 @@ describe("live history", () => {
     expect(sidecar.updatesAsked).toHaveLength(1);
   });
 
-  it("keeps the first commit selected, rather than the new top one, until the user picks another", async () => {
+  it("moves the selection to the new top commit, until the user picks another", async () => {
     const { sidecar, changed } = setup([commit("c1")], [ref("main", "c1")]);
     await loaded("1 commit");
 
@@ -74,6 +74,12 @@ describe("live history", () => {
     changed();
 
     await loaded("2 commits");
+    expect(selected()).toBe("Commit c2");
+    fireEvent.click(row("Commit c1"));
+    sidecar.history = [commit("c3", ["c2"]), ...sidecar.history];
+    sidecar.refs = [ref("main", "c3")];
+    changed();
+    await loaded("3 commits");
     expect(selected()).toBe("Commit c1");
   });
 

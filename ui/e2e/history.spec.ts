@@ -315,17 +315,33 @@ test("new commits appear without moving the commits in view or the selection", a
   await expect(subjectOf(page)).toHaveText(subject!);
 });
 
-test("at the top, new commits come into view and the selection stays on its commit", async ({ page }) => {
+test("at the top, new commits come into view and the selection moves to the new top commit", async ({ page }) => {
   await openHistory(page, 2_000);
-  const subject = await selected(page).locator(".subject").textContent();
 
   await commitOnMain(page, 2);
 
   await expect(list(page).getByRole("option").first().locator(".subject")).toHaveText("New commit 2");
   await expect(list(page).getByRole("option").first()).toContainText("main");
-  await expect(selected(page)).toHaveAttribute("aria-posinset", "3");
-  await expect(selected(page).locator(".subject")).toHaveText(subject!);
+  await expect(selected(page)).toHaveAttribute("aria-posinset", "1");
+  await expect(subjectOf(page)).toHaveText("New commit 2");
   expect(await scrollTop(page)).toBe(0);
+});
+
+test("a pull does not move a view the user scrolled, and scrolling up afterwards stays where it is put", async ({ page }) => {
+  await openHistory(page, 5_000);
+  await list(page).evaluate((el) => (el.scrollTop = 28 * 1_000 + 5));
+  const before = await scrollTop(page);
+
+  await commitOnMain(page, 3);
+  await page.getByRole("button", { name: /^Pull/ }).click();
+
+  await expect(page.getByRole("status").filter({ hasText: "commits" })).toHaveText("5,003 commits");
+  await expect.poll(() => scrollTop(page)).toBe(before + 3 * 28);
+  await list(page).hover();
+  for (let i = 0; i < 4; i++) await page.mouse.wheel(0, -300);
+  await expect.poll(() => scrollTop(page)).toBe(before + 3 * 28 - 1200);
+  await page.waitForTimeout(1_000);
+  expect(await scrollTop(page)).toBe(before + 3 * 28 - 1200);
 });
 
 test("the toggles fade merged branches, or everything but agent work", async ({ page }) => {
