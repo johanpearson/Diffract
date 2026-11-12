@@ -113,7 +113,10 @@ function switchTitle(target: SwitchTo): string {
 }
 
 function resetText(reset: ResetResult): string {
-  return `Reset ${reset.branch} (${reset.mode.toLowerCase()}) from ${short(reset.oldCommit)} to ${short(reset.newCommit)}.`;
+  const moved = `Reset ${reset.branch} (${reset.mode.toLowerCase()}) from ${short(reset.oldCommit)} to ${short(reset.newCommit)}.`;
+  const kept = reset.kept?.files.length ?? 0;
+  if (reset.kept === null) return moved;
+  return kept === 0 ? `${moved} Nothing uncommitted was lost.` : `${moved} ${kept === 1 ? "1 file was" : `${kept} files were`} copied first, so Undo brings ${kept === 1 ? "it" : "them"} back.`;
 }
 
 function short(commit: string): string {

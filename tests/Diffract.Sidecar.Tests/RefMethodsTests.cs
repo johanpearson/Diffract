@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Diffract.Fixtures;
 using Diffract.Git;
+using Diffract.Leftovers.Cleanup;
 using Diffract.Sidecar.Rpc;
 
 namespace Diffract.Sidecar.Tests;
@@ -39,7 +40,7 @@ public sealed class RefMethodsTests : IAsyncDisposable
 
         _methods = new SidecarMethods(
             new GitRunnerOptions { Environment = IsolatedGit.Environment(_temp) },
-            new SidecarDependencies { Notify = (method, parameters) => _host.Host.NotifyAsync(method, parameters), Running = new FakeProcessTable() });
+            new SidecarDependencies { Notify = (method, parameters) => _host.Host.NotifyAsync(method, parameters), Running = new FakeProcessTable(), DiscardBackups = new DiscardBackups(_temp.Combine("copies")) });
         _host = new HostHarness(_methods.Dispatch);
         Assert.True((await RequestAsync("repo.open", new { path = git.Path })).TryGetProperty("result", out _));
         return repo;
@@ -111,6 +112,28 @@ public sealed class RefMethodsTests : IAsyncDisposable
 
         Assert.Equal(("main", repo.Second, repo.First, "Mixed"), (reset.GetProperty("branch").GetString(), reset.GetProperty("oldCommit").GetString(), reset.GetProperty("newCommit").GetString(), reset.GetProperty("mode").GetString()));
         Assert.Equal(repo.Second, undone.GetProperty("newCommit").GetString());
+        Assert.Equal(repo.Second, await repo.Git.RevParseAsync("main"));
+    }
+
+    [Fact]
+    public async Task Hard_reset_keeps_uncommitted_work_and_undo_brings_it_back()
+    {
+        var repo = await OpenAsync();
+        repo.Git.WriteFile("a.txt", "mine, not committed\n");
+        repo.Git.WriteFile("new.txt", "staged new\n");
+        await repo.Git.GitAsync("add", "new.txt");
+
+        var reset = Result(await RequestAsync("branch.reset", new { repoId = "1", worktree = repo.Git.Path, commit = repo.First, mode = "Hard" }));
+        var cleanAfter = (await repo.Git.GitAsync("status", "--porcelain")).StandardOutput;
+        var undone = Result(await RequestAsync("branch.undoReset", new { repoId = "1", worktree = repo.Git.Path, reset }));
+
+        var kept = reset.GetProperty("kept").GetProperty("files").EnumerateArray().Select(f => f.GetProperty("path").GetString()!).Order().ToArray();
+        Assert.Equal("Hard", reset.GetProperty("mode").GetString());
+        Assert.Equal(["a.txt", "new.txt"], kept);
+        Assert.Equal("", cleanAfter);
+        Assert.Equal(JsonValueKind.Null, undone.GetProperty("kept").ValueKind);
+        Assert.Equal(" M a.txt\nA  new.txt\n", (await repo.Git.GitAsync("status", "--porcelain")).StandardOutput);
+        Assert.Equal("mine, not committed\n", await File.ReadAllTextAsync(Path.Combine(repo.Git.Path, "a.txt"), TestContext.Current.CancellationToken));
         Assert.Equal(repo.Second, await repo.Git.RevParseAsync("main"));
     }
 

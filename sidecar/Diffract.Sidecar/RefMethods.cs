@@ -1,16 +1,17 @@
 using System.Text.Json;
 using Diffract.Git;
 using Diffract.Git.Refs;
+using Diffract.Leftovers.Cleanup;
 using Diffract.Sidecar.Rpc;
 
 namespace Diffract.Sidecar;
 
 /// <summary>
-/// The history menu's changes in one worktree: create a branch or tag, switch, and reset the current branch soft or
-/// mixed, with undo. They write through a changes runner, which allows nothing but <see cref="ChangesPolicy"/>.
+/// The history menu's changes in one worktree: create a branch or tag, switch, and reset the current branch soft,
+/// mixed or hard, with undo. They write through a changes runner, which allows nothing but <see cref="ChangesPolicy"/>.
 /// <c>ref.checkName</c> only reads. The repo's watcher reports what moved as <c>repo.changed</c>.
 /// </summary>
-internal sealed class RefMethods(RepoWorktrees worktrees, GitRunnerOptions runnerOptions, CommandOutputs outputs)
+internal sealed class RefMethods(RepoWorktrees worktrees, GitRunnerOptions runnerOptions, CommandOutputs outputs, DiscardBackups backups)
 {
     /// <summary>Why a new branch or tag name cannot be used, before anything runs. Two reads.</summary>
     public async Task<JsonElement> CheckNameAsync(JsonElement? parameters, CancellationToken ct)
@@ -39,22 +40,36 @@ internal sealed class RefMethods(RepoWorktrees worktrees, GitRunnerOptions runne
         return RunAsync(parameters, target.RepoId, target.Worktree, w => w.SwitchAsync(TargetOf(target), ct));
     }
 
-    public async Task<JsonElement> ResetAsync(JsonElement? parameters, CancellationToken ct)
+    public Task<JsonElement> ResetAsync(JsonElement? parameters, CancellationToken ct)
     {
         var reset = SidecarMethods.Params<BranchResetParams>(parameters);
-        var writer = new ResetWriter(worktrees.Resolve(reset.RepoId, reset.Worktree), outputs.For(runnerOptions, parameters));
         var mode = reset.Mode ?? throw new RpcException(RpcErrorCodes.InvalidParams, "'mode' is required");
-        return SidecarMethods.Result(await Checked(() => writer.ResetAsync(Commit(reset.Commit), mode, ct)).ConfigureAwait(false));
+        var commit = Commit(reset.Commit);
+        var tools = ToolsFor(parameters, reset.RepoId, reset.Worktree);
+        return AnswerAsync(mode == ResetMode.Hard ? () => tools.Hard.ResetAsync(commit, ct) : () => tools.Writer.ResetAsync(commit, mode, ct));
     }
 
     /// <summary>Takes back the result <c>branch.reset</c> answered with, as it was.</summary>
-    public async Task<JsonElement> UndoResetAsync(JsonElement? parameters, CancellationToken ct)
+    public Task<JsonElement> UndoResetAsync(JsonElement? parameters, CancellationToken ct)
     {
         var undo = SidecarMethods.Params<BranchUndoResetParams>(parameters);
-        var writer = new ResetWriter(worktrees.Resolve(undo.RepoId, undo.Worktree), outputs.For(runnerOptions, parameters));
         var reset = undo.Reset ?? throw new RpcException(RpcErrorCodes.InvalidParams, "'reset' is required");
-        return SidecarMethods.Result(await Checked(() => writer.UndoAsync(reset, ct)).ConfigureAwait(false));
+        var tools = ToolsFor(parameters, undo.RepoId, undo.Worktree);
+        return AnswerAsync(reset.Mode == ResetMode.Hard ? () => tools.Hard.UndoAsync(reset, ct) : () => tools.Writer.UndoAsync(reset, ct));
     }
+
+    /// <summary>A hard reset keeps a copy of the work it throws away, so it goes through <see cref="HardReset"/>; the others through the writer.</summary>
+    private sealed record ResetTools(HardReset Hard, ResetWriter Writer);
+
+    private ResetTools ToolsFor(JsonElement? parameters, string? repoId, string? worktree)
+    {
+        var path = worktrees.Resolve(repoId, worktree);
+        var options = outputs.For(runnerOptions, parameters);
+        return new ResetTools(new HardReset(path, options, backups), new ResetWriter(path, options));
+    }
+
+    private async Task<JsonElement> AnswerAsync(Func<Task<ResetResult>> run) =>
+        SidecarMethods.Result(await Checked(run).ConfigureAwait(false));
 
     private async Task<JsonElement> RunAsync(JsonElement? parameters, string? repoId, string? worktree, Func<RefWriter, Task<RefChange>> run)
     {

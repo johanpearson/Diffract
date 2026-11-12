@@ -29,7 +29,10 @@ import {
   type ChangesCommitResult,
   type RemoteSyncResult,
   type RefChange,
+  type KeptFile,
+  type KeptWork,
   type ResetResult,
+  type StagedEntry,
   type ChangesFile,
   type Hunk,
   type CommitDetails,
@@ -191,7 +194,12 @@ const hunk = object<Hunk>({ id: string, oldStart: number, oldLines: number, newS
 
 const refChange = object<RefChange>({ ref: nullable(string), message: string });
 
-export const resetResult = object<ResetResult>({ branch: string, oldCommit: string, newCommit: string, mode: oneOf(resetModes) });
+const keptWork = object<KeptWork>({
+  files: arrayOf(object<KeptFile>({ path: string, backupName: nullable(string), afterHash: nullable(string) })),
+  staged: arrayOf(object<StagedEntry>({ path: string, mode: string, id: string })),
+});
+
+export const resetResult = object<ResetResult>({ branch: string, oldCommit: string, newCommit: string, mode: oneOf(resetModes), kept: nullable(keptWork) });
 
 const remoteSyncResult = object<RemoteSyncResult>({ outcome: oneOf(remoteOutcomes), message: string, status: worktreeChanges });
 

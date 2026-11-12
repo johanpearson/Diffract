@@ -3,8 +3,8 @@ namespace Diffract.Git;
 /// <summary>
 /// The changes Diffract makes to a repo on the user's behalf, as exact command shapes. Anything else is rejected
 /// before a process starts: other subcommands, other options, reads, and values that git could take as an option,
-/// a forced refspec or a deletion. Nothing on the list forces or skips hooks. Only the two discard shapes throw a
-/// change away, and the discard runs only after Diffract has copied the file.
+/// a forced refspec or a deletion. Nothing on the list forces or skips hooks. Only the two discard shapes and
+/// <c>reset --hard</c> throw a change away, and each runs only after Diffract has copied the files.
 /// </summary>
 public static class ChangesPolicy
 {
@@ -54,6 +54,12 @@ public static class ChangesPolicy
         ["tag", "-a", RefSlot, CommitSlot, "-F", "-"],
         ["reset", "--soft", CommitSlot],
         ["reset", "--mixed", CommitSlot],
+        // Hard throws uncommitted work away, so Diffract copies every file first (docs/findings/hard-reset.md).
+        // Keep is how Undo moves back: it stops rather than overwrite a change.
+        ["reset", "--hard", CommitSlot],
+        ["reset", "--keep", CommitSlot],
+        // Puts the index entries a hard reset threw away back by object id, byte for byte. "-z" for paths git would quote.
+        ["update-index", "-z", "--index-info"],
         // A stash keeps everything it takes, so nothing is lost. Without a message, git writes "WIP on <branch>".
         ["stash", "push"],
         ["stash", "push", "--include-untracked"],

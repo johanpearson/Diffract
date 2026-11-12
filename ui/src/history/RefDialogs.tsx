@@ -123,12 +123,13 @@ interface ResetProps {
 const modes: { mode: ResetMode; label: string; detail: string }[] = [
   { mode: "Soft", label: "Soft", detail: "Their changes stay staged, ready to commit again." },
   { mode: "Mixed", label: "Mixed", detail: "Their changes stay in your files, unstaged." },
+  { mode: "Hard", label: "Hard", detail: "Their changes are removed from your files too, and so is everything you have not committed." },
 ];
 
 /** How many leaving commits are listed by name. The rest are counted. */
 const listed = 8;
 
-/** Says which commits leave the branch and asks soft or mixed. Files are never touched either way. */
+/** Says which commits leave the branch and asks soft, mixed or hard. Only hard touches the files. */
 export function ResetDialog({ branch, commit, preview, busy, onReset, onCancel }: ResetProps) {
   const [mode, setMode] = useState<ResetMode>("Soft");
   return (
@@ -139,8 +140,13 @@ export function ResetDialog({ branch, commit, preview, busy, onReset, onCancel }
           {preview.pushedTo} already has some of these commits. After the reset, pushing {branch} needs a force push, which Diffract does not do yet.
         </p>
       )}
+      {mode === "Hard" && (
+        <p className="warn-text" role="note">
+          Your files go back to how this commit has them. Diffract copies every file that changes first, and Undo puts them back, but only until Diffract is closed.
+        </p>
+      )}
       <fieldset className="reset-modes">
-        <legend>Keep the changes</legend>
+        <legend>What happens to the changes</legend>
         {modes.map((m) => (
           <label key={m.mode} className="check-field">
             <input type="radio" name="reset-mode" checked={mode === m.mode} onChange={() => setMode(m.mode)} />

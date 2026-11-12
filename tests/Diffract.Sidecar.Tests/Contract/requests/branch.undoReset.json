@@ -5,6 +5,32 @@
     "branch": "claude/räksmörgås-fix",
     "oldCommit": "9fceb02d0ae598e95dc970b74767f19372d61af8",
     "newCommit": "e83c5163316f89bfbde7d9ab23ca2e25604af290",
-    "mode": "Soft"
+    "mode": "Hard",
+    "kept": {
+      "files": [
+        {
+          "path": "src/räksmörgås.cs",
+          "backupName": "0123456789abcdef0123456789abcdef",
+          "afterHash": "9b74c9897bac770ffc029102a200c5de1b8c1f3ba3a3f1b5e0c9d9b4b3a8f1aa"
+        },
+        {
+          "path": "new file.txt",
+          "backupName": "fedcba9876543210fedcba9876543210",
+          "afterHash": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+        }
+      ],
+      "staged": [
+        {
+          "path": "src/räksmörgås.cs",
+          "mode": "100644",
+          "id": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+        },
+        {
+          "path": "new file.txt",
+          "mode": "000000",
+          "id": "0000000000000000000000000000000000000000"
+        }
+      ]
+    }
   }
 }

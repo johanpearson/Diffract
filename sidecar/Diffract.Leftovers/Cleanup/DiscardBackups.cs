@@ -60,5 +60,8 @@ internal static class FileState
     }
 
     /// <summary>The SHA-256 of the file, or null when there is no file.</summary>
-    public static string? HashOf(string fullPath) => Read(fullPath) is { } bytes ? Convert.ToHexStringLower(SHA256.HashData(bytes)) : null;
+    public static string? HashOf(string fullPath) => HashOf(Read(fullPath));
+
+    /// <summary>The SHA-256 of the bytes, or null when there is no file.</summary>
+    public static string? HashOf(byte[]? bytes) => bytes is null ? null : Convert.ToHexStringLower(SHA256.HashData(bytes));
 }

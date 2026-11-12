@@ -94,7 +94,8 @@
   ],
   "resetMode": [
     "Soft",
-    "Mixed"
+    "Mixed",
+    "Hard"
   ],
   "gitOutputKind": [
     "Command",
