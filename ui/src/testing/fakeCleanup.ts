@@ -131,6 +131,13 @@ ${why}`, data: { kind: "RemoteFailed" } };
     return plan;
   }
 
+  /** As cleanup.planDiscard: one step per file, which `effect` carries out on the fake worktree when applied. */
+  planDiscard(repoId: string, leftovers: LeftoverPlanView[], effect: Effect): CleanupPlanView {
+    const plan: CleanupPlanView = { planId: `plan-${++this.next}`, leftovers };
+    this.plans.set(plan.planId, { repoId, plan, leftovers: leftovers.map(() => null), effect });
+    return plan;
+  }
+
   private apply(host: CleanupHost, repoId: string, planId: string, leaveOut: StepRef[]): CleanupResult {
     const kept = this.plans.get(planId);
     if (!kept || kept.repoId !== repoId) throw refused("This plan is no longer there, or was applied already. Select the leftovers again.");

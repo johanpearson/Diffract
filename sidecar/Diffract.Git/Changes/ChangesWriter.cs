@@ -10,12 +10,14 @@ public sealed record HunkRequest(string Path, string? OldPath, string HunkId);
 
 /// <summary>
 /// Stages and unstages whole files and single hunks in one worktree. Every write goes through a changes runner, which
-/// runs nothing but <see cref="ChangesPolicy"/>. Nothing here throws a change away: whatever leaves the index stays on disk.
+/// runs nothing but <see cref="ChangesPolicy"/>. Staging and unstaging throw nothing away: whatever leaves the index stays
+/// on disk. The two discard methods do, so the caller must have kept a copy of the file first.
 /// </summary>
 public sealed class ChangesWriter
 {
     private static readonly string[] StageFiles = ["add", "--pathspec-from-file=-", "--pathspec-file-nul"];
     private static readonly string[] UnstageFiles = ["restore", "--staged", "--pathspec-from-file=-", "--pathspec-file-nul"];
+    private static readonly string[] DiscardFiles = ["restore", "--worktree", "--pathspec-from-file=-", "--pathspec-file-nul"];
     private static readonly string[] UnstageFilesBeforeFirstCommit = ["rm", "--cached", "-q", "--pathspec-from-file=-", "--pathspec-file-nul"];
 
     private readonly string _worktree;
@@ -53,13 +55,32 @@ public sealed class ChangesWriter
     /// <summary>Unstages one hunk of the staged diff, if it is still exactly as the user saw it. Two git calls.</summary>
     public Task UnstageHunkAsync(HunkRequest hunk, CancellationToken ct) => ApplyHunkAsync(hunk, HunkDirection.Unstage, ct);
 
+    /// <summary>
+    /// The patch that reverses one hunk of the unstaged diff, if it is still exactly as the user saw it. Read when a
+    /// discard is planned, and kept in the plan, so applying it can only ever throw away what the dialog showed.
+    /// </summary>
+    public Task<HunkPatch> ReadHunkPatchAsync(HunkRequest hunk, CancellationToken ct) => PatchOfAsync(hunk, HunkDirection.Discard, ct);
+
+    /// <summary>Puts the listed files back as the index has them. Staged changes stay. One git call.</summary>
+    public Task DiscardFilesAsync(IReadOnlyList<string> paths, CancellationToken ct) =>
+        WriteAsync(GitCommandLine.WithBytes(DiscardFiles, PathList(paths)), ct);
+
+    /// <summary>Reverses a patch from <see cref="ReadHunkPatchAsync"/> in the working tree. Git changes nothing when it refuses.</summary>
+    public async Task DiscardPatchAsync(byte[] patch, string path, CancellationToken ct)
+    {
+        try
+        {
+            await WriteAsync(GitCommandLine.WithBytes(HunkDirection.Discard.Apply, patch), ct).ConfigureAwait(false);
+        }
+        catch (GitCommandException)
+        {
+            throw new ChangedSinceShownException(path);
+        }
+    }
+
     private async Task ApplyHunkAsync(HunkRequest hunk, HunkDirection direction, CancellationToken ct)
     {
-        CheckPath(hunk.Path);
-        if (hunk.OldPath is not null)
-            WorktreeFile.Resolve(_worktree, hunk.OldPath);
-        var diff = await _reads.RunAsync(FilePatch.Arguments(new DiffTarget(hunk.Path, hunk.OldPath, direction.FromStaged)), ct).ConfigureAwait(false);
-        var patch = FilePatch.Parse(diff.StandardOutputBytes).PatchFor(hunk.HunkId) ?? throw new ChangedSinceShownException(hunk.Path);
+        var patch = (await PatchOfAsync(hunk, direction, ct).ConfigureAwait(false)).Patch;
         try
         {
             await WriteAsync(GitCommandLine.WithBytes(direction.Apply, patch), ct).ConfigureAwait(false);
@@ -69,6 +90,15 @@ public sealed class ChangesWriter
             // The index changed between reading the diff and applying it. git apply changes nothing when it refuses.
             throw new ChangedSinceShownException(hunk.Path);
         }
+    }
+
+    private async Task<HunkPatch> PatchOfAsync(HunkRequest hunk, HunkDirection direction, CancellationToken ct)
+    {
+        CheckPath(hunk.Path);
+        if (hunk.OldPath is not null)
+            WorktreeFile.Resolve(_worktree, hunk.OldPath);
+        var diff = await _reads.RunAsync(FilePatch.Arguments(new DiffTarget(hunk.Path, hunk.OldPath, direction.FromStaged)), ct).ConfigureAwait(false);
+        return FilePatch.Parse(diff.StandardOutputBytes).Find(hunk.HunkId) ?? throw new ChangedSinceShownException(hunk.Path);
     }
 
     private Task WriteAsync(GitCommandLine command, CancellationToken ct) => _retry.RunAsync(_changes, command, ct);
@@ -106,5 +136,8 @@ public sealed class ChangesWriter
         public static readonly HunkDirection Stage = new(false, ["apply", "--cached", "--unidiff-zero", "-"]);
 
         public static readonly HunkDirection Unstage = new(true, ["apply", "--cached", "--unidiff-zero", "--reverse", "-"]);
+
+        /// <summary>Reverses a hunk of the unstaged diff in the working tree, and leaves the index alone.</summary>
+        public static readonly HunkDirection Discard = new(false, ["apply", "--unidiff-zero", "--reverse", "-"]);
     }
 }

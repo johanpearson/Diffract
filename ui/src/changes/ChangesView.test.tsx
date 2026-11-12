@@ -55,8 +55,11 @@ function Changes({ client, openedPath }: { client: RpcClient; openedPath: string
 
 const lists = () => screen.getByRole("listbox", { name: "Changed files" });
 const group = (name: "Unstaged" | "Staged") => within(lists()).getByRole("group", { name: new RegExp(`^${name}`) });
-const rows = (name: "Unstaged" | "Staged") => within(group(name)).queryAllByRole("option").map((o) => o.textContent);
+// Without the Discard button an unstaged row has: the tests for discarding look at it on its own.
+const rows = (name: "Unstaged" | "Staged") => within(group(name)).queryAllByRole("option").map((o) => o.textContent?.replace("Discard", ""));
 const selected = () => within(lists()).getByRole("option", { selected: true });
+/** The Stage hunk or Unstage hunk buttons in the diff, without the Discard hunk ones beside them. */
+const toggles = () => monaco.actions.filter((a) => a.label !== "Discard hunk");
 const commandWindow = () => screen.getByRole("dialog");
 const windowClosed = () => waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 const commitButton = () => screen.getByRole("button", { name: /^(Commit|Amend)/ });
@@ -82,27 +85,29 @@ describe("the Changes view", () => {
 
     await waitFor(() => expect(monaco.shown.at(-1)?.path).toBe("src/Cart.cs"));
     expect(monaco.shown.at(-1)!.modified).toContain("Math.Round");
-    await waitFor(() => expect(monaco.actions.map((a) => [a.line, a.label])).toEqual([[5, "Stage hunk"], [9, "Stage hunk"]]));
+    await waitFor(() =>
+      expect(monaco.actions.map((a) => [a.line, a.label])).toEqual([[5, "Stage hunk"], [5, "Discard hunk"], [9, "Stage hunk"], [9, "Discard hunk"]]),
+    );
     expect(screen.getByRole("region", { name: "Diff of src/Cart.cs" }).textContent).toContain("Not staged, against the index");
   });
 
   it("stages one hunk, and the file is then in both lists", async () => {
     const sidecar = setup();
     await ready();
-    await waitFor(() => expect(monaco.actions).toHaveLength(2));
+    await waitFor(() => expect(toggles()).toHaveLength(2));
 
-    act(() => monaco.actions[1]!.run());
+    act(() => toggles()[1]!.run());
 
     await waitFor(() => expect(rows("Staged")).toEqual(["MREADME.mdUnstage", "Msrc/Cart.csUnstage"]));
     expect(rows("Unstaged")[0]).toBe("Msrc/Cart.csStage");
     expect(sidecar.stagesAsked.at(-1)).toEqual({ method: "changes.stage", paths: undefined, hunk: { path: "src/Cart.cs", oldPath: null, id: "cart-round" } });
-    await waitFor(() => expect(monaco.actions).toHaveLength(1));
+    await waitFor(() => expect(toggles()).toHaveLength(1));
   });
 
   it("moves through the changes from the bar above the diff, scrolls to each, and stages the one shown", async () => {
     const sidecar = setup();
     await ready();
-    await waitFor(() => expect(monaco.actions).toHaveLength(2));
+    await waitFor(() => expect(toggles()).toHaveLength(2));
     const bar = screen.getByRole("group", { name: "Changes in this file" });
     expect(bar.textContent).toContain("Change 1 of 2, line 5");
     expect((within(bar).getByRole("button", { name: "Previous change" }) as HTMLButtonElement).disabled).toBe(true);
@@ -284,12 +289,12 @@ describe("the Changes view", () => {
   it("says a hunk changed since it was shown, and reads the file again", async () => {
     const sidecar = setup();
     await ready();
-    await waitFor(() => expect(monaco.actions).toHaveLength(2));
+    await waitFor(() => expect(toggles()).toHaveLength(2));
     sidecar.failures.set("changes.stage", {
       error: { code: -32007, message: "src/Cart.cs changed since it was shown, so nothing was staged or unstaged. Look at it again.", data: { kind: "ChangedSinceShown" } },
     });
 
-    act(() => monaco.actions[0]!.run());
+    act(() => toggles()[0]!.run());
 
     expect((await screen.findByRole("alert")).textContent).toContain("changed since it was shown");
   });

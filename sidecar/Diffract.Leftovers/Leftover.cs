@@ -9,6 +9,9 @@ public enum LeftoverKind
 {
     Worktree, PrunableWorktree, LocalBranch, RemoteBranch,
     Stash, CheckpointSession, OrphanedCommit, BackupTag, LeftoverFolder,
+
+    /// <summary>A file, or a hunk of one, the user is discarding from the Changes view. Never found by a rule.</summary>
+    DiscardedChange,
 }
 
 /// <param name="Agent">The agent the config patterns point to. A hint only: it never changes the verdict.</param>

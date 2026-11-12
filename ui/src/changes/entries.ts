@@ -43,6 +43,14 @@ function entry(file: ChangedFile, side: Side): Entry {
   return { key: `${side}:${file.path}`, side, file, change: side === "staged" ? file.staged : file.unstaged, blocked: blockedReasons[file.kind] ?? null };
 }
 
+/**
+ * Whether the row's unstaged changes can be thrown away: an unstaged row git lets Diffract stage. A file that is only
+ * marked to be added is left alone, as there is nothing in the index to go back to.
+ */
+export function canDiscard(entry: Entry): boolean {
+  return entry.side === "unstaged" && entry.blocked === null && !(entry.file.kind === "Tracked" && entry.change === "Added");
+}
+
 /** The paths git needs to stage or unstage these rows. Unstaging a rename needs both its paths. */
 export function pathsOf(entries: readonly Entry[]): string[] {
   const paths = entries.flatMap((e) => (e.side === "staged" && e.file.oldPath !== null ? [e.file.path, e.file.oldPath] : [e.file.path]));

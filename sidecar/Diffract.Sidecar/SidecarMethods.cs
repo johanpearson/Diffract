@@ -40,6 +40,9 @@ internal sealed record SidecarDependencies
     /// <summary>Where cleanups are logged, so they can be undone. Diffract's own folder; tests use a temp folder.</summary>
     public string OperationLogFolder { get; init; } = OperationLog.DefaultFolder;
 
+    /// <summary>Where the copies of discarded files are kept, until Diffract closes.</summary>
+    public DiscardBackups DiscardBackups { get; init; } = DiscardBackups.Default;
+
     /// <summary>Where hidden rows are remembered, next to the operation log. Tests use a temp folder.</summary>
     public string HiddenRowsFolder { get; init; } = HiddenRows.DefaultFolder;
 
@@ -59,7 +62,7 @@ internal delegate Task<JsonElement> MethodHandler(JsonElement? parameters, Cance
 internal sealed class SidecarMethods : IDisposable
 {
     /// <summary>Every method <see cref="Dispatch"/> answers. The host itself answers app.shutdown and $/cancelRequest.</summary>
-    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit", "remote.fetch", "remote.pull", "remote.push", "ref.checkName", "branch.create", "branch.switch", "tag.create", "branch.reset", "branch.undoReset", "stash.push", "stash.apply", "cleanup.plan", "cleanup.planStash", "cleanup.planPrune", "cleanup.inspect", "cleanup.apply", "cleanup.history", "cleanup.undo", "cleanup.hide", "cleanup.unhide"];
+    public static IReadOnlyList<string> Names { get; } = ["app.info", "repo.open", "repo.refresh", "repo.close", "system.openFolder", "system.listTerminals", "system.openTerminal", "git.checkUpdate", "git.update", "git.inUse", "git.openDownloadPage", "history.read", "history.update", "history.refs", "history.details", "history.file", "changes.status", "changes.file", "changes.stage", "changes.unstage", "changes.commit", "remote.fetch", "remote.pull", "remote.push", "ref.checkName", "branch.create", "branch.switch", "tag.create", "branch.reset", "branch.undoReset", "stash.push", "stash.apply", "cleanup.plan", "cleanup.planStash", "cleanup.planPrune", "cleanup.planDiscard", "cleanup.inspect", "cleanup.apply", "cleanup.history", "cleanup.undo", "cleanup.hide", "cleanup.unhide"];
 
     /// <summary>
     /// Diffract's own errors and the kind each becomes, most specific first. A null kind, as for a read-only or changes
@@ -130,7 +133,7 @@ internal sealed class SidecarMethods : IDisposable
         _remote = new RemoteMethods(worktrees, RunnerOptions, outputs);
         _refs = new RefMethods(worktrees, RunnerOptions, outputs);
         _stash = new StashMethods(worktrees, RunnerOptions, outputs);
-        _cleanup = new CleanupMethods(_repos, RunnerOptions, outputs, new CleanupSetup(d.Config, new OperationLog(d.OperationLogFolder), d.Folders));
+        _cleanup = new CleanupMethods(_repos, RunnerOptions, outputs, new CleanupSetup(d.Config, new OperationLog(d.OperationLogFolder), d.Folders, d.DiscardBackups));
         _handlers = CreateHandlers();
     }
 
@@ -166,6 +169,7 @@ internal sealed class SidecarMethods : IDisposable
             ["cleanup.plan"] = _cleanup.PlanAsync,
             ["cleanup.planStash"] = _cleanup.PlanStashAsync,
             ["cleanup.planPrune"] = _cleanup.PlanPruneAsync,
+            ["cleanup.planDiscard"] = _cleanup.PlanDiscardAsync,
             ["cleanup.inspect"] = _cleanup.InspectAsync,
             ["cleanup.hide"] = _cleanup.HideAsync,
             ["cleanup.unhide"] = _cleanup.UnhideAsync,

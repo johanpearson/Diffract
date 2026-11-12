@@ -1607,6 +1607,22 @@ body {
   opacity: 1;
 }
 
+.change-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+/* Throws work away, so it is red, and only appears with the row's other button. */
+.abtn.danger {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.abtn.danger:hover:not(:disabled) {
+  background: var(--red-soft);
+}
+
 .change-blocked {
   flex: none;
   font-family: var(--sans);

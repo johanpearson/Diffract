@@ -16,6 +16,8 @@ interface Props {
   entry: Entry;
   storage: AppHost["storage"];
   onToggleHunk(hunk: Hunk): void;
+  /** Opens the dialog that throws one change of an unstaged row away. */
+  onDiscardHunk(hunk: Hunk): void;
   /** No hunk buttons while an action runs, or until an in-use worktree's warning is accepted. */
   locked: boolean;
 }
@@ -24,18 +26,19 @@ interface Props {
  * One row's diff: the index against the worktree for an unstaged row, HEAD against the index for a staged one. Each
  * change has its own Stage hunk or Unstage hunk button. A new or deleted file is one change, staged as a file.
  */
-export function ChangesDiff({ client, repoId, status, entry, storage, onToggleHunk, locked }: Props) {
+export function ChangesDiff({ client, repoId, status, entry, storage, onToggleHunk, onDiscardHunk, locked }: Props) {
   const [layout, setLayout] = useStoredLayout(storage);
   const [view, setView] = useState<FileView | null>(null);
   const state = useChangesFile(client, repoId, status, entry);
-  const shown = useShown(state, entry, locked, onToggleHunk);
+  const handlers = useMemo(() => ({ toggle: onToggleHunk, discard: onDiscardHunk }), [onToggleHunk, onDiscardHunk]);
+  const shown = useShown(state, entry, locked, handlers);
 
   return (
     <section className="diff-pane" aria-label={`Diff of ${entry.file.path}`}>
       <div className="diff-bar">
         <DiffTitle entry={entry} />
         <span className="grow" />
-        {shown.hunks.length > 0 && <HunkBar key={entry.key} hunks={shown.hunks} side={entry.side} view={view} onToggle={onToggleHunk} locked={locked} />}
+        {shown.hunks.length > 0 && <HunkBar key={entry.key} hunks={shown.hunks} side={entry.side} view={view} onToggle={onToggleHunk} onDiscard={onDiscardHunk} locked={locked} />}
         {shown.twoSides && <DiffTools layout={layout} onLayout={setLayout} view={view} moves={false} />}
       </div>
       {shown.sides ? <MonacoDiff sides={shown.sides} layout={layout} onView={setView} actions={shown.actions} /> : <Message state={state} />}
@@ -44,12 +47,15 @@ export function ChangesDiff({ client, repoId, status, entry, storage, onToggleHu
 }
 
 /** What the diff shows once the file is read: its sides, its changes, and a button above each. */
-function useShown(state: FileState, entry: Entry, locked: boolean, onToggleHunk: (hunk: Hunk) => void) {
+function useShown(state: FileState, entry: Entry, locked: boolean, handlers: { toggle(hunk: Hunk): void; discard(hunk: Hunk): void }) {
   const ready = state.kind === "ready" ? state : null;
   const path = entry.file.path;
   const sides = useMemo(() => (ready ? { path, original: ready.original, modified: ready.modified } : null), [ready, path]);
   const hunks = ready?.hunks ?? noHunks;
-  const actions = useMemo(() => (locked ? [] : hunkActions(hunks, entry.side, onToggleHunk)), [hunks, locked, entry.side, onToggleHunk]);
+  const actions = useMemo(
+    () => (locked ? [] : hunkActions(hunks, entry.side, handlers.toggle, handlers.discard)),
+    [hunks, locked, entry.side, handlers],
+  );
   return { sides, hunks, actions, twoSides: sides?.original != null && sides.modified != null };
 }
 
@@ -71,6 +77,7 @@ interface HunkBarProps {
   side: Side;
   view: FileView | null;
   onToggle(hunk: Hunk): void;
+  onDiscard(hunk: Hunk): void;
   locked: boolean;
 }
 
@@ -78,7 +85,7 @@ interface HunkBarProps {
  * The changes of the file one at a time, for the keyboard and for screen readers, which cannot reach the buttons in
  * the diff itself. Moving to a change scrolls the diff to it.
  */
-function HunkBar({ hunks, side, view, onToggle, locked }: HunkBarProps) {
+function HunkBar({ hunks, side, view, onToggle, onDiscard, locked }: HunkBarProps) {
   const [chosen, setChosen] = useState(0);
   const index = Math.min(chosen, hunks.length - 1);
   const hunk = hunks[index]!;
@@ -100,6 +107,11 @@ function HunkBar({ hunks, side, view, onToggle, locked }: HunkBarProps) {
       <button className="abtn small" disabled={locked} onClick={() => onToggle(hunk)}>
         {verbOf(side)} this change
       </button>
+      {side === "unstaged" && (
+        <button className="abtn small danger" disabled={locked} onClick={() => onDiscard(hunk)}>
+          Discard this change
+        </button>
+      )}
     </div>
   );
 }

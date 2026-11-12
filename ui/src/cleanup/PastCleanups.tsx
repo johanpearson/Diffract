@@ -19,6 +19,7 @@ const nouns: Record<LeftoverKind, [string, string]> = {
   OrphanedCommit: ["orphaned commit row", "orphaned commit rows"],
   BackupTag: ["backup tag", "backup tags"],
   LeftoverFolder: ["folder", "folders"],
+  DiscardedChange: ["discarded change", "discarded changes"],
 };
 
 /**

@@ -13,6 +13,8 @@ public class ChangesPolicyTests
         "rm --cached -q --pathspec-from-file=- --pathspec-file-nul",
         "apply --cached --unidiff-zero -",
         "apply --cached --unidiff-zero --reverse -",
+        "restore --worktree --pathspec-from-file=- --pathspec-file-nul",
+        "apply --unidiff-zero --reverse -",
         "commit -F -",
         "commit --amend -F -",
         "fetch origin",
@@ -97,7 +99,14 @@ public class ChangesPolicyTests
     [InlineData("stash store -m message 0123456789abcdef0123456789abcdef01234567")]
     [InlineData("restore file.txt")]
     [InlineData("restore --staged --worktree --pathspec-from-file=- --pathspec-file-nul")]
-    [InlineData("restore --worktree --pathspec-from-file=- --pathspec-file-nul")]
+    // Discarding is only from the index, for the files given on standard input, or one reversed patch.
+    [InlineData("restore --worktree file.txt")]
+    [InlineData("restore --worktree --source=HEAD --pathspec-from-file=- --pathspec-file-nul")]
+    [InlineData("restore --worktree --staged --pathspec-from-file=- --pathspec-file-nul")]
+    [InlineData("restore --pathspec-from-file=- --pathspec-file-nul")]
+    [InlineData("apply --reverse -")]
+    [InlineData("apply --unidiff-zero --reverse patch.diff")]
+    [InlineData("apply --unidiff-zero --reverse --3way -")]
     [InlineData("rebase main")]
     [InlineData("merge main")]
     [InlineData("merge --ff-only -s ours main")]

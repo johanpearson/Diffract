@@ -1,5 +1,6 @@
 using System.Text;
 using Diffract.Git;
+using Diffract.Leftovers.Cleanup;
 using Diffract.Sidecar.Rpc;
 
 namespace Diffract.Sidecar;
@@ -21,9 +22,32 @@ internal static class Program
         // The real git, not Git for Windows' launcher, which costs a second process start on every call. Found again
         // when an update of Git for Windows moves it.
         var runnerOptions = new GitRunnerOptions { Locator = GitLocator.ForThisMachine() };
-        using var methods = new SidecarMethods(runnerOptions, new SidecarDependencies { Notify = (method, parameters) => host!.NotifyAsync(method, parameters), Log = Console.Error });
-        host = new RpcHost(input, output, methods.Dispatch, Console.Error);
-        await host.RunAsync(CancellationToken.None);
-        return 0;
+        // The copies of discarded files last until Diffract closes: cleared now, in case the last run crashed, and on exit.
+        var copies = DiscardBackups.Default;
+        ClearCopies(copies);
+        try
+        {
+            using var methods = new SidecarMethods(runnerOptions, new SidecarDependencies { Notify = (method, parameters) => host!.NotifyAsync(method, parameters), Log = Console.Error, DiscardBackups = copies });
+            host = new RpcHost(input, output, methods.Dispatch, Console.Error);
+            await host.RunAsync(CancellationToken.None);
+            return 0;
+        }
+        finally
+        {
+            ClearCopies(copies);
+        }
+    }
+
+    /// <summary>A copy another program holds open stays until the next start. That must never stop Diffract.</summary>
+    private static void ClearCopies(DiscardBackups copies)
+    {
+        try
+        {
+            copies.Clear();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"Could not remove the copies of discarded files: {e.Message}");
+        }
     }
 }

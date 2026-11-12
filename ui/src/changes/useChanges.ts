@@ -26,6 +26,10 @@ export interface Changes {
   stash(message: string, includeUntracked: boolean): Promise<boolean>;
   /** Shows a status that arrived with another answer, such as a pull's. */
   apply(status: WorktreeChanges): void;
+  /** Reads the changes again, after something that changed files without answering with a status, such as a discard. */
+  reload(): void;
+  /** Shows why an action that is not one of these could not start. */
+  fail(message: string): void;
 }
 
 /**
@@ -94,6 +98,8 @@ export function useChanges(client: RpcClient, repoId: string, worktree: string):
     commit,
     stash,
     apply,
+    reload: read,
+    fail: setProblem,
   };
 }
 

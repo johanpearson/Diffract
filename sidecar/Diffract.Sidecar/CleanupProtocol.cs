@@ -32,5 +32,5 @@ internal sealed record LeftoverPlanView(LeftoverKind Kind, string Name, string? 
 /// <param name="Optional">Has its own checkbox, ticked by default. Its place can be sent in <c>leaveOut</c>.</param>
 internal sealed record StepView(StepKind Kind, string Description, bool Undoable, string? UndoNote, bool Optional)
 {
-    public static StepView Of(CleanupStep step) => new(step.Kind, step.Description, step.Undo is not null, step.UndoNote, step.Optional);
+    public static StepView Of(CleanupStep step) => new(step.Kind, step.Description, step.CanUndo, step.UndoNote, step.Optional);
 }

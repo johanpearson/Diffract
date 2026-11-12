@@ -36,3 +36,9 @@ internal sealed record CleanupPlanStashParams(string? RepoId, string? Commit);
 
 /// <summary>The params of <c>cleanup.planPrune</c>: the remote whose vanished branches to remove here.</summary>
 internal sealed record CleanupPlanPruneParams(string? RepoId, string? Remote);
+
+/// <summary>
+/// The params of <c>cleanup.planDiscard</c>: the unstaged changes to throw away in one worktree, either whole files or
+/// one hunk. Never both.
+/// </summary>
+internal sealed record CleanupPlanDiscardParams(string? RepoId, string? Worktree, IReadOnlyList<string>? Paths, ChangesHunkParams? Hunk);

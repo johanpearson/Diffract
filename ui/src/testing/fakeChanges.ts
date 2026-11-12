@@ -96,6 +96,39 @@ export class FakeWorktree {
     return this.update((f) => (f.path === path ? { ...f, [to]: f[to] ?? "Modified", [from]: left.length === 0 ? null : f[from] } : f));
   }
 
+  /**
+   * Throws the unstaged side of these files away: a new file goes, a tracked one keeps what is staged. Answers with what
+   * puts everything back, as Undo does. Nothing is thrown away for a path with nothing unstaged.
+   */
+  discard(paths: readonly string[]): () => void {
+    const back = this.snapshot();
+    this.update((f) => (paths.includes(f.path) && f.unstaged !== null ? { ...f, unstaged: null } : f));
+    for (const path of paths) this.diffs.delete(`unstaged:${path}`);
+    return back;
+  }
+
+  /** As `discard`, for one hunk, or as the sidecar answers when the file changed since its diff was read. */
+  discardHunk(path: string, id: string): () => void {
+    const source = this.diffs.get(`unstaged:${path}`);
+    if (!source?.hunks.some((h) => h.id === id)) throw error(-32007, `${path} changed since it was shown, so nothing was staged or unstaged. Look at it again.`, "ChangedSinceShown");
+    const back = this.snapshot();
+    const left = source.hunks.filter((h) => h.id !== id);
+    this.diffs.set(`unstaged:${path}`, { ...source, hunks: left });
+    this.update((f) => (f.path === path && left.length === 0 ? { ...f, unstaged: null } : f));
+    return back;
+  }
+
+  /** The status and diffs as they are now, and a function that puts them back. */
+  private snapshot(): () => void {
+    const status = this.status;
+    const diffs = new Map(this.diffs);
+    return () => {
+      this.status = status;
+      this.diffs.clear();
+      for (const [key, diff] of diffs) this.diffs.set(key, diff);
+    };
+  }
+
   commit(message: string, amend: boolean): WorktreeChanges {
     if (!amend && !this.status.files.some((f) => f.staged !== null)) throw error(-32008, "Nothing is staged, so there is nothing to commit.", "CommitRefused");
     this.commits.push({ message, amend });

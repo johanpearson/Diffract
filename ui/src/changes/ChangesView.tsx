@@ -11,6 +11,8 @@ import { FileLists } from "./FileLists";
 import { BranchInfo } from "../components/BranchInfo";
 import { useCommands } from "../commands/Commands";
 import { useChanges } from "./useChanges";
+import { useDiscard } from "./useDiscard";
+import { DiscardDialog } from "./DiscardDialog";
 
 interface Props {
   client: RpcClient;
@@ -67,6 +69,9 @@ function useChangesModel(client: RpcClient, state: RepoState, worktree: string) 
   const { toggleHunk } = changes;
   const entry = selection.entry;
   const onToggleHunk = useCallback((hunk: Hunk) => entry && toggleHunk(entry, hunk), [entry, toggleHunk]);
+  const discard = useDiscard({ client, repoId: state.repoId, worktree, reload: changes.reload, fail: changes.fail });
+  const { hunk: discardHunk } = discard;
+  const onDiscardHunk = useCallback((hunk: Hunk) => entry && discardHunk(entry, hunk), [entry, discardHunk]);
   const warning = accepted ? null : inUse;
   return {
     client,
@@ -75,6 +80,8 @@ function useChangesModel(client: RpcClient, state: RepoState, worktree: string) 
     lists,
     selection,
     onToggleHunk,
+    onDiscardHunk,
+    discard,
     warning,
     accept: () => setAccepted(true),
     // A pull moves the branch and the index, so nothing is staged or committed while it runs.
@@ -97,16 +104,27 @@ function ChangesMain({ model, status, lists, storage }: { model: Model; status: 
           onSelect={selection.select}
           onToggle={(e) => (e.side === "unstaged" ? changes.stage([e]) : changes.unstage([e]))}
           onStageAll={() => changes.stage(lists.unstaged.filter((e) => e.blocked === null))}
+          onDiscard={(e) => model.discard.files([e])}
           locked={locked}
         />
         <CommitBox status={status} stagedCount={lists.staged.length} locked={locked} onCommit={changes.commit} onStash={changes.stash} />
       </div>
       <Splitter label="Resize file lists" orientation="vertical" spec={ListsWidth} size={width} onSize={setWidth} growsForward />
       {entry ? (
-        <ChangesDiff client={model.client} repoId={model.repoId} status={status} entry={entry} storage={storage} onToggleHunk={model.onToggleHunk} locked={locked} />
+        <ChangesDiff
+          client={model.client}
+          repoId={model.repoId}
+          status={status}
+          entry={entry}
+          storage={storage}
+          onToggleHunk={model.onToggleHunk}
+          onDiscardHunk={model.onDiscardHunk}
+          locked={locked}
+        />
       ) : (
         <p className="empty">{lists.unstaged.length + lists.staged.length === 0 ? "Nothing has changed in this worktree." : "Select a file to see its changes."}</p>
       )}
+      {model.discard.plan && <DiscardDialog plan={model.discard.plan} onConfirm={model.discard.confirm} onCancel={model.discard.cancel} />}
     </div>
   );
 }

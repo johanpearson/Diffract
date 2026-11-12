@@ -1,0 +1,24 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "planId": "2d7f0a9c4e81",
+    "leftovers": [
+      {
+        "kind": "DiscardedChange",
+        "name": "src/räksmörgås.cs",
+        "path": "C:\\src\\shop\\.claude\\worktrees\\räksmörgås fix\\src\\räksmörgås.cs",
+        "refused": null,
+        "steps": [
+          {
+            "kind": "DiscardChanges",
+            "description": "Discard the change at line 12 (replaces your 2 lines with 1 line) in src/räksmörgås.cs",
+            "undoable": true,
+            "undoNote": "Undo puts the file back as it is now, for as long as Diffract stays open.",
+            "optional": false
+          }
+        ]
+      }
+    ]
+  }
+}

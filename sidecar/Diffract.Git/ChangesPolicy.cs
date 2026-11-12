@@ -3,7 +3,8 @@ namespace Diffract.Git;
 /// <summary>
 /// The changes Diffract makes to a repo on the user's behalf, as exact command shapes. Anything else is rejected
 /// before a process starts: other subcommands, other options, reads, and values that git could take as an option,
-/// a forced refspec or a deletion. Nothing on the list forces, skips hooks or throws a change away.
+/// a forced refspec or a deletion. Nothing on the list forces or skips hooks. Only the two discard shapes throw a
+/// change away, and the discard runs only after Diffract has copied the file.
 /// </summary>
 public static class ChangesPolicy
 {
@@ -31,6 +32,10 @@ public static class ChangesPolicy
         ["rm", "--cached", "-q", "--pathspec-from-file=-", "--pathspec-file-nul"],
         ["apply", "--cached", "--unidiff-zero", "-"],
         ["apply", "--cached", "--unidiff-zero", "--reverse", "-"],
+        // Discarding: the working tree file goes back to the index, or one hunk of it is reversed. Both throw work away,
+        // so Diffract keeps a copy of the file first (docs/findings/discard.md).
+        ["restore", "--worktree", "--pathspec-from-file=-", "--pathspec-file-nul"],
+        ["apply", "--unidiff-zero", "--reverse", "-"],
         ["commit", "-F", "-"],
         ["commit", "--amend", "-F", "-"],
         ["fetch", RemoteSlot],

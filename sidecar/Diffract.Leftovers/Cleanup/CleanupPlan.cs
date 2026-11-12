@@ -30,6 +30,12 @@ public enum StepKind
     /// then <see cref="CleanupStep.Keep"/> tags it. Nothing is removed. One orphaned commit is a plain <see cref="Backup"/>.
     /// </summary>
     KeepCommits,
+
+    /// <summary>
+    /// Throws a file's unstaged changes away, or one hunk of them, after Diffract copies the file. Not a plain git
+    /// command, so the step has <see cref="CleanupStep.Discard"/> instead, and undo writes the copy back.
+    /// </summary>
+    DiscardChanges,
 }
 
 /// <summary>The backup tag a <see cref="StepKind.KeepCommits"/> step puts on the commit it made.</summary>
@@ -50,8 +56,15 @@ public sealed record KeepTag(string Name, string Message);
 [JsonDerivedType(typeof(PathAbsent), "pathAbsent")]
 [JsonDerivedType(typeof(StashPresent), "stashPresent")]
 [JsonDerivedType(typeof(StashAbsent), "stashAbsent")]
+[JsonDerivedType(typeof(FileIs), "fileIs")]
 public abstract record Expectation
 {
+    /// <summary>
+    /// A file in a worktree has exactly these bytes, by SHA-256, or is not there when the hash is null. A discard expects
+    /// the file as the dialog showed it, so it can only throw away what the user saw.
+    /// </summary>
+    public sealed record FileIs(string Worktree, string Path, string? Hash) : Expectation;
+
     /// <summary>A ref still holds this object.</summary>
     public sealed record RefAt(string FullName, string ObjectId) : Expectation;
 
@@ -113,6 +126,12 @@ public sealed record CleanupStep
 
     /// <summary>The tag a <see cref="StepKind.KeepCommits"/> step puts on the commit its command makes.</summary>
     public KeepTag? Keep { get; init; }
+
+    /// <summary>The file a <see cref="StepKind.DiscardChanges"/> step throws changes away from.</summary>
+    public DiscardWork? Discard { get; init; }
+
+    /// <summary>Something takes the step back: a git command, or for a discard, the copy of the file.</summary>
+    public bool CanUndo => Undo is not null || Discard is not null;
 }
 
 /// <summary>The steps for one leftover, in order, or why there are none.</summary>
